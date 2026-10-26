@@ -20,5 +20,5 @@ class TestExecutiveBrand(unittest.TestCase):
             apply_brand([{"fx":"slow-push","start":0,"end":1}],"unknown")
     def test_no_inherited_creator_defaults(self):
         s=(ROOT/"scripts/fx.py").read_text(encoding="utf8")
-        for forbidden in ["'CLAUDE'","'VIBE'","@vibha.in.progress","22 effects"]:
+        for forbidden in ["'CLAUDE'","'VIBE'","@vibha.in.progress","22 effects","the art of the|effortless edit"]:
             self.assertNotIn(forbidden,s)

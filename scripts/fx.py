@@ -789,11 +789,11 @@ def glass_widgets_v1(c, e):
     bw, bh = W * 0.37, W * 0.15; bx = W - mg - bw / 2
     b = glass(c, bw, bh, bh * 0.28, bx, y_top + bh / 2, amt=0.14, dark=gd); d = ImageDraw.Draw(b)
     d.ellipse([bh * 0.17, bh * 0.2, bh * 0.17 + bh * 0.11, bh * 0.31], fill=(255, 69, 58, 255))
-    d.text((bh * 0.36, bh * 0.255), 'Rendering', font=font('uim', bh * 0.19), fill=(255, 255, 255, 240), anchor='lm')
+    d.text((bh * 0.36, bh * 0.255), e.o.get('bar_title', 'Execution plan'), font=font('uim', bh * 0.19), fill=(255, 255, 255, 240), anchor='lm')
     p = ease_inout(c.lt / max(0.3, e.d * 0.85))
     d.rounded_rectangle([bh * 0.17, bh * 0.5, bw - bh * 0.17, bh * 0.6], bh * 0.05, fill=(255, 255, 255, 70))
     d.rounded_rectangle([bh * 0.17, bh * 0.5, bh * 0.17 + (bw - bh * 0.34) * max(0.04, p), bh * 0.6], bh * 0.05, fill=(255, 255, 255, 245))
-    d.text((bh * 0.17, bh * 0.78), f"{e.o.get('label', 'glass UI')}  ·  {int(p * 100)}%", font=font('uim', bh * 0.14), fill=(255, 255, 255, 210), anchor='lm')
+    d.text((bh * 0.17, bh * 0.78), e.o.get('label', 'Strategy roadmap'), font=font('uim', bh * 0.14), fill=(255, 255, 255, 210), anchor='lm')
     place(c, b, bx, y_top + bh / 2, 0.6 + 0.4 * pop(c, 0.12), 0, al * clamp((c.lt - 0.12) / 0.1), behind=True)
     cy2 = y_top + bh + mg * 0.45 + bh / 2
     g = glass(c, bw, bh, bh * 0.28, bx, cy2, amt=0.14, dark=gd); d = ImageDraw.Draw(g)
@@ -1764,11 +1764,11 @@ def cover_editorial(c, e):
     m = cached(e, 'm', mast)
     s = 1.05 - 0.05 * ease_out(c.lt / 0.5)
     place(c, m, W / 2, H * 0.085 + m.height / 2, s, 0, al * k, behind=True)
-    iss = cached(e, 'i', lambda: tracked(e.o.get('issue', 'THE ONE-CLIP ISSUE  ·  NO. 42  ·  OCTOBER 2026'), int(W * 0.022), 'ui', ink, W * 0.006))
+    iss = cached(e, 'i', lambda: tracked(e.o.get('issue', 'SWARAG  ·  EXECUTIVE EDITION'), int(W * 0.022), 'ui', ink, W * 0.006))
     place(c, iss, W / 2, H * 0.075, alpha=al * k, behind=True)
     rule = cached(e, 'r', lambda: rrect(W * 0.86, max(3, W // 600), 1, ink + (255,)))
     place(c, rule, W / 2, H * 0.087 + m.height, alpha=al * k * 0.8, behind=True)
-    lines = e.o.get('lines', 'One clip,|42 looks.|NO EDITOR  ·  NO APPS').split('|')
+    lines = [text for text in e.o.get('lines', 'Direction|Delivery|Outcomes').split('|') if text.strip()]
     styles = [('didonei', 0.085, ink), ('didoneb', 0.105, rose), ('ui', 0.03, ink)]
     y = H * float(e.o.get('lines_y', 0.575))
     for j, ln in enumerate(lines):
@@ -1776,7 +1776,7 @@ def cover_editorial(c, e):
         im = cached(e, ('l', j), lambda: (tracked(ln, int(W * sz), kind, col, W * 0.006) if kind == 'ui' else text_img(ln, W * sz, kind, col, glow=(cream, W * 0.012))))
         kj = ease_out((c.lt - 0.2 - 0.1 * j) / 0.35)
         comp(c, im, W * 0.05 - (1 - kj) * W * 0.03, y, al * kj); y += im.height * (0.82 if kind != 'ui' else 1.6)
-    right = e.o.get('right', 'the art of the|effortless edit').split('|')
+    right = [text for text in e.o.get('right', '').split('|') if text.strip()]
     y = H * float(e.o.get('right_y', 0.715))
     for j, ln in enumerate(right):
         im = cached(e, ('r', j), lambda: text_img(ln, W * 0.058, 'didonei', ink, glow=(cream, W * 0.01)))
