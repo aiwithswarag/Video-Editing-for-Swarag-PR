@@ -18,7 +18,7 @@ FONT = {k: os.path.join(ROOT, 'fonts', v) for k, v in {
     'anton': 'Anton-Regular.ttf', 'mont': 'Montserrat.ttf', 'monts': 'Montserrat.ttf', 'montb': 'Montserrat.ttf',
     'didone': 'PlayfairDisplay.ttf', 'didoneb': 'PlayfairDisplay.ttf', 'didonei': 'PlayfairDisplay-Italic.ttf'}.items()}
 WGHT = {'ui': (24, 640), 'uim': (24, 540), 'uib': (32, 860), 'mont': (700,), 'monts': (600,), 'montb': (800,), 'didone': (500,), 'didoneb': (800,), 'didonei': (500,)}  # Inter variable: (optical size, weight)
-CREAM, INK, PEACH, YELLOW = (244, 233, 216), (22, 22, 24), (255, 183, 165), (255, 214, 10)
+CREAM, INK, PEACH, YELLOW = (245, 242, 236), (16, 25, 35), (197, 164, 109), (44, 154, 144)
 NAMES = ['The Noise', 'The Lineup', 'Locked On', 'Orbit', 'Lean-In', 'Backdrop Word', 'Spotlight', 'The Bill',
          'Moody', 'Swipe', 'The To-Do', 'Comment Box', 'The Tap', 'Pause & Point', 'Uninstall', 'Reel Frame',
          'Shortcut Rain', 'Reject Stamp', 'Countdown Flip', 'Rabbit Hole', 'Cover Star', 'Scribble']
@@ -708,7 +708,7 @@ def fx_scribble(c, e):
 # ---------- pack 2: app-style effects (added 21 Oct 2026) ----------
 def pop(c, t0, dur=0.3): return ease_back((c.lt - t0) / dur) if c.lt > t0 else 0.0
 def fade(c, e, t=0.2): return clamp((e.d - c.lt) / t)
-GREEN, BLUE, PURPLE, ORANGE, RED = (34, 197, 94), (10, 132, 255), (124, 92, 255), (217, 119, 87), (238, 34, 34)
+GREEN, BLUE, PURPLE, ORANGE, RED = (44, 154, 144), (69, 124, 165), (130, 147, 165), (197, 164, 109), (171, 75, 73)
 
 
 def glass(c, w, h, r, cx, cy, amt=0.22, tint=(255, 255, 255), blur=None, alpha=240, dark=0.0):
