@@ -30,6 +30,7 @@ def main():
     ap.add_argument("--timeout",type=int,default=180)
     ap.add_argument("--brand",choices=["none","executive"],default="none")
     ap.add_argument("--include-variants",action="store_true")
+    ap.add_argument("--render-motion",action="store_true",help="Also render MP4 clips")
     args=ap.parse_args()
     if args.shards<1 or not 0<=args.shard<args.shards:
         ap.error("Invalid shard or shard count")
@@ -46,13 +47,27 @@ def main():
         command=[sys.executable,str(ROOT/"scripts/video_director.py"),"preview",
                  args.video,str(plan),str(image),"--at",str(args.at),"--width",str(args.width),"--brand",str(args.brand)]
         start=time.monotonic()
+        motion=None
         try:
             p=subprocess.run(command,capture_output=True,text=True,timeout=args.timeout)
             ok=p.returncode==0 and image.exists() and image.stat().st_size>1000
             message=(p.stdout+"\n"+p.stderr)[-5000:]
+            if ok and args.render_motion:
+                motion=out/(label+".mp4")
+                video_command=[sys.executable,str(ROOT/"scripts/video_director.py"),"render",
+                               args.video,str(plan),str(motion),"--width","240","--brand",str(args.brand)]
+                q=subprocess.run(video_command,capture_output=True,text=True,timeout=args.timeout)
+                ok=q.returncode==0 and motion.exists() and motion.stat().st_size>1000
+                if ok:
+                    probe=subprocess.run(["ffprobe","-v","error","-show_entries","stream=codec_type",
+                                          "-of","csv=p=0",str(motion)],capture_output=True,text=True)
+                    ok=probe.returncode==0 and "video" in probe.stdout and "audio" in probe.stdout
+                if not ok:
+                    message=(q.stdout+"\n"+q.stderr)[-5000:]+"\nMotion render or A/V verification failed"
         except subprocess.TimeoutExpired:
             ok=False;message="Timed out"
         statuses.append({"effect":label,"ok":ok,"preview":image.name if ok else None,
+                         "motion":motion.name if args.render_motion and ok else None,
                          "elapsed_seconds":round(time.monotonic()-start,2),
                          "log":message if not ok else ""})
         print(f"{'PASS' if ok else 'FAIL'} {label} ({statuses[-1]['elapsed_seconds']}s)",flush=True)

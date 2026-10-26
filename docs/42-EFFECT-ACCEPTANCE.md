@@ -6,10 +6,10 @@ The 42 names are pinned in `skills/video-director/references/effects-manifest.js
 ## Automated evidence
 - Unit test reads actual renderer Python AST to verify all 42 effects exist.
 - All aliases and named looks are extracted dynamically from the engine.
-- 42 independent PNG renders plus 5 named-look renders run across six GitHub Actions jobs.
+- 42 independent PNG and MP4 motion renders plus 5 named-look variants run across six GitHub Actions jobs.
 - Each render writes its own JSON plan, preview and machine-readable success/failure record.
 - A failure makes the job red; no suppressed errors.
-- Synthetic video rendering detects crashes and missing dependencies, **not** visual correctness.
+- Synthetic video rendering detects crashes and some animation-time faults, but **not** realistic human segmentation or editorial quality.
 
 ## Human approval gates
 - Inspect each of 47 PNG frames for face clipping, text truncation, missing typography, misplaced layers, invented values, downstream branding, colour consistency and readability.

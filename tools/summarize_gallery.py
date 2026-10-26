@@ -21,13 +21,20 @@ def main():
         if image.stem in png_by_stem:
             raise SystemExit(f"Duplicate gallery preview: {image.stem}")
         png_by_stem[image.stem]=image
+    motion=list(root.rglob("*.mp4"))
+    clips_by_stem={}
+    for clip in motion:
+        if clip.stem in clips_by_stem:
+            raise SystemExit(f"Duplicate motion clip: {clip.stem}")
+        clips_by_stem[clip.stem]=clip
+    missing_motion=sorted(expected-set(clips_by_stem))
     missing=sorted(expected-set(png_by_stem))
     unexpected=sorted(set(png_by_stem)-expected)
     runs=list(root.rglob("results.json"))
     results=[r for path in runs for r in json.loads(path.read_text(encoding="utf8"))]
     failed=[r["effect"] for r in results if not r["ok"]]
-    if missing or unexpected or failed or len(results)!=len(expected):
-        raise SystemExit(f"Coverage error: missing={missing}, extra={unexpected}, failed={failed}, results={len(results)} expected={len(expected)}")
+    if missing or missing_motion or unexpected or failed or len(results)!=len(expected):
+        raise SystemExit(f"Coverage error: previews={missing}, motions={missing_motion}, extra={unexpected}, failed={failed}, results={len(results)} expected={len(expected)}")
     ordered=list(names)+[label for label,_,_ in NAMED_VARIANTS]
     cols=6;cellw=205;cellh=390;rows=(len(ordered)+cols-1)//cols
     sheet=Image.new("RGB",(cols*cellw,rows*cellh),(239,240,242))
@@ -40,7 +47,7 @@ def main():
         sheet.paste(original,(x,y))
         dr.text(((i%cols)*cellw+6,(i//cols)*cellh+5),name,fill=(18,25,33))
     sheet.save(output/"all-47-effects.jpg",quality=86)
-    report={"registered_effects":42,"named_looks":5,"rendered_previews":len(results),
+    report={"registered_effects":42,"named_looks":5,"rendered_previews":len(results),"rendered_motion_clips":len(clips_by_stem),
             "missing":[],"duplicates":[],"failed":[],"visual_review":"NOT YET APPROVED"}
     (output/"coverage-report.json").write_text(json.dumps(report,indent=2),encoding="utf8")
     print(json.dumps(report))
