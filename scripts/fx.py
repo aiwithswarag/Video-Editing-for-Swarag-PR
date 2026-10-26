@@ -1985,6 +1985,7 @@ def main():
             m, f = trk(fr_, int(t * 1000)); masks[i] = m; faces.append(f)
         else:
             faces.append(None); trk.prev = None
+    trk.seg.close()  # release native MediaPipe resources before interpreter shutdown
     sm = smooth(faces, fps)
     if sm is None: sm = np.tile([aw / 2, ah * 0.33, aw * 0.15], (len(faces), 1))
     for f in fxs:
