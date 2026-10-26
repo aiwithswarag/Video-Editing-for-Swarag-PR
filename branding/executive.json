@@ -1,0 +1,26 @@
+{
+  "name": "Swarag Executive",
+  "palette": {
+    "ink": "#101923",
+    "navy": "#17283E",
+    "ivory": "#F5F2EC",
+    "slate": "#8293A5",
+    "teal": "#2C9A90",
+    "gold": "#C5A46D"
+  },
+  "typography": {
+    "primary": "Inter",
+    "editorial": "Instrument Serif"
+  },
+  "motion": "restrained",
+  "watermark": false,
+  "recommended": [
+    "slow-push",
+    "headline-box",
+    "moody",
+    "todo",
+    "spotlight",
+    "glass-widgets",
+    "liquid-glass-graph"
+  ]
+}

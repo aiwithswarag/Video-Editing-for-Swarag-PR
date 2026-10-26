@@ -1,0 +1,29 @@
+{
+  "effects": [
+    {
+      "fx": "slow-push",
+      "start": 0,
+      "end": 3,
+      "zoom": 1.12
+    },
+    {
+      "fx": "headline-box",
+      "start": 3,
+      "end": 6,
+      "text": "Strategy|meets execution"
+    },
+    {
+      "fx": "todo",
+      "start": 7,
+      "end": 12,
+      "title": "AI implementation",
+      "text": "Ownership|Governance|Measurable ROI"
+    },
+    {
+      "fx": "moody",
+      "start": 13,
+      "end": 17,
+      "grade": "cool"
+    }
+  ]
+}
