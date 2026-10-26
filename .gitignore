@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+fonts/
+models/
+*.mp4
+*.mov
+*.m4v
+*.webm
+*.words.json
+.DS_Store
