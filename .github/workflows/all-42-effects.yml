@@ -1,0 +1,57 @@
+name: 42 Effect Render Matrix
+on:
+  push:
+    paths:
+      - 'scripts/**'
+      - 'tools/**'
+      - 'tests/**'
+      - 'skills/video-director/references/**'
+      - '.github/workflows/all-42-effects.yml'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'tools/**'
+      - 'tests/**'
+      - 'skills/video-director/references/**'
+      - '.github/workflows/all-42-effects.yml'
+jobs:
+  registry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests -v
+      - run: python scripts/video_director.py list
+  render-all-effects:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install FFmpeg and MediaPipe Linux libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg libgles2 libegl1 libgl1 libglib2.0-0
+      - run: python -m pip install -r requirements.txt
+      - run: python tools/download_assets.py
+      - name: Create small video with audio
+        run: |
+          ffmpeg -hide_banner -loglevel error -y -f lavfi -i 'testsrc2=size=360x640:rate=8:duration=2' -f lavfi -i 'sine=frequency=440:sample_rate=16000:duration=2' -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest sample.mp4
+      - name: Render each effect independently
+        run: |
+          python tools/render_effect_gallery.py --video sample.mp4 --output-dir gallery --width 360 --at 0.95 --shard ${{ matrix.shard }} --shards 6 --include-variants
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: effects-shard-${{ matrix.shard }}
+          path: gallery/
+          if-no-files-found: ignore
+          retention-days: 14
