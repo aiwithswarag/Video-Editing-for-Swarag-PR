@@ -1,19 +1,7 @@
 name: 42 Effect Render Matrix
 on:
-  push:
-    paths:
-      - 'scripts/**'
-      - 'tools/**'
-      - 'tests/**'
-      - 'skills/video-director/references/**'
-      - '.github/workflows/all-42-effects.yml'
   pull_request:
-    paths:
-      - 'scripts/**'
-      - 'tools/**'
-      - 'tests/**'
-      - 'skills/video-director/references/**'
-      - '.github/workflows/all-42-effects.yml'
+  workflow_dispatch:
 jobs:
   registry:
     runs-on: ubuntu-latest
@@ -45,9 +33,9 @@ jobs:
       - name: Create small video with audio
         run: |
           ffmpeg -hide_banner -loglevel error -y -f lavfi -i 'testsrc2=size=360x640:rate=8:duration=2' -f lavfi -i 'sine=frequency=440:sample_rate=16000:duration=2' -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest sample.mp4
-      - name: Render each effect independently
+      - name: Render each original effect independently
         run: |
-          python tools/render_effect_gallery.py --video sample.mp4 --output-dir gallery --width 360 --at 0.95 --shard ${{ matrix.shard }} --shards 6 --include-variants
+          python tools/render_effect_gallery.py --video sample.mp4 --output-dir gallery --width 360 --at 0.95 --shard ${{ matrix.shard }} --shards 6 --include-variants --brand none
       - uses: actions/upload-artifact@v4
         if: always()
         with:

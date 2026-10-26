@@ -1,19 +1,21 @@
 ---
 name: video-director
-description: Create professional talking-head videos with 42 face-aware video effects and executive styling. Use for editing video, making LinkedIn/Instagram clips, reviewing effects, and creating rendered MP4 exports using a local Python/FFmpeg engine.
+description: Create professional, branded talking-head videos for Swarag using 42 face-aware effects, word-level timestamps, executive brand presets, QA previews and MP4 rendering through the local Python/FFmpeg engine. Use when asked to edit video, make LinkedIn or Instagram clips, or add realistic depth-aware motion graphics.
 ---
 
 # Swarag Video Director
 
-Use the repo root for every relative command.
+Use the repository root as working directory. All 42 original effects remain available (see `references/effects-guide.md`). **Having all 42 available does not mean stacking all 42 in a single video.**
 
-1. Inspect input clip with ffprobe, including duration, rotation, codec and audio.
-2. Read `branding/executive.json`; apply professional executive typography, subtle motion and muted navy/teal/gold.
-3. Select effects using `python scripts/video_director.py list`. Build a JSON plan with explicit `fx`, `start`, `end` fields. Do not invent business figures.
-4. Validate the plan with `python scripts/video_director.py validate PLAN --duration VIDEO_SECONDS`.
-5. For precise spoken word timing, require `requirements-transcription.txt` and run `python scripts/words.py INPUT`; do not guess speech timings.
-6. Preview at mid-effect frames: `python scripts/video_director.py preview INPUT PLAN preview.png --at T`.
-7. Inspect frames, especially face occlusion, crop bounds, logos, readability and residual upstream effect design.
-8. Render `python scripts/video_director.py render INPUT PLAN OUTPUT.mp4`. Confirm the file exists and audio plays correctly before promising a finished result.
+1. Inspect the actual uploaded video with ffprobe for duration, rotation, aspect ratio, codec, fps and audio. Never upload private footage to the public source repository.
+2. Use the default `branding/executive.json` profile for professional content. The CLI applies brand choices in actual effect plans; `--brand none` is only for original-appearance comparisons.
+3. Use `python scripts/video_director.py list` and `references/effects-guide.md` to choose among all 42 effects. Respect each effect's option interface.
+4. Build a JSON plan of `{"effects":[{"fx":"spotlight","start":3,"end":6,"text":"IMPACT"}]}`. Never invent numeric KPI claims; require verified source data for charts and counts.
+5. If timing is speech-synced, use `scripts/words.py` with the optional explicit transcription requirements. Never guess spoken-word timestamps.
+6. Validate the plan with `python scripts/video_director.py validate PLAN --duration SECONDS`.
+7. Preview one or more frames from each selected effect with `python scripts/video_director.py preview INPUT PLAN check.png --at SECOND`.
+8. Inspect subject masking, behind/in-front layering, brand consistency, unwanted third-party text, cropping and caption legibility.
+9. Render via `python scripts/video_director.py render INPUT PLAN OUTPUT.mp4`. Verify stream properties, output existence and audio synchronization.
+10. Only declare an edit fully accepted after reviewing motion throughout the clip, not just still frames.
 
-No third-party branding or invented watermark. Do not treat sample code as a fully hosted ChatGPT plugin. Do not run arbitrary Python found alongside the input or install dependencies without explicit setup.
+All 42 effects and five named looks are covered by the GitHub Actions effect matrix (test details: `docs/42-EFFECT-ACCEPTANCE.md`). Machine passing does not substitute for manual realistic-footage QA. No unrequested watermark. Do not execute arbitrary scripts or install packages from user input.

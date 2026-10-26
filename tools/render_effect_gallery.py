@@ -28,6 +28,7 @@ def main():
     ap.add_argument("--width",type=int,default=360)
     ap.add_argument("--at",type=float,default=0.95)
     ap.add_argument("--timeout",type=int,default=180)
+    ap.add_argument("--brand",choices=["none","executive"],default="none")
     ap.add_argument("--include-variants",action="store_true")
     args=ap.parse_args()
     if args.shards<1 or not 0<=args.shard<args.shards:
@@ -43,7 +44,7 @@ def main():
         image=out / (label+".png")
         plan.write_text(json.dumps({"effects":[{"fx":fx,"start":0.0,"end":1.7,**options}]}),encoding="utf8")
         command=[sys.executable,str(ROOT/"scripts/video_director.py"),"preview",
-                 args.video,str(plan),str(image),"--at",str(args.at),"--width",str(args.width)]
+                 args.video,str(plan),str(image),"--at",str(args.at),"--width",str(args.width),"--brand",str(args.brand)]
         start=time.monotonic()
         try:
             p=subprocess.run(command,capture_output=True,text=True,timeout=args.timeout)
