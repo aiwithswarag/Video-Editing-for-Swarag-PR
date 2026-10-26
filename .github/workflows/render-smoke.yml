@@ -16,7 +16,7 @@ jobs:
       - name: Install and verify FFmpeg
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg libgles2 libgl1 libglib2.0-0
+          sudo apt-get install -y -qq ffmpeg libgles2 libegl1 libgl1 libglib2.0-0
           command -v ffmpeg
           command -v ffprobe
       - name: Install rendering dependencies
