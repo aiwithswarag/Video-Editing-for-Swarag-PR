@@ -15,7 +15,7 @@ Use the repository root as working directory. All 42 original effects remain ava
 6. Validate the plan with `python scripts/video_director.py validate PLAN --duration SECONDS`.
 7. Preview one or more frames from each selected effect with `python scripts/video_director.py preview INPUT PLAN check.png --at SECOND`.
 8. Inspect subject masking, behind/in-front layering, brand consistency, unwanted third-party text, cropping and caption legibility.
-9. Render via `python scripts/video_director.py render INPUT PLAN OUTPUT.mp4`. Verify stream properties, output existence and audio synchronization.
-10. Only declare an edit fully accepted after reviewing motion throughout the clip, not just still frames.
+9. For short demonstrations, run `python scripts/video_director.py render INPUT PLAN OUTPUT.mp4`. For longer videos, prefer `python scripts/render_chunks.py INPUT PLAN OUTPUT.mp4 --width 540 --fps 15`: it renders each active effect interval with the original engine and assembles the untouched intervals with original audio. This is review quality; use higher settings for production.
+10. Inspect segment transitions for frame duplication/drift, speaker coverage, audio synchronization, and motion throughout the clip. The original runtime is compute-intensive and chunked rendering is a performance tool, not a substitute for QA.
 
 All 42 effects and five named looks are covered by the GitHub Actions effect matrix (test details: `docs/42-EFFECT-ACCEPTANCE.md`). Machine passing does not substitute for manual realistic-footage QA. No unrequested watermark. Do not execute arbitrary scripts or install packages from user input.
