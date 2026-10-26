@@ -12,7 +12,7 @@ ASSETS={
 "models/NOTICE.md":"678dc0cf9a80bcc45da6ce1b0f21ff83512bfda6",
 "fonts/ArchivoBlack-Regular.ttf":"82d07de3b84ed4428f6a302b70f4b555148dfeb0",
 "fonts/InstrumentSerif-Italic.ttf":"192c3eda9864241ad280e9bcc84e258c80a4a588",
-"fonts/SpaceMono-Bold.ttf":"2c4f2682f915d988e7314544ff7c9e38c8b5335",
+"fonts/SpaceMono-Bold.ttf":"2c4f2682f915d988e7314544ff7c9e38c8c7335",
 "fonts/PermanentMarker-Regular.ttf":"3218fc5b3d395c3a3fc207fdf17a27bb32af3242",
 "fonts/Inter.ttf":"047c92f6e2212473dc436020afed689527076d44",
 "fonts/Anton-Regular.ttf":"c7d74558de6454f0f5f095cbde5967aa9a7ac00d",
