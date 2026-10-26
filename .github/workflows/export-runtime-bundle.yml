@@ -1,0 +1,32 @@
+name: Export portable runtime for real-footage QA
+on:
+  push:
+    branches:
+      - test/verify-all-42-effects
+    paths:
+      - '.github/workflows/export-runtime-bundle.yml'
+  workflow_dispatch:
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Download licensed runtime models and fonts
+        run: python tools/download_assets.py
+      - name: Prepare offline-compatible MediaPipe wheel
+        run: |
+          mkdir -p runtime/wheels
+          python -m pip download --no-deps --only-binary=:all: 'mediapipe==0.10.35' -d runtime/wheels
+      - name: Package renderer, configuration, models and notices
+        run: |
+          cp -r scripts tools branding models fonts requirements.txt THIRD_PARTY.md LICENSE-THIRD-PARTY runtime/
+          python -m compileall -q runtime/scripts runtime/tools
+      - uses: actions/upload-artifact@v4
+        with:
+          name: swarag-engine-portable
+          path: runtime/
+          retention-days: 2
