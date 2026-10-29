@@ -64,6 +64,25 @@ class ProductionPipelineSmoke(unittest.TestCase):
             self.assertEqual(3,len(final['platform_copies']))
             for path in final['platform_copies'].values():
                 self.assertTrue(Path(path).is_file())
+    def test_fractional_fps_59_over_2_end_to_end(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);source=root/'fractional.mp4'
+            subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y',
+                '-f','lavfi','-i','testsrc2=size=360x640:rate=59/2:duration=2.1',
+                '-f','lavfi','-i','sine=frequency=440:sample_rate=48000:duration=2.1',
+                '-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p',
+                '-c:a','aac','-shortest',str(source)],check=True)
+            self.assertEqual('59/2',mod.media(source)['fps'])
+            cues=root/'cues.txt';cues.write_text('FX slow-push 0.3 1.2 zoom=1.05\\n')
+            plan=root/'plan.json';mod.prepare(source,cues,plan)
+            final=mod.release(source,plan,root/'out',look='neutral',crf=20,
+                              width=360,frames_per_chunk=90)
+            self.assertEqual('PASS',final['technical_status'])
+            self.assertAlmostEqual(final['output_fps'],29.5,places=2)
+            self.assertEqual(final['qa']['output_media']['frames'],
+                             final['qa']['source_media']['frames'])
+            self.assertEqual(final['original_audio_md5'],final['master_audio_md5'])
+
     def test_refuses_unverified_speech_plan(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
