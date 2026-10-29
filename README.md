@@ -137,6 +137,16 @@ Select cut points from the **verified** audio/scene context; the example frame n
 
 For research-heavy videos, `scripts/research_cards.py` creates a precise, sourced editorial graphic from `examples/world-model-research-cards.json`, with benchmark scope, references and caveats. `scripts/insert_cutaways.py` replaces multiple exact source-frame windows in one pass, copying original AAC audio. Re-verify research wording against primary papers and review the cutaway timing; see `docs/RESEARCH_EDITS.md`.
 
+## Resumable cinematic master for long renders
+
+If a full-length 1080p grade exceeds available compute time, use frame-checked segments and resume safely rather than restarting the entire export:
+
+```bash
+python scripts/resumable_cinematic_master.py PRIVATE/reviewed_edit.mp4 --output-dir PRIVATE/release --look editorial-cinema --crf 18 --chunk-frames 180 --next-chunk
+```
+
+Repeat the command until all chunks are complete; the tool assembles the final MP4, verifies full decode, frame count and unchanged audio, and creates three bit-identical cross-platform copies. This **does not perform transcript verification, editing, visual approval or sound mastering**. See [Resumable Cinematic Master](docs/RESUMABLE_CINEMATIC_MASTER.md).
+
 ## Cinematic camera finish and social exports
 
 Create a restrained natural camera grade (skin, tonal separation, colour balance and detail without fake depth or resolution) and publish a **reviewed** 9:16 MP4 to Instagram, LinkedIn and YouTube Shorts:
