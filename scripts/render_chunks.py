@@ -221,18 +221,26 @@ def main():
         sources = []
         for part in chunks:
             sources += ["-i", str(part)]
-        sources += ["-i", str(args.input)]
         filter_head = "".join(f"[{i}:v]setsar=1,setpts=PTS-STARTPTS[v{i}];"
                               for i in range(len(chunks)))
         filter_tail = "".join(f"[v{i}]" for i in range(len(chunks)))
         filter_graph = (filter_head + filter_tail +
                         f"concat=n={len(chunks)}:v=1:a=0,format=yuv420p[v]")
+        video_only=folder/"assembled_video_only.mp4"
         run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
              *sources, "-filter_complex", filter_graph,
-             "-map", "[v]", "-map", f"{len(chunks)}:a:0?",
+             "-map", "[v]", "-an",
              "-c:v", "libx264", "-preset", "veryfast",
              "-crf", str(args.crf), "-r", fps, "-frames:v",str(total_frames),
-             "-c:a", "copy", "-movflags", "+faststart",str(args.output)])
+             "-movflags", "+faststart",str(video_only)])
+        if frame_count(video_only)!=total_frames:
+            raise RuntimeError("Concatenated picture track changed exact frame count")
+        # Keep audio out of the -frames:v invocation, which can stop AAC stream-copy
+        # before its trailing packet when AAC runs slightly longer than video.
+        run(["ffmpeg","-hide_banner","-loglevel","error","-y",
+             "-i",str(video_only),"-i",str(args.input),
+             "-map","0:v:0","-map","1:a:0?","-c:v","copy","-c:a","copy",
+             "-movflags","+faststart",str(args.output)])
     if not args.output.is_file() or args.output.stat().st_size < 1024:
         raise RuntimeError("Renderer did not produce a valid output file")
     if frame_count(args.output)!=total_frames:
