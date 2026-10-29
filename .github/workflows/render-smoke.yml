@@ -33,6 +33,15 @@ jobs:
         run: python scripts/video_director.py render sample.mp4 smoke-plan.json smoke.mp4 --width 240
       - name: Run chunked renderer with untouched and effect sections
         run: python scripts/render_chunks.py sample.mp4 smoke-plan.json smoke-segmented.mp4 --width 240 --fps 8
+      - name: Regression - Cover Star at minimum preview width
+        run: |
+          python - <<'PY'
+          import json
+          with open('cover-star-plan.json', 'w') as f:
+              json.dump({'effects':[{'fx':'cover-star','start':0,'end':1.7}]}, f)
+          PY
+          python scripts/video_director.py render sample.mp4 cover-star-plan.json cover-star-small.mp4 --width 240
+          test -s cover-star-small.mp4
       - name: Verify streams and duration
         run: |
           test -s smoke.mp4
@@ -48,6 +57,7 @@ jobs:
           path: |
             smoke.mp4
             smoke-segmented.mp4
+            cover-star-small.mp4
             smoke-plan.json
           if-no-files-found: ignore
           retention-days: 7
