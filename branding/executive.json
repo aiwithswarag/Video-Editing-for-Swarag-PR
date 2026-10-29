@@ -22,5 +22,47 @@
     "spotlight",
     "glass-widgets",
     "liquid-glass-graph"
-  ]
+  ],
+  "effect_defaults": {
+    "backdrop-word": {
+      "color": "#C5A46D"
+    },
+    "spotlight": {
+      "color": "#2C9A90"
+    },
+    "led-sign": {
+      "color": "#2C9A90"
+    },
+    "moody": {
+      "grade": "cool"
+    },
+    "scribble": {
+      "color": "#2C9A90"
+    },
+    "reject-stamp": {
+      "color": "#C5A46D"
+    },
+    "cover-star": {
+      "look": "editorial",
+      "color": "#F5F2EC",
+      "accent": "#C5A46D"
+    },
+    "glass-widgets": {
+      "look": "simple",
+      "dark": 0.5
+    },
+    "liquid-glass-graph": {
+      "color": "#2C9A90"
+    },
+    "match-cut": {
+      "color": "#2C9A90"
+    },
+    "red-collage": {
+      "color": "#C5A46D"
+    },
+    "orbit": {
+      "brand_cards": true,
+      "labels": "STRATEGY|EXECUTION|GOVERNANCE|AI ADOPTION|OUTCOMES|DELIVERY"
+    }
+  }
 }

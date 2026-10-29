@@ -1,18 +1,18 @@
 {
-  "_note": "Illustrative effects plan for user's 60.7s talking-head clip. Not speech-aligned; inspect previews before release.",
+  "_note": "Personal 60.7s video example: ten original effects, timed by illustration rather than transcript; inspect and confirm all edits before publishing.",
   "effects": [
     {
       "fx": "locked-on",
       "start": 0.4,
       "end": 3.3,
       "text": "SWARAG",
-      "zoom": 1.08
+      "zoom": 1.12
     },
     {
       "fx": "backdrop-word",
       "start": 5,
       "end": 8.2,
-      "text": "PERSPECTIVE",
+      "text": "STRATEGY",
       "color": "#C5A46D"
     },
     {
@@ -20,39 +20,42 @@
       "start": 11,
       "end": 14.4,
       "count": 5,
-      "speed": 0.8,
-      "size": 0.65
+      "speed": 0.55,
+      "size": 0.8
     },
     {
       "fx": "glass-widgets",
       "start": 17,
       "end": 20.5,
       "look": "simple",
-      "title": "Swarag",
+      "title": "SWARAG",
       "text": "AI",
       "sub": "STRATEGY|EXECUTION",
-      "pill": "SWARAG|STUDIO",
-      "grade": "cool"
+      "pill": "STRATEGY | EXECUTION",
+      "grade": "cool",
+      "bar_title": "EXECUTION",
+      "label": "STRATEGY ROADMAP"
     },
     {
       "fx": "spotlight",
       "start": 24,
       "end": 27,
-      "text": "FOCUS",
-      "color": "#2C9A90"
+      "text": "IMPACT",
+      "color": "#2C9A90",
+      "push": 1.03
     },
     {
       "fx": "lean-in",
       "start": 31,
       "end": 32.4,
-      "zoom": 1.18
+      "zoom": 1.14
     },
     {
       "fx": "todo",
       "start": 36,
       "end": 40,
-      "text": "Clear ownership|Defined governance|Real outcomes",
-      "title": "Execution principles"
+      "text": "Clear ownership|Governance|Outcomes",
+      "title": "Execution"
     },
     {
       "fx": "cover-star",
@@ -60,13 +63,17 @@
       "end": 48,
       "look": "editorial",
       "text": "EXECUTION",
-      "lines": "Direction|Discipline|Results"
+      "lines": "",
+      "color": "#101923",
+      "accent": "#C5A46D",
+      "issue": "SWARAG  ·  EXECUTIVE EDITION",
+      "right": ""
     },
     {
       "fx": "slow-push",
       "start": 51,
       "end": 55,
-      "zoom": 1.13
+      "zoom": 1.14
     },
     {
       "fx": "led-sign",

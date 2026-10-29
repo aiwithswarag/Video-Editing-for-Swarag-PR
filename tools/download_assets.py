@@ -19,6 +19,13 @@ ASSETS={
 "fonts/Montserrat.ttf":"c97aca18592834d8706549c279cb8d5ac5d85f69",
 "fonts/PlayfairDisplay.ttf":"7a09eb71f10622fd083134ac9ed46f59b21bee18",
 "fonts/PlayfairDisplay-Italic.ttf":"94fae1f2853dd325b1a3602370780d154ffc8c89",
+"fonts/OFL-Anton.txt":"fa985cd1ce56d84853180b96fca5add88696cbd1",
+"fonts/OFL-ArchivoBlack.txt":"8894736938f94c6c7a81f27501f26151c412fcbc",
+"fonts/OFL-InstrumentSerif.txt":"669ce7917bec662fcf7244d37f49c4277f6fbd73",
+"fonts/OFL-Montserrat.txt":"0249f9ff1c3051079f565a0ad82184bc5c9524b0",
+"fonts/OFL-PlayfairDisplay.txt":"13153890847ba9bde8a852596d1515261156e474",
+"fonts/OFL-SpaceMono.txt":"a72b0a7845bec3214559673ffeba60c816a21841",
+"fonts/LICENSE-PermanentMarker.txt":"d645695673349e3947e8e5ae42332d0ac3164cd7",
 "fonts/OFL-Inter.txt":"21f6aff961064c2e429f570995e446bcdd555422"
 }
 def git_sha(data):

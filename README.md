@@ -17,7 +17,17 @@ A **Codex/ChatGPT-compatible** personal video-editing skill for executive video 
 python scripts/video_director.py validate examples/executive.json --duration 30
 python scripts/video_director.py preview input.mp4 examples/executive.json preview.png --at 4
 python scripts/video_director.py render input.mp4 examples/executive.json output.mp4
+# Recommended for longer clips: process only windows with active effects
+python scripts/render_chunks.py input.mp4 examples/executive.json output.mp4 --width 540 --fps 15
 ```
+
+## Full-length videos and performance
+
+For a real 60-second video with several effects, the original frame-by-frame renderer can be slow. The new `scripts/render_chunks.py` groups overlapping effect windows, composites them with the original 42-effect engine, then joins them with unedited sections using FFmpeg. Original audio is sourced only from the input clip, not stitched across segments.
+
+A first real-footage review used five original effects on a 60.7-second vertical video and preserved the audio-stream checksum after assembly. A dedicated chunked-render smoke test passed locally. **This is an engineering workflow, not yet production acceptance:** time-boundary precision, all effects and platform portability still need testing.
+
+Use `--width 540 --fps 15` for low-cost previews; use the intended source frame rate (within the CLI limits) and larger output width for final rendering. Always check exported A/V sync and any boundary seam.
 
 ## Executive design system
 Use navy #17283E, ink #101923, ivory #F5F2EC, restrained teal #2C9A90 and gold #C5A46D. Prefer legible Inter typography, subtle zooms, minimal charts and verified metrics. Avoid unnecessary stickers, flashing animations, or brand logos. Individual legacy effects have their own graphics; visually review output before publishing.

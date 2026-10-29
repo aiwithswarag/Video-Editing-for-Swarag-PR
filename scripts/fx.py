@@ -212,7 +212,7 @@ def cached(e, key, fn):
     return e.state[key]
 
 
-# ---------- the 22 effects ----------
+# ---------- original effect library (all 42 effects) ----------
 @effect('noise', 'reels pile up behind your head, one every quarter second')
 def fx_noise(c, e):
     cw = int(c.W * float(e.o.get('size', 0.34)))
@@ -220,7 +220,7 @@ def fx_noise(c, e):
         rnd = random.Random(7); n = min(16, max(4, int(e.d / 0.22)))
         return [(rnd.uniform(0.14, 0.86), rnd.uniform(0.12, 0.52), rnd.uniform(-7, 7)) for _ in range(n)]
     pos = cached(e, 'pos', setup)
-    cards = cached(e, 'cards', lambda: [card(vary(im, i) if e.o.get('images') is None else im, cw) for i, im in enumerate(e.cards)])
+    cards = cached(e, 'cards', lambda: [card(im if e.o.get('brand_cards') or e.o.get('images') is not None else vary(im, i), cw) for i, im in enumerate(e.cards)])
     out = clamp((e.d - c.lt) / 0.2)
     for i, (x, y, r) in enumerate(pos):
         t0 = i * 0.22
@@ -299,7 +299,7 @@ def fx_lean_in(c, e):
 
 @effect('backdrop-word', 'a giant word drops in behind you')
 def fx_backdrop_word(c, e):
-    word = e.o.get('text', 'CLAUDE')
+    word = e.o.get('text', 'STRATEGY')
     im = cached(e, 'w', lambda: fit_text(word, c.W * 0.94, e.o.get('font', 'bold'), fill=rgb(e.o.get('color'), CREAM), shadow=10))
     k = ease_back(c.lt / 0.42)
     y_end = c.fy - c.fw * 1.05
@@ -658,13 +658,13 @@ def fx_cover_star(c, e):
     if e.o.get('look') == 'editorial': return cover_editorial(c, e)
     k = ease_out(c.lt / 0.35); al = clamp((e.d - c.lt) / 0.2)
     c.img = c.img * (1 - 0.6 * k) + grade(c.img, 'pop') * 0.6 * k
-    title = e.o.get('text', 'VIBE').upper(); col = rgb(e.o.get('color'), (232, 36, 52))
+    title = e.o.get('text', 'EXECUTION').upper(); col = rgb(e.o.get('color'), (232, 36, 52))
     mast = cached(e, 'm', lambda: fit_text(title, c.W * 0.92, 'bold', 600, fill=col))
     mast_h = min(mast.height, c.H * 0.24)
     place(c, mast, c.W / 2, c.H * 0.035 + mast_h / 2 - (1 - k) * mast_h, mast_h / mast.height, 0, al * k, behind=True)
     iss = cached(e, 'i', lambda: text_img(e.o.get('issue', 'THE AI ISSUE  ·  2026'), c.W * 0.025, 'mono', (255, 255, 255), shadow=3))
     place(c, iss, c.W / 2, c.H * 0.03, alpha=al * k, behind=True)
-    lines = e.o.get('lines', '22 effects|you can steal|no editor|needed').split('|')
+    lines = e.o.get('lines', 'EXECUTIVE VIDEO|CLEAN DESIGN|42 EFFECTS|YOUR OWN STYLE').split('|')
     y = c.H * 0.5
     for j, ln in enumerate(lines):
         big = j == 0
@@ -675,7 +675,7 @@ def fx_cover_star(c, e):
         rnd = random.Random(1); bw, bh = int(c.W * 0.16), int(c.W * 0.09)
         im = Image.new('RGBA', (bw, bh), (255, 255, 255, 255)); d = ImageDraw.Draw(im); x = 8
         while x < bw - 8:
-            w = rnd.choice((2, 2, 3, 5)); d.rectangle([x, 6, x + w - 1, bh - 18], fill=(0, 0, 0, 255)); x += w + rnd.choice((2, 3, 4))
+            w = rnd.choice((2, 2, 3, 5)); top = max(2, int(bh * 0.20)); bottom = max(top, bh - max(2, int(bh * 0.15))); d.rectangle([x, top, x + w - 1, bottom], fill=(0, 0, 0, 255)); x += w + rnd.choice((2, 3, 4))
         return im
     bc = cached(e, 'b', barcode)
     comp(c, bc, c.W * 0.95 - bc.width, c.H * 0.93 - bc.height, al * k, guard=True)
@@ -782,18 +782,18 @@ def glass_widgets_v1(c, e):
     a = glass(c, S, S, S * 0.2, mg + S / 2, y_top + S / 2, amt=0.14, dark=gd); d = ImageDraw.Draw(a)
     d.ellipse([S * 0.1, S * 0.115, S * 0.1 + S * 0.06, S * 0.115 + S * 0.06], fill=ORANGE + (255,))
     d.text((S * 0.2, S * 0.145), e.o.get('title', 'Swarag'), font=font('uim', S * 0.085), fill=(255, 255, 255, 235), anchor='lm')
-    d.text((S * 0.08, S * 0.2), e.o.get('text', '22'), font=font('uib', S * 0.44), fill=(255, 255, 255, 255))
+    d.text((S * 0.08, S * 0.2), e.o.get('text', '42'), font=font('uib', S * 0.44), fill=(255, 255, 255, 255))
     for j, ln in enumerate(e.o.get('sub', 'effects|one clip').split('|')):
         d.text((S * 0.1, S * (0.7 + 0.11 * j)), ln, font=font('uim', S * 0.085), fill=(255, 255, 255, 235))
     place(c, a, mg + S / 2, y_top + S / 2, 0.6 + 0.4 * pop(c, 0.0), 0, al * clamp(c.lt / 0.1), behind=True)
     bw, bh = W * 0.37, W * 0.15; bx = W - mg - bw / 2
     b = glass(c, bw, bh, bh * 0.28, bx, y_top + bh / 2, amt=0.14, dark=gd); d = ImageDraw.Draw(b)
     d.ellipse([bh * 0.17, bh * 0.2, bh * 0.17 + bh * 0.11, bh * 0.31], fill=(255, 69, 58, 255))
-    d.text((bh * 0.36, bh * 0.255), 'Rendering', font=font('uim', bh * 0.19), fill=(255, 255, 255, 240), anchor='lm')
+    d.text((bh * 0.36, bh * 0.255), e.o.get('bar_title', 'Execution plan'), font=font('uim', bh * 0.19), fill=(255, 255, 255, 240), anchor='lm')
     p = ease_inout(c.lt / max(0.3, e.d * 0.85))
     d.rounded_rectangle([bh * 0.17, bh * 0.5, bw - bh * 0.17, bh * 0.6], bh * 0.05, fill=(255, 255, 255, 70))
     d.rounded_rectangle([bh * 0.17, bh * 0.5, bh * 0.17 + (bw - bh * 0.34) * max(0.04, p), bh * 0.6], bh * 0.05, fill=(255, 255, 255, 245))
-    d.text((bh * 0.17, bh * 0.78), f"{e.o.get('label', 'glass UI')}  ·  {int(p * 100)}%", font=font('uim', bh * 0.14), fill=(255, 255, 255, 210), anchor='lm')
+    d.text((bh * 0.17, bh * 0.78), e.o.get('label', 'Strategy roadmap'), font=font('uim', bh * 0.14), fill=(255, 255, 255, 210), anchor='lm')
     place(c, b, bx, y_top + bh / 2, 0.6 + 0.4 * pop(c, 0.12), 0, al * clamp((c.lt - 0.12) / 0.1), behind=True)
     cy2 = y_top + bh + mg * 0.45 + bh / 2
     g = glass(c, bw, bh, bh * 0.28, bx, cy2, amt=0.14, dark=gd); d = ImageDraw.Draw(g)
@@ -879,7 +879,7 @@ def fx_pastel_word(c, e):
     bg = _grad[(W, H)] * (0.86 + 0.22 * lum)
     you = np.clip(c.img * 0.93 + 0.05, 0, 1)
     c.img = c.img * (1 - k) + (you * m + bg * (1 - m)) * k
-    word = cached(e, 'w', lambda: fit_text(e.o.get('text', 'REELS').upper(), W * 0.96, 'uib', 700, fill=(255, 255, 255)))
+    word = cached(e, 'w', lambda: fit_text(e.o.get('text', 'INSIGHTS').upper(), W * 0.96, 'uib', 700, fill=(255, 255, 255)))
     dk = ease_out(c.lt / 0.45)
     place(c, shadowed(word, 24, 12, 60), W / 2, max(word.height * 0.45, c.fy - c.fw * 1.2) - (1 - dk) * H * 0.06, 1, 0, al * clamp(c.lt / 0.15), behind=True)
     cw, chh = W * 0.86, W * 0.15; cy = H * 0.865 + (1 - ease_out((c.lt - 0.15) / 0.35)) * H * 0.2
@@ -918,7 +918,7 @@ def fx_check_pills(c, e):
         gr = thumb_grid(e.cards, 3, 3, int(bw * 0.28), int(bw * 0.025), i0=i * 3)
         im.alpha_composite(gr, ((bw - gr.width) // 2, int(bw * 0.2))); return shadowed(im, 16, 8, 70)
     b1 = cached(e, 'b1', lambda: board(0, e.o.get('handle', '@aiwithswarag')))
-    b2 = cached(e, 'b2', lambda: board(1, e.o.get('board', 'Reels  ·  22 effects')))
+    b2 = cached(e, 'b2', lambda: board(1, e.o.get('board', 'Projects  ·  42 effects')))
     by = max(H * 0.17, c.fy - c.fw * 0.9)
     place(c, b1, W * 0.25, by, 0.6 + 0.4 * pop(c, 0.0), 8, al * clamp(c.lt / 0.1), behind=True)
     place(c, b2, W * 0.76, by - W * 0.02, 0.6 + 0.4 * pop(c, 0.1), -8, al * clamp((c.lt - 0.1) / 0.1), behind=True)
@@ -1084,7 +1084,7 @@ def fx_broll_split(c, e):
 @effect('phone-fan', 'your reels fan out like a hand of phones in front of you, under a two-line headline')
 def fx_phone_fan(c, e):
     W, H = c.W, c.H; al = fade(c, e)
-    lines = e.o.get('text', '22 effects.|zero editing apps.').split('|')
+    lines = e.o.get('text', 'STRATEGY.|EXECUTION.').split('|')
     S = cached(e, 'sz', lambda: lines_fit(lines, W * 0.84, 'uib', int(W * 0.08)))
     y = max(H * 0.06, c.fy - c.fw * 1.3 - S * 1.3 * len(lines))
     for j, ln in enumerate(lines):
@@ -1159,10 +1159,10 @@ def rich(parts, size, kind, base, accent, accent_kind=None, shadow=0):
 @effect('headline-wall', 'a wall of your own reel headlines piles up behind your head, then your total views pop in front')
 def fx_headline_wall(c, e):
     W, H = c.W, c.H; u = W / 1080; al = fade(c, e)
-    items = [x.split('::') for x in e.o.get('text', 'Protect your personal data with ChatGPT Agent Mode::197K views|Easiest no-code scroll animation websites::124K views|'
+    items = [x.split('::') for x in e.o.get('text', 'AI implementation readiness::Framework|Enterprise transformation::Strategy|'
                                          'AI adoption: strategy to execution::Case study|Project governance: leading indicators::Framework|'
                                          'AI ROI: measuring business outcomes::Analysis|Delivery excellence: clear ownership::Playbook|'
-                                         'Protect your personal data on the internet::140K views').split('|')]
+                                         'Delivery management essentials::Guide').split('|')]
     looks = [((255, 255, 255), (20, 20, 22)), ((22, 20, 24), (255, 255, 255)), ((246, 238, 226), (30, 24, 20)), ((255, 214, 10), (20, 20, 22))]
     def hcard(i):
         title, meta = (items[i % len(items)] + [''])[:2]; bg, fg = looks[i % len(looks)]
@@ -1190,7 +1190,7 @@ def fx_headline_wall(c, e):
         place(c, cards[i], x * W, y * H, 0.55 + 0.45 * kk, r, al * clamp((c.lt - t0) / 0.06), behind=True)
     t1 = N * gap + 0.1
     if c.lt > t1:
-        tot = e.o.get('total', '672K'); lab = e.o.get('label', 'views from 7 reels')
+        tot = e.o.get('total', 'DEMO'); lab = e.o.get('label', 'example only')
         a = text_img(tot, 96 * u, 'anton', (255, 255, 255)); b = text_img(lab, 34 * u, 'uib', (255, 255, 255))
         pw = int(a.width + b.width + 30 * u); ph = int(max(a.height, b.height) + 10 * u)
         pill = rrect(pw, ph, ph * 0.28, (217, 119, 87, 245)); pill.alpha_composite(a, (int(8 * u), (ph - a.height) // 2)); pill.alpha_composite(b, (int(a.width + 8 * u), (ph - b.height) // 2))
@@ -1305,8 +1305,8 @@ def glass_widgets_v2(c, e):
     d.text((24 * u, 30 * u), 'artifact · views.html', font=font('mono', 15 * u), fill=white + (220,), anchor='lm')
     inn = rrect(aw - 36 * u, ah - 74 * u, 20 * u, (250, 248, 244, 255)); di = ImageDraw.Draw(inn); iw, ih = inn.size
     for j in range(3): di.ellipse([14 * u + j * 16 * u, 14 * u, 24 * u + j * 16 * u, 24 * u], fill=((255, 95, 87), (255, 189, 46), (40, 200, 64))[j] + (255,))
-    di.text((16 * u, 40 * u), 'Top reels', font=font('uib', 26 * u), fill=(24, 22, 26, 255))
-    di.text((16 * u, 72 * u), '197K', font=font('anton', 44 * u), fill=(200, 85, 61, 255))
+    di.text((16 * u, 40 * u), 'Example chart', font=font('uib', 26 * u), fill=(24, 22, 26, 255))
+    di.text((16 * u, 72 * u), 'DEMO', font=font('anton', 44 * u), fill=(200, 85, 61, 255))
     vals = [197, 140, 124, 83, 50, 40, 38]; gx0, gx1, gy1 = 16 * u, iw - 16 * u, ih - 18 * u; bwid = (gx1 - gx0) / 7 * 0.66
     for j, v in enumerate(vals):
         q = ease_out((c.lt - 0.35 - 0.05 * j) / 0.4); hh = (ih * 0.42) * v / 197 * q; x0 = gx0 + (gx1 - gx0) * j / 7
@@ -1325,7 +1325,7 @@ def glass_widgets_v2(c, e):
     mu.alpha_composite(art2, (int(22 * u), int(22 * u)))
     d.text((134 * u, 44 * u), 'NOW EDITING', font=font('mono', 15 * u), fill=white + (200,), anchor='lm')
     d.text((134 * u, 78 * u), e.o.get('song', 'soft UI pops'), font=font('uib', 28 * u), fill=white + (255,), anchor='lm')
-    d.text((134 * u, 108 * u), 'sfx · 25.7s', font=font('uim', 20 * u), fill=white + (200,), anchor='lm')
+    d.text((134 * u, 108 * u), 'timing · example', font=font('uim', 20 * u), fill=white + (200,), anchor='lm')
     pp = clamp(c.lt / max(0.5, e.d)); d.rounded_rectangle([22 * u, 140 * u, mw - 22 * u, 146 * u], 3 * u, fill=white + (70,))
     d.rounded_rectangle([22 * u, 140 * u, 22 * u + (mw - 44 * u) * pp, 146 * u], 3 * u, fill=white + (240,))
     cxm, cym = mw / 2, 184 * u
@@ -1341,14 +1341,14 @@ def glass_widgets_v2(c, e):
     d.text((26 * u, 36 * u), e.o.get('day', 'WED'), font=font('uib', 22 * u), fill=(255, 92, 82, 255), anchor='lm')
     d.text((26 * u, 82 * u), e.o.get('date', '21'), font=font('uib', 56 * u), fill=white + (255,), anchor='lm')
     d.rounded_rectangle([22 * u, 120 * u, kw - 22 * u, 168 * u], 12 * u, fill=(255, 92, 82, 210))
-    d.text((36 * u, 144 * u), e.o.get('event', 'Post 2 reels · tonight'), font=font('uib', 22 * u), fill=white + (255,), anchor='lm')
+    d.text((36 * u, 144 * u), e.o.get('event', 'Review video · today'), font=font('uib', 22 * u), fill=white + (255,), anchor='lm')
     show(ca, kx, ky, 5)
     # 7 · 4K ring
     R = 250 * u; rx, ry = W - 50 * u - R / 2, my + mh / 2 + 26 * u + R / 2
     rg = G(R, R, rx, ry, 56 * u); d = ImageDraw.Draw(rg); rp = ease_inout((c.lt - 0.4) / 1.0); rr = R * 0.34
     d.ellipse([R / 2 - rr, R / 2 - rr - 8 * u, R / 2 + rr, R / 2 + rr - 8 * u], outline=white + (60,), width=int(16 * u))
     if rp > 0: d.arc([R / 2 - rr, R / 2 - rr - 8 * u, R / 2 + rr, R / 2 + rr - 8 * u], -90, -90 + 360 * rp, fill=(52, 199, 89, 255), width=int(16 * u))
-    d.text((R / 2, R / 2 - 8 * u), '4K', font=font('uib', 52 * u), fill=white + (255,), anchor='mm')
+    d.text((R / 2, R / 2 - 8 * u), 'HD', font=font('uib', 52 * u), fill=white + (255,), anchor='mm')
     d.text((R / 2, R - 26 * u), 'render', font=font('uim', 20 * u), fill=white + (210,), anchor='mm')
     show(rg, rx, ry, 6)
     # 8 · editorial label (in front)
@@ -1390,7 +1390,7 @@ def comment_sheet(c, e):
     gets a heart, then your reply drops in with a link chip."""
     W, H = c.W, c.H; u = W / 1080; al = fade(c, e)
     word = e.o.get('text', 'EFFECTS'); handle = e.o.get('handle', 'aiwithswarag')
-    reply = e.o.get('reply', 'Sent you the pack'); chip = e.o.get('chip', '22 effects')
+    reply = e.o.get('reply', 'Sent you the pack'); chip = e.o.get('chip', '42 effects')
     sw, sh = 740 * u, 450 * u
     t_post = 0.3 + 0.06 * len(word) + 0.1; t_heart, t_rep = t_post + 0.25, t_post + 0.4
     sheet = rrect(sw, sh, 30 * u, (38, 38, 40, 248)); d = ImageDraw.Draw(sheet)
@@ -1600,7 +1600,7 @@ def fx_match_cut(c, e):
 
 @effect('apple-toggles', 'an iPhone settings card under your chin flips its switches on, one line at a time')
 def fx_apple_toggles(c, e):
-    rows = e.o.get('text', 'One clip|Type /effects|Zero editing apps').split('|')
+    rows = e.o.get('text', 'CLARITY|GOVERNANCE|OUTCOMES').split('|')
     if e.o.get('pos', 'above') != 'below': face_cam(c, 1 + (float(e.o.get('zoom', 1.12)) - 1) * ease_out(c.lt / 0.5), 0.56)
     W = c.W; cw = int(W * 0.72); rh = int(W * 0.125); ch = rh * len(rows); r = int(W * 0.055)
     tw, th = int(W * 0.135), int(W * 0.08); tx = cw - int(W * 0.05) - tw
@@ -1636,7 +1636,7 @@ def fx_apple_toggles(c, e):
 def fx_led_sign(c, e):
     k = ramp(c, e, 0.2, 0.2)
     face_cam(c, 1 + (float(e.o.get('push', 1.08)) - 1) * ease_inout(c.lt / e.d), 0.42)
-    lines = e.o.get('text', 'CLAUDE').upper().split('|'); col = np.float32(rgb(e.o.get('color'), (255, 146, 48))) / 255
+    lines = e.o.get('text', 'STRATEGY').upper().split('|'); col = np.float32(rgb(e.o.get('color'), (255, 146, 48))) / 255
     def setup():
         mats = []
         for s in lines:
@@ -1723,7 +1723,7 @@ def spotlight_sparkle(c, e):
     rays = cv2.resize(rays.astype(np.float32), (W, H), interpolation=cv2.INTER_LINEAR)
     halo = np.clip(cv2.GaussianBlur(c.m, (0, 0), W * 0.012) * 1.6 - c.m, 0, 1)
     c.img += (rays * 0.32 + halo * 0.7)[..., None] * gold * k * (1 - c.m[..., None])
-    word = e.o.get('text', 'CLAUDE')
+    word = e.o.get('text', 'STRATEGY')
     def wimg():
         size = int(H * 0.2)
         while size > 20 and font('didonei', size).getlength(word) > W * 0.86: size = int(size * 0.94)
@@ -1764,11 +1764,11 @@ def cover_editorial(c, e):
     m = cached(e, 'm', mast)
     s = 1.05 - 0.05 * ease_out(c.lt / 0.5)
     place(c, m, W / 2, H * 0.085 + m.height / 2, s, 0, al * k, behind=True)
-    iss = cached(e, 'i', lambda: tracked(e.o.get('issue', 'THE ONE-CLIP ISSUE  ·  NO. 42  ·  OCTOBER 2026'), int(W * 0.022), 'ui', ink, W * 0.006))
+    iss = cached(e, 'i', lambda: tracked(e.o.get('issue', 'SWARAG  ·  EXECUTIVE EDITION'), int(W * 0.022), 'ui', ink, W * 0.006))
     place(c, iss, W / 2, H * 0.075, alpha=al * k, behind=True)
     rule = cached(e, 'r', lambda: rrect(W * 0.86, max(3, W // 600), 1, ink + (255,)))
     place(c, rule, W / 2, H * 0.087 + m.height, alpha=al * k * 0.8, behind=True)
-    lines = e.o.get('lines', 'One clip,|42 looks.|NO EDITOR  ·  NO APPS').split('|')
+    lines = [text for text in e.o.get('lines', 'Direction|Delivery|Outcomes').split('|') if text.strip()]
     styles = [('didonei', 0.085, ink), ('didoneb', 0.105, rose), ('ui', 0.03, ink)]
     y = H * float(e.o.get('lines_y', 0.575))
     for j, ln in enumerate(lines):
@@ -1776,7 +1776,7 @@ def cover_editorial(c, e):
         im = cached(e, ('l', j), lambda: (tracked(ln, int(W * sz), kind, col, W * 0.006) if kind == 'ui' else text_img(ln, W * sz, kind, col, glow=(cream, W * 0.012))))
         kj = ease_out((c.lt - 0.2 - 0.1 * j) / 0.35)
         comp(c, im, W * 0.05 - (1 - kj) * W * 0.03, y, al * kj); y += im.height * (0.82 if kind != 'ui' else 1.6)
-    right = e.o.get('right', 'the art of the|effortless edit').split('|')
+    right = [text for text in e.o.get('right', '').split('|') if text.strip()]
     y = H * float(e.o.get('right_y', 0.715))
     for j, ln in enumerate(right):
         im = cached(e, ('r', j), lambda: text_img(ln, W * 0.058, 'didonei', ink, glow=(cream, W * 0.01)))
@@ -1803,7 +1803,7 @@ def glass_bento(c, e):
     lay = Image.new('RGBA', (pw, ph), (0, 0, 0, 0)); d = ImageDraw.Draw(lay); pad = pw * 0.05
     g = ease_inout((c.lt - 0.2) / max(0.3, e.d * 0.75))
     d.text((pad, pad * 0.8), e.o.get('text', 'VIEWS').upper(), font=font('mono', pw * 0.026), fill=(255, 255, 255, 180))
-    a, _, _ = num_parts(e.o.get('from', '0')); b, suf, dp = num_parts(e.o.get('to', '197K')); s = f'{a + (b - a) * g:.{dp}f}{suf}'
+    a, _, _ = num_parts(e.o.get('from', '0')); b, suf, dp = num_parts(e.o.get('to', '0')); s = f'{a + (b - a) * g:.{dp}f}{suf}'
     f = font('uib', pw * 0.085); d.text((pw - pad - f.getlength(s), pad * 0.45), s, font=f, fill=(255, 255, 255, 255))
     x0, x1, y0, y1 = pad, pw - pad, ph - pad * 0.8, ph * 0.3
     for j in range(1, 4): yy = y0 - (y0 - y1) * j / 3.3; d.line([(x0, yy), (x1, yy)], fill=(255, 255, 255, 34), width=max(1, W // 1000))
@@ -1825,12 +1825,12 @@ def glass_bento(c, e):
     def dr_donut(t, d, tw, th):
         p = ease_out((c.lt - 0.35) / 0.8) * pct
         dn = donut(tw * 0.86, p, peach, dl, f'{round(p * 100)}%'); t.alpha_composite(dn, (int((tw - dn.width) / 2), int((th - dn.height) / 2)))
-    kv, kl = (e.o.get('kpi', '672K::views · top 7 reels').split('::') + [''])[:2]
+    kv, kl = (e.o.get('kpi', '0::example only').split('::') + [''])[:2]
     def dr_kpi(t, d, tw, th):
         b, suf, dp = num_parts(kv); v = b * ease_out((c.lt - 0.45) / 0.8)
         d.text((tw * 0.1, th * 0.18), f'{v:.{dp}f}{suf}', font=font('uib', th * 0.36), fill=(255, 255, 255, 255))
         d.text((tw * 0.1, th * 0.7), kl.upper(), font=font('mono', th * 0.1), fill=(255, 255, 255, 170))
-    bv, bl = (e.o.get('bars', '197|140|124|83|50::top reels · K views').split('::') + [''])[:2]; vals = [num_parts(v)[0] for v in bv.split('|')]
+    bv, bl = (e.o.get('bars', '4|3|2|1|1::example values').split('::') + [''])[:2]; vals = [num_parts(v)[0] for v in bv.split('|')]
     def dr_bars(t, d, tw, th):
         d.text((tw * 0.1, th * 0.06), bl.upper(), font=font('mono', tw * 0.055), fill=(255, 255, 255, 170))
         n = len(vals); bw = tw * 0.8 / n; top, base = th * 0.2, th * 0.88; mx = max(vals)
@@ -1930,6 +1930,39 @@ class Fx:
         self.o = {k: v for k, v in d.items() if k not in ('fx', 'start', 'end')}; self.state = {}; self.cards = []
 
 
+
+def executive_cards(labels=None):
+    """Generate original, content-neutral Orbit visuals when no user assets are supplied."""
+    names = [v.strip().upper() for v in str(labels or 'STRATEGY|EXECUTION|GOVERNANCE|AI ADOPTION|OUTCOMES|DELIVERY').split('|') if v.strip()]
+    if not names:
+        names = ['STRATEGY']
+    out = []
+    palettes = [((16, 25, 35), (44, 154, 144)), ((23, 40, 62), (197, 164, 109)),
+                ((24, 36, 46), (130, 147, 165)), ((18, 38, 42), (44, 154, 144)),
+                ((38, 36, 42), (197, 164, 109)), ((16, 25, 35), (197, 164, 109))]
+    for i, title in enumerate(names[:20]):
+        W, H = 486, 864
+        bg, accent = palettes[i % len(palettes)]
+        im = Image.new('RGB', (W, H), bg)
+        d = ImageDraw.Draw(im)
+        d.rounded_rectangle([24, 24, W - 25, H - 25], radius=35, outline=accent, width=3)
+        d.rectangle((42, 53, 112, 61), fill=accent)
+        tiny = ImageFont.truetype(FONT['uim'], 21)
+        d.text((W - 42, 50), f'{i+1:02d} / {len(names):02d}', font=tiny, fill=(220, 227, 228), anchor='ra')
+        x0, y0 = 43, H * 0.44
+        for j, chunk in enumerate(title.split(' ')):
+            sz = 64
+            ft = ImageFont.truetype(FONT['uib'], sz)
+            while ft.getlength(chunk) > W - 80 and sz > 24:
+                sz -= 2
+                ft = ImageFont.truetype(FONT['uib'], sz)
+            d.text((x0, y0 + j * 72), chunk, font=ft, fill=(245, 242, 236))
+        d.line([(42, H - 130), (W - 42, H - 130)], fill=accent, width=3)
+        d.text((43, H - 106), 'SWARAG  /  EXECUTIVE', font=tiny, fill=(203, 213, 218))
+        out.append(im)
+    return out
+
+
 def load_cards(folder, thumbs):
     out = []
     if folder and os.path.isdir(folder):
@@ -1985,10 +2018,12 @@ def main():
             m, f = trk(fr_, int(t * 1000)); masks[i] = m; faces.append(f)
         else:
             faces.append(None); trk.prev = None
+    trk.seg.close()  # release native MediaPipe resources before interpreter shutdown
     sm = smooth(faces, fps)
     if sm is None: sm = np.tile([aw / 2, ah * 0.33, aw * 0.15], (len(faces), 1))
     for f in fxs:
-        if f.name in CARD_FX: f.cards = load_cards(f.o.get('images'), thumbs)
+        if f.name in CARD_FX:
+            f.cards = executive_cards(f.o.get('labels')) if f.name == 'orbit' and f.o.get('brand_cards') and not f.o.get('images') else load_cards(f.o.get('images'), thumbs)
     stills = sorted({int(round(float(s) * fps)) for s in a.still.split(',')}) if a.still else None
     enc = None
     if not stills:
