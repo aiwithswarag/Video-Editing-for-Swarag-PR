@@ -30,6 +30,20 @@ python scripts/resumable_cinematic_master.py PRIVATE/world_models_reviewed.mp4 \
   --look editorial-cinema --preset veryfast --crf 18 --chunk-frames 180 --final-only
 ```
 
+## Frame-continuity acceptance check (required before publishing)
+
+After the full master is assembled, compare **actual source-frame indexes** immediately around every segment join. The checker grades the source frames using the same editorial look, then compares each exported frame with the expected source frame and its preceding/following neighbor. The report flags low similarity and likely one-frame shifts.
+
+```bash
+python tools/frame_continuity_report.py \
+  PRIVATE/world_models_reviewed.mp4 \
+  PRIVATE/world_models_release/cinematic_master.mp4 \
+  --look editorial-cinema --chunk-frames 180 \
+  --output PRIVATE/world_models_release/join-continuity-qa.json
+```
+
+This command exits nonzero for suspicious frames. Review the `samples` array and visually inspect all boundaries, including those that PASS. **Technical limitations:** nearly static scenes can hide a duplicate frame; unusual high-noise or strongly compressed video can cause false positives. The test supports spatial looks (`editorial-cinema`, `clean-studio`, `neutral`) but not the temporal denoising `restoration` preset. Synthetic integration tests pass on the correctly aligned film and flag an intentionally shifted copy. No real user footage was used for that regression.
+
 The output directory contains a source/settings fingerprint manifest. Never mix chunks from different files or settings; changing CRF, source mtime, or look requires a **different output directory**. Each chunk must match its expected video frame count, resolution, and FPS. Full assembly checks total frame count, duration (±130ms), audio-stream MD5 identity and a complete decode. A failed check returns non-zero.
 
 ## Deliverables
