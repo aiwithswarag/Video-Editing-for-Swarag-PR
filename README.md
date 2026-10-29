@@ -133,6 +133,10 @@ python tools/master_quality_check.py PRIVATE/base.mp4 PRIVATE/review-with-broll.
 
 Select cut points from the **verified** audio/scene context; the example frame numbers are synthetic (10s at 30 fps). The insertion script enforces frame-perfect resolution and frame-rate matching and stream-copies the original audio. See `docs/WORLD_MODEL_CUTAWAY.md` and `docs/CUTAWAY_INSERTION.md`.
 
+## Evidence-led animations (no fabricated metrics)
+
+For research-heavy videos, `scripts/research_cards.py` creates a precise, sourced editorial graphic from `examples/world-model-research-cards.json`, with benchmark scope, references and caveats. `scripts/insert_cutaways.py` replaces multiple exact source-frame windows in one pass, copying original AAC audio. Re-verify research wording against primary papers and review the cutaway timing; see `docs/RESEARCH_EDITS.md`.
+
 ## Executive design system
 Use navy #17283E, ink #101923, ivory #F5F2EC, restrained teal #2C9A90 and gold #C5A46D. Prefer legible Inter typography, subtle zooms, minimal charts and verified metrics. Avoid unnecessary stickers, flashing animations, or brand logos. Individual legacy effects have their own graphics; visually review output before publishing.
 

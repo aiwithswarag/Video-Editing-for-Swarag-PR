@@ -146,6 +146,21 @@ jobs:
           assert report['audio_bitstream_identical'] is True
           assert report['source_media']['frames']==report['output_media']['frames']
           PY
+      - name: Verify source-backed research graphics and two exact-frame insertions
+        run: |
+          python scripts/research_cards.py examples/world-model-research-cards.json --output-dir research-smoke --width 360
+          test -s research-smoke/evidence_01.png
+          test -s research-smoke/evidence_02.png
+          cat > research-plan.json <<'JSON'
+          {"windows":[{"start_frame":2,"clip":"cutaway-smoke.mp4"},{"start_frame":10,"clip":"cutaway-smoke.mp4"}]}
+          JSON
+          python scripts/insert_cutaways.py cutaway-base.mp4 research-plan.json multi-research-smoke.mp4
+          python tools/master_quality_check.py cutaway-base.mp4 multi-research-smoke.mp4 --expected-width 360 --output multi-research-qa.json
+          python - <<'PY'
+          import json
+          q=json.load(open('multi-research-qa.json'))
+          assert q['technical_status']=='PASS' and q['audio_bitstream_identical'] is True
+          PY
       - name: Verify streams and duration
         run: |
           test -s smoke.mp4
@@ -168,6 +183,7 @@ jobs:
             audio-master-smoke.mp4
             cutaway-insert-smoke.mp4
             cutaway-smoke.mp4
+            multi-research-smoke.mp4
             smoke-plan.json
           if-no-files-found: ignore
           retention-days: 7
