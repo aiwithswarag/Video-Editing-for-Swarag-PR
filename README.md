@@ -97,6 +97,17 @@ python tools/master_quality_check.py input.mp4 PRIVATE/director-cut.mp4 --output
 
 See `docs/CAMERA_DIRECTOR.md`; the committed example JSON is synthetic. Keep the real footage and real timing plan private.
 
+## Optional sound-master review
+
+The original audio remains untouched by default. To build an optional A/B loudness-normalized alternative, run:
+
+```bash
+python tools/two_pass_dialogue_master.py original_cut.mp4 PRIVATE/mastered_review.mp4 --lufs -18 --true-peak -1.9 --report PRIVATE/dialogue-review.json
+python tools/master_quality_check.py original_cut.mp4 PRIVATE/mastered_review.mp4 --allow-audio-remaster --output PRIVATE/technical-qa.json
+```
+
+The two-pass loudness analysis and true-peak ceiling are technical safeguards, not a replacement for listening. See `docs/DIALOGUE_MASTER.md`. No user's audio or video is uploaded to GitHub.
+
 ## Executive design system
 Use navy #17283E, ink #101923, ivory #F5F2EC, restrained teal #2C9A90 and gold #C5A46D. Prefer legible Inter typography, subtle zooms, minimal charts and verified metrics. Avoid unnecessary stickers, flashing animations, or brand logos. Individual legacy effects have their own graphics; visually review output before publishing.
 
