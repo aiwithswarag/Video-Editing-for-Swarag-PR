@@ -6,6 +6,8 @@ from the original input. This avoids the memory and CPU overhead of sending
 untouched frames through the face tracking and effects pipeline.
 """
 import argparse
+import hashlib
+from contextlib import nullcontext
 from fractions import Fraction
 import json
 import subprocess
@@ -113,6 +115,16 @@ def frame_segments(plan, total_frames, rate):
     return parts
 
 
+def usable_segment(path,frames,width,height,fps):
+    try:
+        if not path.is_file() or path.stat().st_size<1024 or frame_count(path)!=frames:
+            return False
+        _,w,h=probe(path)
+        return (w,h)==(width,height) and resolve_fps("auto",path)==fps
+    except (ValueError,FileNotFoundError,subprocess.CalledProcessError,KeyError):
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path)
@@ -124,6 +136,7 @@ def main():
                         help="Output rate: auto (source rate), 30, 29.5 or 30000/1001; effect engine supports 8–30.5 fps")
     parser.add_argument("--brand", choices=["executive", "none"], default="executive")
     parser.add_argument("--crf", type=int, default=19)
+    parser.add_argument("--cache-dir",type=Path,help="Optional reusable effect-segment directory; safe to rerun after interruption")
     args = parser.parse_args()
     if not args.input.is_file():
         parser.error("Input file is missing")
@@ -154,7 +167,27 @@ def main():
         raise ValueError("Video and container duration disagree by >130ms; normalize to CFR source")
     segments=frame_segments(plan,total_frames,rate)
     print(f"Segments: {len(segments)}, active: {sum(bool(e) for _, _, e in segments)}, exact frames: {total_frames}", flush=True)
-    with tempfile.TemporaryDirectory(prefix="swarag_segments_") as temp:
+    if args.cache_dir:
+        cache=args.cache_dir.resolve()
+        if cache==args.input.resolve() or cache==args.output.resolve():
+            raise ValueError("Cache directory must not replace source or destination")
+        cache.mkdir(parents=True,exist_ok=True)
+        stat=args.input.stat()
+        context={"input":str(args.input.resolve()),"size":stat.st_size,"mtime_ns":stat.st_mtime_ns,
+                 "plan":plan,"width":w,"height":h,"fps":fps,"crf":args.crf,"brand":args.brand}
+        digest=hashlib.sha256(json.dumps(context,sort_keys=True).encode()).hexdigest()
+        manifest=cache/"effect_cache_manifest.json"
+        if manifest.exists():
+            if json.loads(manifest.read_text())["sha256"]!=digest:
+                raise ValueError("Cached effect sections belong to a different source/plan/settings")
+        else:
+            if any(cache.glob("input_*.mp4")) or any(cache.glob("edited_*.mp4")):
+                raise ValueError("Unmanaged effect sections found; use an empty cache directory")
+            manifest.write_text(json.dumps({"sha256":digest,"context":context},indent=2)+"\n")
+        manager=nullcontext(str(cache))
+    else:
+        manager=tempfile.TemporaryDirectory(prefix="swarag_segments_")
+    with manager as temp:
         folder = Path(temp)
         chunks = []
         for i, (start_frame, count, effects) in enumerate(segments):
@@ -162,22 +195,24 @@ def main():
             dst = folder / f"edited_{i:02d}.mp4"
             start_time=float(Fraction(start_frame,1)/rate)
             end_time=float(Fraction(start_frame+count,1)/rate)
-            run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-                 "-ss", f"{start_time:.9f}", "-i", str(args.input),
-                 "-vf", f"fps={fps},scale={w}:{h}:flags=lanczos",
-                 "-frames:v",str(count),"-an",
-                 "-c:v", "libx264", "-preset", "veryfast", "-crf", str(args.crf),
-                 "-pix_fmt", "yuv420p", str(src)])
-            if frame_count(src)!=count:
-                raise RuntimeError(f"Frame mismatch in input segment {i}: expected {count}")
+            if not usable_segment(src,count,w,h,fps):
+                run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                     "-ss", f"{start_time:.9f}", "-i", str(args.input),
+                     "-vf", f"fps={fps},scale={w}:{h}:flags=lanczos",
+                     "-frames:v",str(count),"-an",
+                     "-c:v", "libx264", "-preset", "veryfast", "-crf", str(args.crf),
+                     "-pix_fmt", "yuv420p", str(src)])
+            if not usable_segment(src,count,w,h,fps):
+                raise RuntimeError(f"Input segment {i} failed exact media QA")
             if effects:
                 plan_path = folder / f"plan_{i:02d}.json"
                 plan_path.write_text(json.dumps({"effects": effects}), encoding="utf8")
-                run([sys.executable, str(ROOT / "scripts/video_director.py"),
-                     "render", str(src), str(plan_path), str(dst),
-                     "--width", str(args.width), "--brand", args.brand])
-                if frame_count(dst)!=count:
-                    raise RuntimeError(f"42-effect engine changed frame count in segment {i}")
+                if not usable_segment(dst,count,w,h,fps):
+                    run([sys.executable, str(ROOT / "scripts/video_director.py"),
+                         "render", str(src), str(plan_path), str(dst),
+                         "--width", str(args.width), "--brand", args.brand])
+                if not usable_segment(dst,count,w,h,fps):
+                    raise RuntimeError(f"42-effect engine changed segment {i} frame count, FPS or dimensions")
                 chunks.append(dst)
             else:
                 chunks.append(src)
