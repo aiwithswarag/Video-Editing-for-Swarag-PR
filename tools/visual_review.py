@@ -2,6 +2,7 @@
 """Create a visual edit-review sheet from actual MP4 frames (not mock screenshots)."""
 from __future__ import annotations
 import argparse,json,math,subprocess,tempfile
+from fractions import Fraction
 from pathlib import Path
 from PIL import Image,ImageDraw,ImageFont
 
@@ -32,6 +33,19 @@ def review_points(effects,duration,limit=24):
         unique=[unique[i] for i in take]
     return unique
 
+def last_decodable_time(video):
+    """Container duration often extends past the last video frame due to AAC padding."""
+    raw=subprocess.run(['ffprobe','-v','error','-select_streams','v:0',
+        '-show_entries','stream=nb_frames,avg_frame_rate','-of','json',str(video)],
+        check=True,capture_output=True,text=True)
+    track=json.loads(raw.stdout)['streams'][0]
+    frames=int(track['nb_frames'])
+    rate=Fraction(track['avg_frame_rate'])
+    if frames<1 or rate<=0:
+        raise ValueError('Invalid frame count / FPS for review frames')
+    return max(0.,float(Fraction(frames-1,1)/rate)-.001)
+
+
 def frame(video,at,path,width=240):
     subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-nostdin','-y',
         '-ss',f'{at:.6f}','-i',str(video),'-map','0:v:0',
@@ -45,7 +59,8 @@ def create(video,effects,duration,output,limit=24,width=240):
     video=Path(video);output=Path(output)
     if not video.is_file():raise FileNotFoundError(video)
     if width<160 or width>640:raise ValueError('Width must be 160..640')
-    pts=review_points(effects,duration,limit)
+    last=last_decodable_time(video)
+    pts=[(min(t,last),label) for t,label in review_points(effects,duration,limit)]
     cols=4 if len(pts)>4 else len(pts);cols=max(cols,1)
     with tempfile.TemporaryDirectory(prefix='review_frames_') as temp:
         frames=[(frame(video,t,Path(temp)/f'frame_{i:03}.png',width),t,label)
