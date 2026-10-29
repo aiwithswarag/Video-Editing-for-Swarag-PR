@@ -60,6 +60,14 @@ python scripts/editorial_director.py input.mp4 private/editorial-draft.json priv
 
 The pause map is evidence of *timing*, not speech content. The generated storyboard only uses contiguous word sequences from supplied ASR output, marks itself as a draft, and never invents metrics or quotations. See `docs/SPEECH_LED_EDITING.md`.
 
+## Sound finishing (non-destructive first)
+
+```bash
+python tools/audio_quality_report.py input.mp4 --output private/audio-qa.json
+```
+
+Check integrated LUFS, true peak and loudness range before any mastering. The script does **not modify the audio** and warns if gain-only boosting would exceed the true-peak reference. Review on headphones and mobile speakers before adding compression/EQ or new music. See `docs/AUDIO_QA.md`.
+
 ## Executive design system
 Use navy #17283E, ink #101923, ivory #F5F2EC, restrained teal #2C9A90 and gold #C5A46D. Prefer legible Inter typography, subtle zooms, minimal charts and verified metrics. Avoid unnecessary stickers, flashing animations, or brand logos. Individual legacy effects have their own graphics; visually review output before publishing.
 

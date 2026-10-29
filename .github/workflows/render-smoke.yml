@@ -70,6 +70,16 @@ jobs:
           assert s['beats'][0]['headline']=='Clear thinking.'
           assert 'DRAFT' in s['status']
           PY
+      - name: Non-destructive audio QC
+        run: |
+          python tools/audio_quality_report.py sample.mp4 --output audio-qa-smoke.json
+          python - <<'PY'
+          import json
+          r=json.load(open('audio-qa-smoke.json'))
+          assert r['source_preserved'] is True
+          assert 'integrated_lufs' in r
+          assert 'true_peak_dbtp' in r
+          PY
       - name: Verify streams and duration
         run: |
           test -s smoke.mp4
