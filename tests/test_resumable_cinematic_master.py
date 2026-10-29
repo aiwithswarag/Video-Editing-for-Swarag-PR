@@ -40,5 +40,25 @@ class ResumableMasterSmoke(unittest.TestCase):
             with self.assertRaises(ValueError):
                 r.process(source,out,preset='ultrafast',crf=18,frames_per_chunk=30)
 
+
+    def test_one_frame_final_chunk_keeps_source_fps(self):
+        # This is a regression for x264 B-frame DTS reordering at a 1-frame tail.
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)
+            source=folder/'one-frame-tail.mp4'
+            subprocess.run([
+                'ffmpeg','-hide_banner','-loglevel','error','-y',
+                '-f','lavfi','-i','testsrc2=size=180x320:rate=59/2:duration=2.1',
+                '-f','lavfi','-i','sine=frequency=420:sample_rate=48000:duration=2.1',
+                '-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p',
+                '-c:a','aac','-shortest',str(source)],check=True)
+            self.assertEqual(61,r.count_frames(r.stream(source)))
+            output=folder/'result'
+            report=r.process(source,output,preset='veryfast',crf=20,frames_per_chunk=30)
+            self.assertEqual('PASS',report['technical_status'])
+            self.assertEqual('59/2',r.stream(output/'cinematic_master.mp4')['avg_frame_rate'])
+            self.assertEqual(61,r.count_frames(r.stream(output/'cinematic_master.mp4')))
+            self.assertEqual(r.audio_md5(source),r.audio_md5(output/'cinematic_master.mp4'))
+
 if __name__=='__main__':
     unittest.main()
