@@ -112,6 +112,16 @@ jobs:
           assert report['technical_status']=='PASS'
           assert report['audio_bitstream_identical'] is True
           PY
+      - name: Build optional two-pass voice-level review
+        run: |
+          python tools/two_pass_dialogue_master.py sample.mp4 audio-master-smoke.mp4 --lufs -18 --true-peak -1.9 --report audio-master-smoke.json
+          python tools/master_quality_check.py sample.mp4 audio-master-smoke.mp4 --allow-audio-remaster --output audio-master-technical-qa.json
+          python - <<'PY'
+          import json
+          report=json.load(open('audio-master-smoke.json'))
+          assert report['technical_loudness_status']=='PASS'
+          assert report['creative_status'].startswith('NOT APPROVED')
+          PY
       - name: Verify streams and duration
         run: |
           test -s smoke.mp4
@@ -131,6 +141,7 @@ jobs:
             editorial-smoke.mp4
             native-identity-smoke.mp4
             camera-smoke.mp4
+            audio-master-smoke.mp4
             smoke-plan.json
           if-no-files-found: ignore
           retention-days: 7
