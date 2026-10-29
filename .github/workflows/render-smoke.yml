@@ -161,6 +161,10 @@ jobs:
           q=json.load(open('multi-research-qa.json'))
           assert q['technical_status']=='PASS' and q['audio_bitstream_identical'] is True
           PY
+      - name: Validate resumable master and real-frame continuity regression
+        run: |
+          python -m unittest discover -s tests -p 'test_resumable_cinematic_master.py' -v
+          python -m unittest discover -s tests -p 'test_frame_continuity_report.py' -v
       - name: Cinematic finishing and Instagram export smoke
         run: |
           python scripts/cinematic_finish.py sample.mp4 --look clean-studio --platform instagram --audio aac --preset ultrafast --output-dir cinematic-smoke
