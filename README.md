@@ -126,12 +126,12 @@ The model-only workflow builds whisper.cpp and an English base model **without u
 For an actual robot/cup discussion, the optional **World Models** cutaway uses an original illustrated robot arm, two possible outcomes and three animation phases. It contains no invented performance statistics or test footage, and its conceptual status is explicit on-screen.
 
 ```bash
-python scripts/world_model_cutaway.py PRIVATE/world-model-illustration.mp4 --width 1080 --fps 29.5 --frames 192
-python scripts/insert_cutaway.py PRIVATE/base.mp4 PRIVATE/world-model-illustration.mp4 PRIVATE/review-with-broll.mp4 --at-frame 385
+python scripts/world_model_cutaway.py PRIVATE/world-model-illustration.mp4 --width 1080 --fps 30 --frames 60
+python scripts/insert_cutaway.py PRIVATE/base.mp4 PRIVATE/world-model-illustration.mp4 PRIVATE/review-with-broll.mp4 --at-frame 120
 python tools/master_quality_check.py PRIVATE/base.mp4 PRIVATE/review-with-broll.mp4 --output PRIVATE/qa.json
 ```
 
-Select cut points from the **verified** audio/scene context; the example frame numbers are only for a private one-minute demo. The insertion script enforces frame-perfect resolution and frame-rate matching and stream-copies the original audio. See `docs/WORLD_MODEL_CUTAWAY.md` and `docs/CUTAWAY_INSERTION.md`.
+Select cut points from the **verified** audio/scene context; the example frame numbers are synthetic (10s at 30 fps). The insertion script enforces frame-perfect resolution and frame-rate matching and stream-copies the original audio. See `docs/WORLD_MODEL_CUTAWAY.md` and `docs/CUTAWAY_INSERTION.md`.
 
 ## Executive design system
 Use navy #17283E, ink #101923, ivory #F5F2EC, restrained teal #2C9A90 and gold #C5A46D. Prefer legible Inter typography, subtle zooms, minimal charts and verified metrics. Avoid unnecessary stickers, flashing animations, or brand logos. Individual legacy effects have their own graphics; visually review output before publishing.
