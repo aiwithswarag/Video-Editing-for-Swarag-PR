@@ -24,6 +24,11 @@ class EditorialTests(unittest.TestCase):
     def test_reject_oversized_copy(self):
         bad={"beats":[{"kind":"chapter","start":0,"end":1,"headline":"x"*300}]}
         with self.assertRaises(ValueError):editorial.check_story(bad,2)
+    def test_fast_render_uses_static_artwork(self):
+        import inspect
+        source=inspect.getsource(editorial.render)
+        self.assertIn("layout(width,height,beat",source)
+        self.assertNotIn("generate_frames(",source)
     def test_keep_graphics_off_center_face(self):
         fonts=ROOT/"fonts"
         if not fonts.is_dir():self.skipTest("Licensed fonts not installed")
