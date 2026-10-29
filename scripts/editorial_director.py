@@ -92,7 +92,7 @@ def layout(width,height,beat,font_dir):
         if draw.textlength(headline,font=headfont)>available:
             raise ValueError('Headline exceeds safe area')
         draw.text((left,upper+int(height*.024)),headline,font=headfont,fill=INK+(255,))
-    if small or headline:
+    if eyebrow or headline:
         rule_y=upper+int(height*.102)
         draw.line([(left,rule_y),(left+int(width*.078),rule_y)],fill=GOLD+(235,),width=max(2,int(width*.004)))
     if beat['kind'] in ('opener','closing'):
