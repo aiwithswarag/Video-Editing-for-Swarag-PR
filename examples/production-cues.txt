@@ -1,0 +1,6 @@
+# Example cue sheet, replace with decisions based on the real video and verified script.
+# All 42 registered FX names are available via: python scripts/produce_video.py catalog
+# FX <name> <start_s> <end_s> [key=value ...]
+FX slow-push 1.0 3.2 zoom=1.06
+FX backdrop-word 8.0 10.5 text="WORLD MODELS"
+FX headline-box 25.5 28.5 text="THE EVIDENCE"
