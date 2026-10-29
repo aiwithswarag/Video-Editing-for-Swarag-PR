@@ -86,6 +86,17 @@ python tools/master_quality_check.py input.mp4 export.mp4 --output private/techn
 
 This fails on lost frames, changed resolution, substantial FPS/duration drift and modified original audio (when audio preservation was requested). **Technical PASS is not creative approval.** See `docs/MASTER_QA.md`.
 
+## Camera reframes guided by real speech pauses
+
+For fixed-camera videos, a moderate cut between 1× and 1.09× often communicates more clearly than a cascade of widgets. Use audio-only pauses as **timing candidates** (not transcript semantics), approve the edit, then apply it without changing spoken audio:
+
+```bash
+python scripts/render_directors_cut.py input.mp4 PRIVATE/camera-reframes.json PRIVATE/director-cut.mp4
+python tools/master_quality_check.py input.mp4 PRIVATE/director-cut.mp4 --output PRIVATE/camera-qa.json
+```
+
+See `docs/CAMERA_DIRECTOR.md`; the committed example JSON is synthetic. Keep the real footage and real timing plan private.
+
 ## Executive design system
 Use navy #17283E, ink #101923, ivory #F5F2EC, restrained teal #2C9A90 and gold #C5A46D. Prefer legible Inter typography, subtle zooms, minimal charts and verified metrics. Avoid unnecessary stickers, flashing animations, or brand logos. Individual legacy effects have their own graphics; visually review output before publishing.
 
