@@ -35,8 +35,11 @@ class ResumableMasterSmoke(unittest.TestCase):
                 target=out/f'cinematic_master_{platform}.mp4'
                 self.assertTrue(target.exists())
                 self.assertEqual(target.read_bytes(),(out/'cinematic_master.mp4').read_bytes())
+            before=(out/'cinematic_master.mp4').stat().st_mtime_ns
             again=r.process(source,out,preset='ultrafast',crf=20,frames_per_chunk=30,final_only=True)
             self.assertEqual('PASS',again['technical_status'])
+            self.assertEqual(before,(out/'cinematic_master.mp4').stat().st_mtime_ns)
+            self.assertEqual(again['master_file_sha256'],r.file_sha256(out/'cinematic_master.mp4'))
             with self.assertRaises(ValueError):
                 r.process(source,out,preset='ultrafast',crf=18,frames_per_chunk=30)
 
