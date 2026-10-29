@@ -123,7 +123,7 @@ def main():
                  "-ss", str(start), "-i", str(args.input),
                  "-t", str(end - start), "-vf",
                  f"fps={fps},scale={w}:{h}:flags=lanczos", "-an",
-                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "19",
+                 "-c:v", "libx264", "-preset", "veryfast", "-crf", str(args.crf),
                  "-pix_fmt", "yuv420p", str(src)])
             if effects:
                 plan_path = folder / f"plan_{i:02d}.json"
