@@ -9,9 +9,9 @@ BR={"width":1080,"height":1920,"fps":Fraction(30,1),"frames":60,"audio":False}
 class EditCutTests(unittest.TestCase):
     def test_insert(self):self.assertEqual(180,validate(SRC,BR,120))
     def test_res(self):
-        with self.assertRaises(ValueError):validate(SRC,{**BR,"width":720},385)
+        with self.assertRaises(ValueError):validate(SRC,{**BR,"width":720},120)
     def test_fps(self):
-        with self.assertRaises(ValueError):validate(SRC,{**BR,"fps":Fraction(30,1)},385)
+        with self.assertRaises(ValueError):validate(SRC,{**BR,"fps":Fraction(59,2)},120)
     def test_bounds(self):
         with self.assertRaises(ValueError):validate(SRC,BR,270)
     def test_no_voice(self):
