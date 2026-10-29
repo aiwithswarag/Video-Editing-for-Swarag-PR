@@ -108,6 +108,19 @@ python tools/master_quality_check.py original_cut.mp4 PRIVATE/mastered_review.mp
 
 The two-pass loudness analysis and true-peak ceiling are technical safeguards, not a replacement for listening. See `docs/DIALOGUE_MASTER.md`. No user's audio or video is uploaded to GitHub.
 
+## Private offline ASR: cut to the actual speech
+
+The original 42-effect renderer still works without speech recognition. For professional content-led timelines, use the optional **offline** word-timestamp workflow:
+
+```bash
+# Build the pinned CPU runtime using .github/workflows/offline-asr-runtime.yml
+# Extract the GitHub artifact on the private computer where your footage lives
+python tools/transcribe_offline.py INPUT.mp4 --binary PRIVATE/whisper-cli --model PRIVATE/models/ggml-base.en.bin --output PRIVATE/draft-words.json
+python tools/transcript_storyboard.py PRIVATE/draft-words.json --duration 60.71 --output PRIVATE/storyboard.json
+```
+
+The model-only workflow builds whisper.cpp and an English base model **without uploading the user's footage**. Its output is **automated and unverified**; correct all transcript words and verify research figures before producing quotes or promotional content. See `docs/OFFLINE_ASR.md`.
+
 ## Executive design system
 Use navy #17283E, ink #101923, ivory #F5F2EC, restrained teal #2C9A90 and gold #C5A46D. Prefer legible Inter typography, subtle zooms, minimal charts and verified metrics. Avoid unnecessary stickers, flashing animations, or brand logos. Individual legacy effects have their own graphics; visually review output before publishing.
 
