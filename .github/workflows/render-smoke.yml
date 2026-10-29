@@ -165,6 +165,9 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_resumable_cinematic_master.py' -v
           python -m unittest discover -s tests -p 'test_frame_continuity_report.py' -v
+      - name: Production CLI end-to-end 42-effect registry and real MP4 test
+        run: |
+          python -m unittest discover -s tests -p 'test_produce_video.py' -v
       - name: Cinematic finishing and Instagram export smoke
         run: |
           python scripts/cinematic_finish.py sample.mp4 --look clean-studio --platform instagram --audio aac --preset ultrafast --output-dir cinematic-smoke
