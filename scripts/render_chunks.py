@@ -6,6 +6,7 @@ from the original input. This avoids the memory and CPU overhead of sending
 untouched frames through the face tracking and effects pipeline.
 """
 import argparse
+from fractions import Fraction
 import json
 import subprocess
 import sys
@@ -60,6 +61,22 @@ def probe(path):
     return float(media["format"]["duration"]), int(stream["width"]), int(stream["height"])
 
 
+def resolve_fps(value, source):
+    """Choose the actual source frame rate, retaining fractional values (e.g. 59/2)."""
+    if value == "auto":
+        record = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+            "-show_entries", "stream=avg_frame_rate", "-of", "default=nw=1:nk=1",
+            str(source)], capture_output=True, text=True, check=True)
+        value = record.stdout.strip()
+    try:
+        rate = Fraction(value).limit_denominator(1001000)
+    except (ValueError, ZeroDivisionError) as exc:
+        raise ValueError(f"Unsupported FPS value: {value}") from exc
+    if not 8 <= float(rate) <= 30.5:
+        raise ValueError("This 42-effect engine supports 8–30.5 fps for full-quality effect rendering. Normalize higher-FPS footage explicitly before editing.")
+    return f"{rate.numerator}/{rate.denominator}"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path)
@@ -67,8 +84,8 @@ def main():
     parser.add_argument("output", type=Path)
     parser.add_argument("--width", type=int, default=540,
                         help="Short side of output in even pixels")
-    parser.add_argument("--fps", type=int, default=15,
-                        help="Frame rate; use source FPS for a production master")
+    parser.add_argument("--fps", default="auto",
+                        help="Output rate: auto (source rate), 30, 29.5 or 30000/1001; effect engine supports 8–30.5 fps")
     parser.add_argument("--brand", choices=["executive", "none"], default="executive")
     parser.add_argument("--crf", type=int, default=19)
     args = parser.parse_args()
@@ -80,8 +97,10 @@ def main():
         parser.error("Output must be MP4")
     if not 240 <= args.width <= 2160 or args.width % 2:
         parser.error("--width must be even, between 240 and 2160")
-    if not 8 <= args.fps <= 60:
-        parser.error("--fps must be 8-60")
+    try:
+        fps = resolve_fps(args.fps, args.input)
+    except (ValueError, subprocess.CalledProcessError) as exc:
+        parser.error(str(exc))
     if not 0 <= args.crf <= 51:
         parser.error("--crf must be 0-51")
 
@@ -103,7 +122,7 @@ def main():
             run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
                  "-ss", str(start), "-i", str(args.input),
                  "-t", str(end - start), "-vf",
-                 f"fps={args.fps},scale={w}:{h}:flags=lanczos", "-an",
+                 f"fps={fps},scale={w}:{h}:flags=lanczos", "-an",
                  "-c:v", "libx264", "-preset", "veryfast", "-crf", "19",
                  "-pix_fmt", "yuv420p", str(src)])
             if effects:
@@ -130,7 +149,7 @@ def main():
              *sources, "-filter_complex", filter_graph,
              "-map", "[v]", "-map", f"{len(chunks)}:a:0?",
              "-c:v", "libx264", "-preset", "veryfast",
-             "-crf", str(args.crf), "-r", str(args.fps),
+             "-crf", str(args.crf), "-r", fps,
              "-c:a", "copy", "-movflags", "+faststart",
              "-t", str(duration), str(args.output)])
     if not args.output.is_file() or args.output.stat().st_size < 1024:
