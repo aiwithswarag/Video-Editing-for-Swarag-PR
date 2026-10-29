@@ -26,3 +26,9 @@ Render the selected advanced effects using `scripts/render_chunks.py`, then pass
 - Confirm exact frame rate, H.264/AAC output, speech synchronization and readability on a mobile device.
 - Review manual selections of the 42 effects separately. The 47/47 synthetic passing test only establishes functional completeness.
 - Do not assert that the demonstration headings match the transcript, or that a synthetic preview is a production master.
+
+## Performance and verified scope
+
+The first implementation generated one RGBA PNG **per frame** and exceeded local rendering limits at 1080×1920 for 12 seconds. The default renderer now **creates one transparent artwork image per editorial beat** and delegates fades, compositing, scaling, colour and encoding to FFmpeg. A 12-second 540×960/15fps review is visually consistent with the earlier pipeline, and a 3-second 1080×1920/30fps clip was rendered from the original private footage.
+
+**Open limitation:** The complete 12-second 1080×1920/30fps preview still exceeded available CPU time on the current environment. Do not claim a full 1080p, minute-long production render is verified. Optimize with dedicated encode workers/hardware acceleration, smaller batch windows, reusable intermediate renders and benchmark on the target machine before release.
