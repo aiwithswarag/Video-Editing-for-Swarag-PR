@@ -675,7 +675,7 @@ def fx_cover_star(c, e):
         rnd = random.Random(1); bw, bh = int(c.W * 0.16), int(c.W * 0.09)
         im = Image.new('RGBA', (bw, bh), (255, 255, 255, 255)); d = ImageDraw.Draw(im); x = 8
         while x < bw - 8:
-            w = rnd.choice((2, 2, 3, 5)); d.rectangle([x, 6, x + w - 1, bh - 18], fill=(0, 0, 0, 255)); x += w + rnd.choice((2, 3, 4))
+            w = rnd.choice((2, 2, 3, 5)); top = max(2, int(bh * 0.20)); bottom = max(top, bh - max(2, int(bh * 0.15))); d.rectangle([x, top, x + w - 1, bottom], fill=(0, 0, 0, 255)); x += w + rnd.choice((2, 3, 4))
         return im
     bc = cached(e, 'b', barcode)
     comp(c, bc, c.W * 0.95 - bc.width, c.H * 0.93 - bc.height, al * k, guard=True)
