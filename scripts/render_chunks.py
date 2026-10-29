@@ -197,8 +197,7 @@ def main():
              "-map", "[v]", "-map", f"{len(chunks)}:a:0?",
              "-c:v", "libx264", "-preset", "veryfast",
              "-crf", str(args.crf), "-r", fps, "-frames:v",str(total_frames),
-             "-c:a", "copy", "-movflags", "+faststart",
-             "-t", str(duration), str(args.output)])
+             "-c:a", "copy", "-movflags", "+faststart",str(args.output)])
     if not args.output.is_file() or args.output.stat().st_size < 1024:
         raise RuntimeError("Renderer did not produce a valid output file")
     if frame_count(args.output)!=total_frames:
