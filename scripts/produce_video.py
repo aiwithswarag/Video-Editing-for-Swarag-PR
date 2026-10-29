@@ -141,7 +141,8 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
         master=outdir/'final_master.mp4'
         cmd=[sys.executable,str(ROOT/'scripts'/'render_chunks.py'),str(graded),
              str(workplan_path),str(master),'--width',str(width),
-             '--fps','auto','--brand',brand,'--crf',str(crf)]
+             '--fps','auto','--brand',brand,'--crf',str(crf),
+             '--cache-dir',str(outdir/'effect_cache')]
         run(cmd)
         report=check_master(graded,master,expected_width=width)
         if report['technical_status']!='PASS':
