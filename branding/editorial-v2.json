@@ -1,0 +1,47 @@
+{
+  "name": "Swarag Executive Editorial V2",
+  "intent": "Human-led editorial filmmaking; not template-style sticker animation",
+  "palette": {
+    "ink": "#121B26",
+    "ivory": "#F2EFE9",
+    "antique_gold": "#B79660",
+    "muted_slate": "#CDD5D5"
+  },
+  "type": {
+    "headlines": "Instrument Serif Italic",
+    "labels": "Inter Medium",
+    "microtype": "Inter Semibold"
+  },
+  "composition": {
+    "format": "9:16",
+    "left_margin_percent": 7.9,
+    "top_copy_zone_percent": [
+      8,
+      21
+    ],
+    "lower_third_zone_percent": [
+      78,
+      87
+    ],
+    "face_priority": true
+  },
+  "motion": {
+    "fade_seconds": 0.45,
+    "max_concurrent_graphics": 1,
+    "translate_in_pixels_at_540x960": 8
+  },
+  "post": {
+    "contrast": 1.035,
+    "saturation": 0.93
+  },
+  "avoid": [
+    "invented statistics",
+    "face-clone fallback cards",
+    "social media UI",
+    "text across eyes",
+    "neon glow",
+    "random transition stacks",
+    "fabricated quotes",
+    "unrequested watermark"
+  ]
+}
