@@ -122,6 +122,17 @@ jobs:
           assert report['technical_loudness_status']=='PASS'
           assert report['creative_status'].startswith('NOT APPROVED')
           PY
+      - name: Verify offline ASR JSON adapter without personal audio
+        run: |
+          python - <<'PY'
+          from tools.transcribe_offline import normalize
+          segments=[{'text':word,'offsets':{'from':i*180,'to':(i+1)*180}}
+                    for i,word in enumerate(['World','models','predict','what','happens'])]
+          result=normalize({'transcription':segments},2.0)
+          assert len(result['words'])==5
+          assert result['transcript_verified'] is False
+          assert result['kind']=='private_asr_word_draft'
+          PY
       - name: Verify streams and duration
         run: |
           test -s smoke.mp4
