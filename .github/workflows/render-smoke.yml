@@ -53,6 +53,23 @@ jobs:
           test -s editorial-smoke.mp4
           ffprobe -v error -show_entries stream=codec_type -of default=nw=1 editorial-smoke.mp4 | grep video
           ffprobe -v error -show_entries stream=codec_type -of default=nw=1 editorial-smoke.mp4 | grep audio
+      - name: Test real-audio timing and transcript-grounded storyboard
+        run: |
+          python tools/audio_pause_map.py sample.mp4 --output pause-smoke.json
+          python - <<'PY'
+          import json
+          with open('timed-words-demo.json', 'w') as f:
+              json.dump([{'w':'Clear','s':0.2,'e':0.45},{'w':'thinking.','s':0.48,'e':0.76}],f)
+          PY
+          python tools/transcript_storyboard.py timed-words-demo.json --duration 2 --output speech-storyboard-smoke.json
+          python - <<'PY'
+          import json
+          p=json.load(open('pause-smoke.json'))
+          s=json.load(open('speech-storyboard-smoke.json'))
+          assert p['kind']=='audio_pause_map'
+          assert s['beats'][0]['headline']=='Clear thinking.'
+          assert 'DRAFT' in s['status']
+          PY
       - name: Verify streams and duration
         run: |
           test -s smoke.mp4

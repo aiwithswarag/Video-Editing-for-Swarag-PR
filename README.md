@@ -44,6 +44,22 @@ python scripts/editorial_director.py input.mp4 examples/editorial-storyboard.jso
 
 See `docs/ART_DIRECTION_V2.md` and `branding/editorial-v2.json`.
 
+## Content-led editing (new)
+
+Before writing on-screen copy, establish where the speaker actually pauses, and obtain *verified* word timestamps. Both generated files belong in a **private working folder**; do not commit a personal video's transcription or private media.
+
+```bash
+python tools/audio_pause_map.py input.mp4 --output private/pauses.json
+# Requires explicitly installed faster-whisper extras and a model download:
+python -m pip install -r requirements-transcription.txt
+python scripts/words.py input.mp4
+python tools/transcript_storyboard.py input.words.json --duration 60.71 --output private/editorial-draft.json
+# Review and correct transcript words and draft titles before rendering.
+python scripts/editorial_director.py input.mp4 private/editorial-draft.json private/review.mp4 --seconds 12 --width 540 --fps 15
+```
+
+The pause map is evidence of *timing*, not speech content. The generated storyboard only uses contiguous word sequences from supplied ASR output, marks itself as a draft, and never invents metrics or quotations. See `docs/SPEECH_LED_EDITING.md`.
+
 ## Executive design system
 Use navy #17283E, ink #101923, ivory #F5F2EC, restrained teal #2C9A90 and gold #C5A46D. Prefer legible Inter typography, subtle zooms, minimal charts and verified metrics. Avoid unnecessary stickers, flashing animations, or brand logos. Individual legacy effects have their own graphics; visually review output before publishing.
 

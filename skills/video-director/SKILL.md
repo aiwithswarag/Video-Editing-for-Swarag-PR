@@ -11,7 +11,7 @@ Use the repository root as working directory. All 42 original effects remain ava
 2. Use the default `branding/executive.json` profile for professional content. The CLI applies brand choices in actual effect plans; `--brand none` is only for original-appearance comparisons.
 3. Use `python scripts/video_director.py list` and `references/effects-guide.md` to choose among all 42 effects. Respect each effect's option interface.
 4. Build a JSON plan of `{"effects":[{"fx":"spotlight","start":3,"end":6,"text":"IMPACT"}]}`. Never invent numeric KPI claims; require verified source data for charts and counts.
-5. If timing is speech-synced, use `scripts/words.py` with the optional explicit transcription requirements. Never guess spoken-word timestamps.
+5. For actual speech-based pacing, start with `python tools/audio_pause_map.py INPUT --output PRIVATE/pauses.json`. This detects silence *only*, not meaning. For exact spoken words, run `scripts/words.py` with explicitly installed transcription extras; inspect and correct results. Then build a **draft** by `python tools/transcript_storyboard.py INPUT.words.json --duration SECONDS --output PRIVATE/story.json`. Review every word before quoting. See `docs/SPEECH_LED_EDITING.md`.
 6. Validate the plan with `python scripts/video_director.py validate PLAN --duration SECONDS`.
 7. Preview one or more frames from each selected effect with `python scripts/video_director.py preview INPUT PLAN check.png --at SECOND`.
 8. Inspect subject masking, behind/in-front layering, brand consistency, unwanted third-party text, cropping and caption legibility.
