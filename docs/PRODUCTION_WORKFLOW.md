@@ -15,6 +15,18 @@ python scripts/produce_video.py catalog
 
 **Video requirements:** native portrait 9:16 with audio, a decodable frame count, constant frame rate 8–30.5 fps, SDR Rec.709 or known-safe SDR. Input above 30.5 fps must be explicitly converted outside the editing workflow; the original 42-effect engine internally caps higher rates. Do not silently drop 60 fps motion. Preserve original files.
 
+### Windows PowerShell quick start
+
+Once Python 3.12, FFmpeg and the project dependencies are installed, run these commands from the repository directory:
+
+```powershell
+py -3.12 scripts/produce_video.py catalog
+py -3.12 scripts/produce_video.py plan "PRIVATE\original.mp4" --instructions "PRIVATE\director-cues.txt" --output "PRIVATE\edit-plan.json"
+py -3.12 scripts/produce_video.py render "PRIVATE\original.mp4" --plan "PRIVATE\edit-plan.json" --output-dir "PRIVATE\final_release" --look clean-studio --crf 18
+```
+
+For source speech captions, add `--script "PRIVATE\verified-script.txt" --transcript-verified` to the plan command **only after personally verifying the recording**. Use a local `PRIVATE` folder ignored by Git, and never upload source footage into the public repository.
+
 ## Step 1 — Choose effects in ordinary language, then make explicit edit cues
 
 The assistant/director should watch the video and listen to the verified voice track, then write an editable plain-text cue sheet. Your prompt and script are *instructions*, not direct executable FFmpeg commands. Timed instructions are the contract between creative planning and the rendering engine.
