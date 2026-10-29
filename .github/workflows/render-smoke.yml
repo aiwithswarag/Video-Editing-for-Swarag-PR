@@ -80,6 +80,18 @@ jobs:
           assert 'integrated_lufs' in r
           assert 'true_peak_dbtp' in r
           PY
+      - name: Verify segmented native-resolution editorial export
+        run: |
+          python - <<'PY'
+          import json
+          story={"beats":[{"kind":"opener","start":0.25,"end":1.55,
+                          "name":"SWARAG","subline":"EXECUTIVE NOTES"}]}
+          with open("identity-smoke.json","w") as f:json.dump(story,f)
+          PY
+          python scripts/render_editorial_master.py sample.mp4 identity-smoke.json native-identity-smoke.mp4 --width 360 --fps 12
+          test -s native-identity-smoke.mp4
+          ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 native-identity-smoke.mp4 | grep '360,'
+          ffprobe -v error -select_streams a:0 -show_entries stream=codec_type -of csv=p=0 native-identity-smoke.mp4 | grep audio
       - name: Verify streams and duration
         run: |
           test -s smoke.mp4
@@ -97,6 +109,7 @@ jobs:
             smoke-segmented.mp4
             cover-star-small.mp4
             editorial-smoke.mp4
+            native-identity-smoke.mp4
             smoke-plan.json
           if-no-files-found: ignore
           retention-days: 7
