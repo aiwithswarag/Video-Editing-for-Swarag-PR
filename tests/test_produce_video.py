@@ -63,6 +63,14 @@ class ProductionPipelineSmoke(unittest.TestCase):
             self.assertEqual(final['original_audio_md5'],final['master_audio_md5'])
             self.assertEqual(3,len(final['platform_copies']))
             self.assertTrue(Path(final['visual_review']['contact_sheet']).is_file())
+            cache=root/'deliver'/'effect_cache'
+            chunks=list(cache.glob('edited_*.mp4'))
+            self.assertTrue(chunks)
+            previous=[c.stat().st_mtime_ns for c in chunks]
+            repeat=mod.release(native,plan,root/'deliver',look='clean-studio',width=360,
+                               crf=20,frames_per_chunk=30)
+            self.assertEqual('PASS',repeat['technical_status'])
+            self.assertEqual(previous,[c.stat().st_mtime_ns for c in chunks])
             self.assertGreaterEqual(final['visual_review']['frames'],4)
             for path in final['platform_copies'].values():
                 self.assertTrue(Path(path).is_file())
