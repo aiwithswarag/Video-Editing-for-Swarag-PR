@@ -94,12 +94,15 @@ def frame_segments(plan, total_frames, rate):
     for _,end,_ in legacy:
         stop=min(total_frames,max(cursor,round(Fraction(str(end))*rate)))
         if stop<=cursor:continue
-        a,b=float(Fraction(cursor,1)/rate),float(Fraction(stop,1)/rate)
         edits=[]
         for item in plan:
-            lo=max(a,item["start"]);hi=min(b,item["end"])
-            if hi-lo>1e-6:
-                edit={**item,"start":round(lo-a,6),"end":round(hi-a,6)}
+            fx_start=round(Fraction(str(item["start"]))*rate)
+            fx_end=round(Fraction(str(item["end"]))*rate)
+            lo=max(cursor,fx_start);hi=min(stop,fx_end)
+            if hi>lo:
+                edit={**item,
+                      "start":round(float(Fraction(lo-cursor,1)/rate),6),
+                      "end":round(float(Fraction(hi-cursor,1)/rate),6)}
                 edits.append(edit)
         parts.append((cursor,stop-cursor,edits))
         cursor=stop
