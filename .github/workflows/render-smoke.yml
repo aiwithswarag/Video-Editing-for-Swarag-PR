@@ -161,6 +161,11 @@ jobs:
           q=json.load(open('multi-research-qa.json'))
           assert q['technical_status']=='PASS' and q['audio_bitstream_identical'] is True
           PY
+      - name: Cinematic finishing and Instagram export smoke
+        run: |
+          python scripts/cinematic_finish.py sample.mp4 --look clean-studio --platform instagram --audio aac --preset ultrafast --output-dir cinematic-smoke
+          test -s cinematic-smoke/sample_clean-studio_instagram.mp4
+          test -s cinematic-smoke/cinematic_qa.json
       - name: Verify streams and duration
         run: |
           test -s smoke.mp4

@@ -137,6 +137,16 @@ Select cut points from the **verified** audio/scene context; the example frame n
 
 For research-heavy videos, `scripts/research_cards.py` creates a precise, sourced editorial graphic from `examples/world-model-research-cards.json`, with benchmark scope, references and caveats. `scripts/insert_cutaways.py` replaces multiple exact source-frame windows in one pass, copying original AAC audio. Re-verify research wording against primary papers and review the cutaway timing; see `docs/RESEARCH_EDITS.md`.
 
+## Cinematic camera finish and social exports
+
+Create a restrained natural camera grade (skin, tonal separation, colour balance and detail without fake depth or resolution) and publish a **reviewed** 9:16 MP4 to Instagram, LinkedIn and YouTube Shorts:
+
+```bash
+python scripts/cinematic_finish.py reviewed_edit.mp4 --look clean-studio --platform all --audio source --output-dir exports
+```
+
+For prompts with attached video and script, read `docs/CINEMATIC_PRODUCTION.md`: transcribe, plan effects, edit and **then** grade/export. A script passed to the finisher alone is a reference, not a caption generator. The optional `restoration` look is resource intensive.
+
 ## Executive design system
 Use navy #17283E, ink #101923, ivory #F5F2EC, restrained teal #2C9A90 and gold #C5A46D. Prefer legible Inter typography, subtle zooms, minimal charts and verified metrics. Avoid unnecessary stickers, flashing animations, or brand logos. Individual legacy effects have their own graphics; visually review output before publishing.
 
