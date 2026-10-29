@@ -21,6 +21,7 @@ from effect_catalog import read_registry
 from resumable_cinematic_master import process as grade_master,stream
 from cinematic_finish import probe,audio_md5
 from master_quality_check import evaluate as check_master
+from production_lint import audit as audit_plan
 
 
 def run(args):
@@ -97,7 +98,7 @@ def build_preview(video,plan,start,seconds,tmp):
 
 
 def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executive',
-            crf=18,frames_per_chunk=180,preview_start=None,preview_seconds=None):
+            crf=18,frames_per_chunk=180,preview_start=None,preview_seconds=None,style='premium'):
     video=Path(video).resolve();plan_path=Path(plan_path).resolve()
     outdir=Path(outdir).resolve()
     if not plan_path.is_file():raise FileNotFoundError(plan_path)
@@ -106,6 +107,9 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
         raise ValueError('Transcript-based plan must be explicitly verified before export')
     original=media(video)
     plan=validate_plan(raw,original['duration'])
+    creative_lint=audit_plan(plan,original['duration'],style)
+    if creative_lint['blocking_errors']:
+        raise ValueError('Premium edit rejected by creative lint: '+json.dumps(creative_lint['blocking_errors']))
     if original['frames'] is None:
         raise ValueError('Frame count missing; normalize video to CFR H264/AAC first')
     if original['width']*16!=original['height']*9:
@@ -155,7 +159,8 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
                 'grade_before_graphics':look,'source':video.name,
                 'preview':preview_seconds is not None,
                 'source_fps':original['fps'],'output_fps':report['output_media']['fps'],
-                'qa':report,'original_audio_md5':audio_md5(source),
+                'qa':report,'creative_lint':creative_lint,
+                'original_audio_md5':audio_md5(source),
                 'master_audio_md5':audio_md5(master),
                 'output':str(master),'platform_copies':outputs,
                 'platform_note':'Same portrait H264/AAC master, no platform-specific video layout or bitrate.',
@@ -180,6 +185,8 @@ def main():
     export.add_argument('--output-dir',required=True,type=Path)
     export.add_argument('--look',choices=('clean-studio','editorial-cinema','neutral','restoration'),default='clean-studio')
     export.add_argument('--brand',choices=('executive','none'),default='executive')
+    export.add_argument('--style',choices=('premium','showcase'),default='premium',
+                        help='Premium blocks placeholder/crowded edits; showcase permits experiments with documented warnings')
     export.add_argument('--width',type=int)
     export.add_argument('--crf',type=int,default=18)
     export.add_argument('--chunk-frames',type=int,default=180)
@@ -198,7 +205,7 @@ def main():
             if args.preview_start is not None and args.preview_seconds is None:
                 p.error('--preview-start requires --preview-seconds')
             result=release(args.video,args.plan,args.output_dir,args.look,args.width,args.brand,
-                           args.crf,args.chunk_frames,args.preview_start,args.preview_seconds)
+                           args.crf,args.chunk_frames,args.preview_start,args.preview_seconds,args.style)
         print(json.dumps(result,indent=2,ensure_ascii=False))
     except (ValueError,RuntimeError,FileNotFoundError,subprocess.CalledProcessError) as exc:
         p.exit(1,f'Production pipeline failed: {exc}\n')
