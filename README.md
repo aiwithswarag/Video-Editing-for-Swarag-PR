@@ -68,6 +68,16 @@ python tools/audio_quality_report.py input.mp4 --output private/audio-qa.json
 
 Check integrated LUFS, true peak and loudness range before any mastering. The script does **not modify the audio** and warns if gain-only boosting would exceed the true-peak reference. Review on headphones and mobile speakers before adding compression/EQ or new music. See `docs/AUDIO_QA.md`.
 
+## Full-resolution identity and editorial reviews
+
+The new segmented export path avoids recompositing every frame at full resolution. It renders art-directed beats and re-encodes untouched spans cheaply, then remuxes the source audio without changing it:
+
+```bash
+python scripts/render_editorial_master.py input.mp4 examples/identity-only-story.json review.mp4 --width 1080 --fps 29.5
+```
+
+This example adds **nameplates only** and does not claim to match unverified spoken words. It is intentionally a visual baseline, not the completed ten-effect edit. See `docs/NATIVE_EDITORIAL_MASTER.md`.
+
 ## Executive design system
 Use navy #17283E, ink #101923, ivory #F5F2EC, restrained teal #2C9A90 and gold #C5A46D. Prefer legible Inter typography, subtle zooms, minimal charts and verified metrics. Avoid unnecessary stickers, flashing animations, or brand logos. Individual legacy effects have their own graphics; visually review output before publishing.
 
