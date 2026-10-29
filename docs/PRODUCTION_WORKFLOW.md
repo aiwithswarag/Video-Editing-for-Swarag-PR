@@ -90,6 +90,12 @@ Pipeline:
 
 `--style premium` (default) flags aggressive zoom, missing intentional headline text, and more than two simultaneous effects. `--style showcase` permits intentional experiments, reports issues, and never magically upgrades their creative quality.
 
+### Resume interrupted effect renders
+
+The production command stores validated, previously completed effects in `PRIVATE/final_release/effect_cache`. The `render_chunks.py --cache-dir` backend fingerprints the input file, plan, native fps, export dimensions, CRF and branding. Repeat the **same** production command after an interruption: completed sections are reused; uncompleted or corrupt sections are rerendered. If the original footage, effect timings, profile or settings change, use **a new output directory**. The source grade has its own separate resumable cache.
+
+Audio is assembled in a separate remux step *after* video-frame-constrained encoding; this preserves the original AAC packets even if the audio track extends slightly beyond the last video frame.
+
 ## Step 5 — Final human production acceptance
 
 At final native resolution, check **every cut and every effect** on phone and desktop:
