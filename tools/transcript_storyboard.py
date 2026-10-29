@@ -74,8 +74,13 @@ def create_story(words_source,duration,max_beats=6,min_spacing=6.5):
         start=max(0.,group[0]["s"]-.16)
         end=min(duration,start+max(2.4,min(4.,group[-1]["e"]-group[0]["s"]+.55)))
         if end<=start+.5:continue
+        count=0
+        for token in group:
+            if count>=6 or len(text_from_words(group[:count+1]))>37:
+                break
+            count+=1
         candidates.append({"s":start,"e":end,"headline":headline,
-                           "word_span":[group[0]["s"],group[min(len(group)-1,5)]["e"]]})
+                           "word_span":[group[0]["s"],group[count-1]["e"]]})
     beats=[]
     for candidate in candidates:
         if beats and candidate["s"]-beats[-1]["start"]<min_spacing:continue
