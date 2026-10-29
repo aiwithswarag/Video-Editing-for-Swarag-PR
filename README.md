@@ -29,6 +29,21 @@ A first real-footage review used five original effects on a 60.7-second vertical
 
 Use `--width 540 --fps 15` for low-cost previews; use the intended source frame rate (within the CLI limits) and larger output width for final rendering. Always check exported A/V sync and any boundary seam.
 
+## Art-directed premium edits (Executive Editorial V2)
+
+The **premium editorial director** is separate from, and compatible with, the 42-effect engine. It places a restrained serif headline in the upper negative space and simple typography in the lower third. It intentionally avoids busy glass status widgets, face-covering typography, pretend KPIs, and social-media template chrome.
+
+```bash
+python tools/download_assets.py
+python scripts/editorial_director.py input.mp4 examples/editorial-storyboard.json style-test.mp4 --seconds 12 --width 540 --fps 15
+# For full-resolution test sections:
+python scripts/editorial_director.py input.mp4 examples/editorial-storyboard.json full-res-sample.mp4 --seconds 3 --width 1080 --fps 30
+```
+
+**Edit the sample headings** in `examples/editorial-storyboard.json`; they are concept copy, *not* automatically transcribed speech. For sophisticated compositing, render your chosen effects via `scripts/render_chunks.py`, then use their output as the input to `editorial_director.py`. Do not duplicate title treatments between both passes.
+
+See `docs/ART_DIRECTION_V2.md` and `branding/editorial-v2.json`.
+
 ## Executive design system
 Use navy #17283E, ink #101923, ivory #F5F2EC, restrained teal #2C9A90 and gold #C5A46D. Prefer legible Inter typography, subtle zooms, minimal charts and verified metrics. Avoid unnecessary stickers, flashing animations, or brand logos. Individual legacy effects have their own graphics; visually review output before publishing.
 

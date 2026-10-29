@@ -42,6 +42,17 @@ jobs:
           PY
           python scripts/video_director.py render sample.mp4 cover-star-plan.json cover-star-small.mp4 --width 240
           test -s cover-star-small.mp4
+      - name: Test Executive Editorial V2 finishing pass
+        run: |
+          python - <<'PY'
+          import json
+          with open('editorial-smoke.json', 'w') as f:
+              json.dump({'duration': 2, 'beats': [{'kind':'opener', 'start':0.15, 'end':1.6, 'eyebrow':'SWARAG / NOTES', 'headline':'Clear thinking.', 'name':'SWARAG', 'subline':'STRATEGY / DELIVERY'}]}, f)
+          PY
+          python scripts/editorial_director.py sample.mp4 editorial-smoke.json editorial-smoke.mp4 --seconds 1.8 --width 360 --fps 12
+          test -s editorial-smoke.mp4
+          ffprobe -v error -show_entries stream=codec_type -of default=nw=1 editorial-smoke.mp4 | grep video
+          ffprobe -v error -show_entries stream=codec_type -of default=nw=1 editorial-smoke.mp4 | grep audio
       - name: Verify streams and duration
         run: |
           test -s smoke.mp4
@@ -58,6 +69,7 @@ jobs:
             smoke.mp4
             smoke-segmented.mp4
             cover-star-small.mp4
+            editorial-smoke.mp4
             smoke-plan.json
           if-no-files-found: ignore
           retention-days: 7
