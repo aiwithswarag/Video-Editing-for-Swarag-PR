@@ -22,6 +22,7 @@ from resumable_cinematic_master import process as grade_master,stream
 from cinematic_finish import probe,audio_md5
 from master_quality_check import evaluate as check_master
 from production_lint import audit as audit_plan
+from visual_review import create as make_review_sheet
 
 
 def run(args):
@@ -147,6 +148,7 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
             raise RuntimeError('Final QA FAIL: '+', '.join(report['errors']))
         run(['ffmpeg','-hide_banner','-loglevel','error','-xerror',
              '-i',str(master),'-map','0:v:0','-f','null','-'])
+        review=make_review_sheet(master,workplan,media(master)['duration'],outdir/'visual_review.jpg')
         outputs={}
         for name in ('instagram','linkedin','youtube-shorts'):
             dest=outdir/f'final_{name}.mp4'
@@ -159,7 +161,7 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
                 'grade_before_graphics':look,'source':video.name,
                 'preview':preview_seconds is not None,
                 'source_fps':original['fps'],'output_fps':report['output_media']['fps'],
-                'qa':report,'creative_lint':creative_lint,
+                'qa':report,'creative_lint':creative_lint,'visual_review':review,
                 'original_audio_md5':audio_md5(source),
                 'master_audio_md5':audio_md5(master),
                 'output':str(master),'platform_copies':outputs,
