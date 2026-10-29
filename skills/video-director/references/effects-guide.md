@@ -66,3 +66,7 @@ The engine implements **all 42 registered effects** from the original upstream M
 - Final acceptance requires manual review of real-footage motion and audio synchronization.
 
 Source: [Vibha Ramprakash/claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects), original effect syntax adapted under the MIT license.
+
+## Swarag Executive Orbit fallback
+
+When no image folder is supplied, the executive profile now creates six original editorial strategy cards instead of duplicating screenshots of the speaker. Set `labels` to pipe-separated topic names to customize them. Supplying an `images` folder always takes precedence. Use `--brand none` for an unchanged upstream-style thumbnail fallback. This change retains the original `orbit` effect and its motion tracking.

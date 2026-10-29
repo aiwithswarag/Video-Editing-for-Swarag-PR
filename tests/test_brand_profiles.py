@@ -18,6 +18,15 @@ class TestExecutiveBrand(unittest.TestCase):
     def test_brand_name_validation(self):
         with self.assertRaises(ValueError):
             apply_brand([{"fx":"slow-push","start":0,"end":1}],"unknown")
+    def test_orbit_executive_cards_default(self):
+        plan=[{"fx":"orbit","start":0,"end":2}]
+        branded=apply_brand(plan)[0]
+        self.assertTrue(branded["brand_cards"])
+        self.assertIn("STRATEGY",branded["labels"])
+        self.assertNotIn("brand_cards",apply_brand(plan,"none")[0])
+    def test_orbit_user_images_take_priority(self):
+        script=(ROOT/"scripts/fx.py").read_text(encoding="utf8")
+        self.assertIn("not f.o.get('images') else load_cards",script)
     def test_no_inherited_creator_defaults(self):
         s=(ROOT/"scripts/fx.py").read_text(encoding="utf8")
         for forbidden in ["'CLAUDE'","'VIBE'","@vibha.in.progress","22 effects","the art of the|effortless edit"]:

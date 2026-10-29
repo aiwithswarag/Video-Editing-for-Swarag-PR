@@ -220,7 +220,7 @@ def fx_noise(c, e):
         rnd = random.Random(7); n = min(16, max(4, int(e.d / 0.22)))
         return [(rnd.uniform(0.14, 0.86), rnd.uniform(0.12, 0.52), rnd.uniform(-7, 7)) for _ in range(n)]
     pos = cached(e, 'pos', setup)
-    cards = cached(e, 'cards', lambda: [card(vary(im, i) if e.o.get('images') is None else im, cw) for i, im in enumerate(e.cards)])
+    cards = cached(e, 'cards', lambda: [card(im if e.o.get('brand_cards') or e.o.get('images') is not None else vary(im, i), cw) for i, im in enumerate(e.cards)])
     out = clamp((e.d - c.lt) / 0.2)
     for i, (x, y, r) in enumerate(pos):
         t0 = i * 0.22
@@ -1930,6 +1930,39 @@ class Fx:
         self.o = {k: v for k, v in d.items() if k not in ('fx', 'start', 'end')}; self.state = {}; self.cards = []
 
 
+
+def executive_cards(labels=None):
+    """Generate original, content-neutral Orbit visuals when no user assets are supplied."""
+    names = [v.strip().upper() for v in str(labels or 'STRATEGY|EXECUTION|GOVERNANCE|AI ADOPTION|OUTCOMES|DELIVERY').split('|') if v.strip()]
+    if not names:
+        names = ['STRATEGY']
+    out = []
+    palettes = [((16, 25, 35), (44, 154, 144)), ((23, 40, 62), (197, 164, 109)),
+                ((24, 36, 46), (130, 147, 165)), ((18, 38, 42), (44, 154, 144)),
+                ((38, 36, 42), (197, 164, 109)), ((16, 25, 35), (197, 164, 109))]
+    for i, title in enumerate(names[:20]):
+        W, H = 486, 864
+        bg, accent = palettes[i % len(palettes)]
+        im = Image.new('RGB', (W, H), bg)
+        d = ImageDraw.Draw(im)
+        d.rounded_rectangle([24, 24, W - 25, H - 25], radius=35, outline=accent, width=3)
+        d.rectangle((42, 53, 112, 61), fill=accent)
+        tiny = ImageFont.truetype(FONT['uim'], 21)
+        d.text((W - 42, 50), f'{i+1:02d} / {len(names):02d}', font=tiny, fill=(220, 227, 228), anchor='ra')
+        x0, y0 = 43, H * 0.44
+        for j, chunk in enumerate(title.split(' ')):
+            sz = 64
+            ft = ImageFont.truetype(FONT['uib'], sz)
+            while ft.getlength(chunk) > W - 80 and sz > 24:
+                sz -= 2
+                ft = ImageFont.truetype(FONT['uib'], sz)
+            d.text((x0, y0 + j * 72), chunk, font=ft, fill=(245, 242, 236))
+        d.line([(42, H - 130), (W - 42, H - 130)], fill=accent, width=3)
+        d.text((43, H - 106), 'SWARAG  /  EXECUTIVE', font=tiny, fill=(203, 213, 218))
+        out.append(im)
+    return out
+
+
 def load_cards(folder, thumbs):
     out = []
     if folder and os.path.isdir(folder):
@@ -1989,7 +2022,8 @@ def main():
     sm = smooth(faces, fps)
     if sm is None: sm = np.tile([aw / 2, ah * 0.33, aw * 0.15], (len(faces), 1))
     for f in fxs:
-        if f.name in CARD_FX: f.cards = load_cards(f.o.get('images'), thumbs)
+        if f.name in CARD_FX:
+            f.cards = executive_cards(f.o.get('labels')) if f.name == 'orbit' and f.o.get('brand_cards') and not f.o.get('images') else load_cards(f.o.get('images'), thumbs)
     stills = sorted({int(round(float(s) * fps)) for s in a.still.split(',')}) if a.still else None
     enc = None
     if not stills:

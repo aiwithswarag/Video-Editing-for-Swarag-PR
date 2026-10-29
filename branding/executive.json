@@ -59,6 +59,10 @@
     },
     "red-collage": {
       "color": "#C5A46D"
+    },
+    "orbit": {
+      "brand_cards": true,
+      "labels": "STRATEGY|EXECUTION|GOVERNANCE|AI ADOPTION|OUTCOMES|DELIVERY"
     }
   }
 }
