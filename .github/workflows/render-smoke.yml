@@ -92,6 +92,16 @@ jobs:
           test -s native-identity-smoke.mp4
           ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 native-identity-smoke.mp4 | grep '360,'
           ffprobe -v error -select_streams a:0 -show_entries stream=codec_type -of csv=p=0 native-identity-smoke.mp4 | grep audio
+      - name: Verify master duration, FPS and original AAC bitstream
+        run: |
+          python tools/master_quality_check.py sample.mp4 native-identity-smoke.mp4 --output master-qa-smoke.json --expected-width 360 --allow-fps-change
+          python - <<'PY'
+          import json
+          report=json.load(open('master-qa-smoke.json'))
+          assert report['technical_status']=='PASS'
+          assert report['audio_bitstream_identical'] is True
+          assert report['creative_status'].startswith('NOT APPROVED')
+          PY
       - name: Verify streams and duration
         run: |
           test -s smoke.mp4
