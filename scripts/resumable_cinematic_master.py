@@ -16,6 +16,14 @@ from pathlib import Path
 from cinematic_finish import PLATFORMS, probe, video_filter, audio_md5
 
 
+def file_sha256(path):
+    digest=hashlib.sha256()
+    with open(path,'rb') as source:
+        for chunk in iter(lambda:source.read(1024*1024),b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def run(args, capture=False):
     return subprocess.run(args, check=True, text=True, capture_output=capture)
 
@@ -143,7 +151,7 @@ def finalize(source, outdir, chunks, fps, info, ident, approved, report_path):
             'source_fps':str(fps),'source_audio_md5':audio_md5(source),
             'output_audio_md5':audio_md5(master),'duration_s':exported['duration'],
             'dimensions':expected,'decode':'PASS','shared_encode':True,
-            'master':str(master),'platform_exports':platforms}
+            'master':str(master),'master_file_sha256':file_sha256(master),'platform_exports':platforms}
     report_path.write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
     return report
 
@@ -177,7 +185,23 @@ def process(source,outdir,look='editorial-cinema',preset='veryfast',crf=18,
                 'chunks_total':len(chunks),'next_chunk':remaining[0],
                 'instruction':'Run the same command again with --next-chunk, or without it to finish all chunks'}
         print(json.dumps(result,indent=2));return result
-    return finalize(source,outdir,chunks,fps,info,ident,approved,outdir/'cinematic_qa.json')
+    report_file=outdir/'cinematic_qa.json'
+    current=outdir/'cinematic_master.mp4'
+    if report_file.is_file() and current.is_file():
+        previous=json.loads(report_file.read_text(encoding='utf8'))
+        expected=(min(info['width'],1080),min(info['height'],1920))
+        if (previous.get('render_config_sha256')==ident
+            and previous.get('technical_status')=='PASS'
+            and previous.get('master_file_sha256')
+            and check_chunk(current,sum(n for _,_,n in chunks),expected,fps)
+            and file_sha256(current)==previous['master_file_sha256']
+            and audio_md5(source)==previous.get('source_audio_md5')):
+            for name in PLATFORMS:
+                dest=outdir/f'cinematic_master_{name}.mp4'
+                if not dest.is_file() or file_sha256(dest)!=previous['master_file_sha256']:
+                    shutil.copyfile(current,dest)
+            return previous
+    return finalize(source,outdir,chunks,fps,info,ident,approved,report_file)
 
 
 def main():
