@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "status": "IDENTITY-ONLY DEMO; NOT SPEECH TRANSCRIBED OR APPROVED",
+  "requires_transcript": false,
+  "transcript_verified": false,
+  "beats": [
+    {
+      "kind": "opener",
+      "start": 0.7,
+      "end": 4.1,
+      "eyebrow": "",
+      "name": "SWARAG",
+      "subline": "EXECUTIVE NOTES"
+    },
+    {
+      "kind": "closing",
+      "start": 56.8,
+      "end": 60.4,
+      "eyebrow": "",
+      "name": "SWARAG",
+      "subline": "SWARAG.ME"
+    }
+  ]
+}
