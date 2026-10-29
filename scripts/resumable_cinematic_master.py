@@ -87,7 +87,7 @@ def encode_chunk(source, target, start, frames, fps, info, look, preset, crf):
          '-ss',f'{float(start/fps):.9f}','-i',str(source),'-map','0:v:0','-an',
          '-vf',video_filter(info,look),'-frames:v',str(frames),
          '-fps_mode','cfr','-r',str(fps),'-c:v','libx264','-preset',preset,
-         '-crf',str(crf),'-maxrate','16M','-bufsize','24M',
+         '-crf',str(crf),'-bf','0','-maxrate','16M','-bufsize','24M',
          '-pix_fmt','yuv420p','-color_primaries','bt709','-color_trc','bt709',
          '-colorspace','bt709','-movflags','+faststart',str(tmp)]
     try:
