@@ -92,13 +92,14 @@ def layout(width,height,beat,font_dir):
         if draw.textlength(headline,font=headfont)>available:
             raise ValueError('Headline exceeds safe area')
         draw.text((left,upper+int(height*.024)),headline,font=headfont,fill=INK+(255,))
-    rule_y=upper+int(height*.102)
-    draw.line([(left,rule_y),(left+int(width*.078),rule_y)],fill=GOLD+(235,),width=max(2,int(width*.004)))
+    if small or headline:
+        rule_y=upper+int(height*.102)
+        draw.line([(left,rule_y),(left+int(width*.078),rule_y)],fill=GOLD+(235,),width=max(2,int(width*.004)))
     if beat['kind'] in ('opener','closing'):
         y=int(height*.790)
-        draw.line([(left,y-16),(left,y+48)],fill=GOLD+(235,),width=max(2,int(width*.005)))
+        draw.line([(left,y-16),(left,y+89)],fill=GOLD+(235,),width=max(2,int(width*.005)))
         draw.text((left+int(width*.026),y-22),beat.get('name','SWARAG'),font=f['name'],fill=IVORY+(255,))
-        letterspaced(draw,(left+int(width*.027),y+23),
+        letterspaced(draw,(left+int(width*.027),y+62),
                      (sub or 'STRATEGY  /  DELIVERY').upper(),
                      f['small'],LIGHT+(220,),width*.0015)
     elif sub:
