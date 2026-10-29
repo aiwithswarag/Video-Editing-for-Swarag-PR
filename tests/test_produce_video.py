@@ -75,7 +75,7 @@ class ProductionPipelineSmoke(unittest.TestCase):
                 '-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p',
                 '-c:a','aac','-shortest',str(source)],check=True)
             self.assertEqual('59/2',mod.media(source)['fps'])
-            cues=root/'cues.txt';cues.write_text('FX slow-push 0.3 1.2 zoom=1.05\\n')
+            cues=root/'cues.txt';cues.write_text('FX slow-push 0.3 1.2 zoom=1.05'+chr(10))
             plan=root/'plan.json';mod.prepare(source,cues,plan)
             final=mod.release(source,plan,root/'out',look='neutral',crf=20,
                               width=360,frames_per_chunk=90)
