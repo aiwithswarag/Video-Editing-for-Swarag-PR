@@ -133,6 +133,19 @@ jobs:
           assert result['transcript_verified'] is False
           assert result['kind']=='private_asr_word_draft'
           PY
+      - name: Render original robotics cutaway and verify frame-exact insertion
+        run: |
+          ffmpeg -hide_banner -loglevel error -y -i sample.mp4 -vf 'scale=360:640,setsar=1' -c:v libx264 -preset ultrafast -crf 25 -c:a copy cutaway-base.mp4
+          python scripts/world_model_cutaway.py cutaway-smoke.mp4 --width 360 --fps 8 --frames 4
+          python scripts/insert_cutaway.py cutaway-base.mp4 cutaway-smoke.mp4 cutaway-insert-smoke.mp4 --at-frame 5
+          python tools/master_quality_check.py cutaway-base.mp4 cutaway-insert-smoke.mp4 --output cutaway-master-qa.json
+          python - <<'PY'
+          import json
+          report=json.load(open('cutaway-master-qa.json'))
+          assert report['technical_status']=='PASS'
+          assert report['audio_bitstream_identical'] is True
+          assert report['source_media']['frames']==report['output_media']['frames']
+          PY
       - name: Verify streams and duration
         run: |
           test -s smoke.mp4
@@ -153,6 +166,8 @@ jobs:
             native-identity-smoke.mp4
             camera-smoke.mp4
             audio-master-smoke.mp4
+            cutaway-insert-smoke.mp4
+            cutaway-smoke.mp4
             smoke-plan.json
           if-no-files-found: ignore
           retention-days: 7
