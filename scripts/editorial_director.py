@@ -139,25 +139,41 @@ def generate_frames(story,out,width,height,fps,start,seconds,font_dir):
     return frames
 
 def render(video,out,story,width,fps,start,seconds,root=ROOT,crf=19):
+    """Use one pre-rendered transparent PNG per beat; FFmpeg owns fade and encode."""
     duration,sw,sh=media_info(video)
     if seconds<=0 or start<0 or start+seconds>duration+.05:
         raise ValueError('Invalid source time range')
     height=round(width*sh/sw/2)*2
-    check_story(story,duration)
-    with tempfile.TemporaryDirectory(prefix='swarag_editorial_') as folder:
-        frames=Path(folder)
-        generate_frames(story,frames,width,height,fps,start,seconds,root/'fonts')
-        command=['ffmpeg','-hide_banner','-loglevel','error','-y',
-                 '-ss',str(start),'-t',str(seconds),'-i',str(video),
-                 '-framerate',str(fps),'-start_number','0','-i',str(frames/'%05d.png'),
-                 '-filter_complex',
-                 f'[0:v]fps={fps},scale={width}:{height}:flags=lanczos,eq=contrast=1.035:saturation=0.93[base];[base][1:v]overlay=0:0:format=auto,format=yuv420p[v]',
-                 '-map','[v]','-map','0:a:0?','-c:v','libx264','-preset','veryfast',
-                 '-crf',str(crf),'-c:a','aac','-b:a','160k',
-                 '-movflags','+faststart','-shortest',str(out)]
-        subprocess.run(command,check=True)
+    beats=check_story(story,duration)
+    with tempfile.TemporaryDirectory(prefix='swarag_editorial_') as temporary:
+        directory=Path(temporary)
+        active=[]
+        for index,beat in enumerate(beats):
+            if beat['end']<=start or beat['start']>=start+seconds:continue
+            png=directory/f'beat_{index:02d}.png'
+            layout(width,height,beat,root/'fonts').save(png)
+            active.append((png,beat))
+        cmd=['ffmpeg','-hide_banner','-loglevel','error','-y',
+             '-ss',str(start),'-t',str(seconds),'-i',str(video)]
+        for png,_ in active:
+            cmd+=['-loop','1','-framerate',str(fps),'-i',str(png)]
+        filters=[f'[0:v]fps={fps},scale={width}:{height}:flags=lanczos,eq=contrast=1.035:saturation=0.93,setsar=1,format=yuv420p[v0]']
+        previous='v0'
+        for index,(_,beat) in enumerate(active,1):
+            begin=max(0.,beat['start']-start)
+            finish=min(seconds,beat['end']-start)
+            fade=min(.45,(finish-begin)/2.)
+            filters.append(f'[{index}:v]format=rgba,fade=t=in:st={begin:.4f}:d={fade:.4f}:alpha=1,'
+                           f'fade=t=out:st={finish-fade:.4f}:d={fade:.4f}:alpha=1[a{index}]')
+            filters.append(f'[{previous}][a{index}]overlay=0:0:format=auto:shortest=1[v{index}]')
+            previous=f'v{index}'
+        cmd+=['-filter_complex',';'.join(filters),'-map',f'[{previous}]','-map','0:a:0?',
+              '-t',str(seconds),'-c:v','libx264','-preset','veryfast','-crf',str(crf),
+              '-r',str(fps),'-pix_fmt','yuv420p','-c:a','aac','-b:a','160k',
+              '-movflags','+faststart','-shortest',str(out)]
+        subprocess.run(cmd,check=True)
     if not out.is_file() or out.stat().st_size<1024:
-        raise RuntimeError('No MP4 produced')
+        raise RuntimeError('No MP4 was produced')
     return out
 
 def main():
