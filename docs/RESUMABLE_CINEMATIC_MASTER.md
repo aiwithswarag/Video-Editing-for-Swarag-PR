@@ -44,7 +44,7 @@ python tools/frame_continuity_report.py \
 
 This command exits nonzero for suspicious frames. Review the `samples` array and visually inspect all boundaries, including those that PASS. **Technical limitations:** nearly static scenes can hide a duplicate frame; unusual high-noise or strongly compressed video can cause false positives. The test supports spatial looks (`editorial-cinema`, `clean-studio`, `neutral`) but not the temporal denoising `restoration` preset. Synthetic integration tests pass on the correctly aligned film and flag an intentionally shifted copy. No real user footage was used for that regression.
 
-The output directory contains a source/settings fingerprint manifest. Never mix chunks from different files or settings; changing CRF, source mtime, or look requires a **different output directory**. Each chunk must match its expected video frame count, resolution, and FPS. Full assembly checks total frame count, duration (±130ms), audio-stream MD5 identity and a complete decode. A failed check returns non-zero.
+The output directory contains a source/settings fingerprint manifest. Never mix chunks from different files or settings; changing CRF, source mtime, or look requires a **different output directory**. Each chunk must match its expected video frame count, resolution, and FPS. **Chunk encodes disable x264 B-frame reordering (`-bf 0`)**: this avoids concatenation timestamp/FPS corruption when the final chunk contains only a single frame; the trade-off is somewhat less coding efficiency at the same quality target. Full assembly checks total frame count, duration (±130ms), audio-stream MD5 identity and a complete decode. A failed check returns non-zero.
 
 ## Deliverables
 
