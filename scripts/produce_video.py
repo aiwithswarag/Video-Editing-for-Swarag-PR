@@ -146,6 +146,8 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
         report=check_master(graded,master,expected_width=width)
         if report['technical_status']!='PASS':
             raise RuntimeError('Final QA FAIL: '+', '.join(report['errors']))
+        if report['source_media']['frames']!=report['output_media']['frames']:
+            raise RuntimeError('Final QA FAIL: effect editor added or removed a frame')
         run(['ffmpeg','-hide_banner','-loglevel','error','-xerror',
              '-i',str(master),'-map','0:v:0','-f','null','-'])
         review=make_review_sheet(master,workplan,media(master)['duration'],outdir/'visual_review.jpg')
