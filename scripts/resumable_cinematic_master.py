@@ -101,7 +101,7 @@ def encode_chunk(source, target, start, frames, fps, info, look, preset, crf):
 
 def finalize(source, outdir, chunks, fps, info, ident, approved, report_path):
     playlist=outdir/'chunks.txt'
-    playlist.write_text(''.join("file '"+str((outdir/f'chunk_{i:04d}.mp4').resolve()).replace("'","'\\''")+"'\\n"
+    playlist.write_text(''.join("file '"+str((outdir/f'chunk_{i:04d}.mp4').resolve()).replace("'","'\\''")+"'\n"
                      for i,_,_ in chunks),encoding='utf8')
     master=outdir/'cinematic_master.mp4'
     temp=outdir/'cinematic_master.tmp.mp4'
@@ -144,7 +144,7 @@ def finalize(source, outdir, chunks, fps, info, ident, approved, report_path):
             'output_audio_md5':audio_md5(master),'duration_s':exported['duration'],
             'dimensions':expected,'decode':'PASS','shared_encode':True,
             'master':str(master),'platform_exports':platforms}
-    report_path.write_text(json.dumps(report,indent=2)+'\\n',encoding='utf8')
+    report_path.write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
     return report
 
 
@@ -163,7 +163,7 @@ def process(source,outdir,look='editorial-cinema',preset='veryfast',crf=18,
     else:
         if any(outdir.glob('chunk_*.mp4')):
             raise ValueError('Found unmanaged chunks; use an empty output folder')
-        manifest.write_text(json.dumps({'config_sha256':ident,'config':config},indent=2)+'\\n')
+        manifest.write_text(json.dumps({'config_sha256':ident,'config':config},indent=2)+'\n')
     expected=(min(info['width'],1080),min(info['height'],1920))
     pending=[(i,start,n) for i,start,n in chunks if not check_chunk(outdir/f'chunk_{i:04d}.mp4',n,expected,fps)]
     if not final_only:
