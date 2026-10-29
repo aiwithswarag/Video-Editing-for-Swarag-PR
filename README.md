@@ -11,6 +11,18 @@ A **Codex/ChatGPT-compatible** personal video-editing skill for executive video 
 3. Download licensed assets from the original repository using `python tools/download_assets.py`.
 4. Run `python scripts/video_director.py list` and `python -m unittest discover -s tests -v`.
 
+## Production-ready command path: 42 effects + cinematic finishing
+
+**One entry point** combines validated edit cues, original camera-footage grading, all 42 original effect implementations, source-rate segment rendering, private MP4 exports and technical QA. Start with [the full production workflow](docs/PRODUCTION_WORKFLOW.md).
+
+```bash
+python scripts/produce_video.py catalog
+python scripts/produce_video.py plan PRIVATE/original.mp4 --instructions PRIVATE/director-cues.txt --script PRIVATE/verified-script.txt --transcript-verified --output PRIVATE/edit-plan.json
+python scripts/produce_video.py render PRIVATE/original.mp4 --plan PRIVATE/edit-plan.json --output-dir PRIVATE/final_release --look clean-studio --crf 18
+```
+
+Use `--style premium` (default) for restrained professional edits with preventive checks against placeholder titles, crowded overlays and excessive zoom. Use `--style showcase` only for deliberate demonstrations. All 42 effects remain available; **professional realism depends on original footage and manual frame-by-frame creative review**, not on the number of effects used. The current system is a CLI, **not** an automatically deployed ChatGPT editor. Script/brief text is a creative reference; timed director decisions must be checked and supplied in the plan, not hallucinated by the renderer.
+
 ## Commands
 
 ```bash
