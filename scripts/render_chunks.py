@@ -77,6 +77,39 @@ def resolve_fps(value, source):
     return f"{rate.numerator}/{rate.denominator}"
 
 
+def frame_count(path):
+    raw = subprocess.run(["ffprobe","-v","error","-select_streams","v:0",
+        "-show_entries","stream=nb_frames","-of","default=nw=1:nk=1",str(path)],
+        capture_output=True,text=True,check=True).stdout.strip()
+    if not raw.isdigit() or int(raw)<1:
+        raise ValueError("Exact source-frame metadata required; normalize to CFR MP4 first")
+    return int(raw)
+
+
+def frame_segments(plan, total_frames, rate):
+    """Snap every edit boundary to the source frame grid, with complete frame coverage."""
+    duration=float(Fraction(total_frames,1)/rate)
+    legacy=intervals(plan,duration)
+    parts=[];cursor=0
+    for _,end,_ in legacy:
+        stop=min(total_frames,max(cursor,round(Fraction(str(end))*rate)))
+        if stop<=cursor:continue
+        a,b=float(Fraction(cursor,1)/rate),float(Fraction(stop,1)/rate)
+        edits=[]
+        for item in plan:
+            lo=max(a,item["start"]);hi=min(b,item["end"])
+            if hi-lo>1e-6:
+                edit={**item,"start":round(lo-a,6),"end":round(hi-a,6)}
+                edits.append(edit)
+        parts.append((cursor,stop-cursor,edits))
+        cursor=stop
+    if cursor<total_frames:
+        parts.append((cursor,total_frames-cursor,[]))
+    if sum(part[1] for part in parts)!=total_frames:
+        raise RuntimeError("Frame grid did not cover entire source video")
+    return parts
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path)
@@ -111,30 +144,41 @@ def main():
         w, h = args.width, round(args.width * sh / sw / 2) * 2
     else:
         h, w = args.width, round(args.width * sw / sh / 2) * 2
-    segments = intervals(plan, duration)
-    print(f"Segments: {len(segments)}, active: {sum(bool(e) for _, _, e in segments)}", flush=True)
+    rate=Fraction(fps)
+    total_frames=frame_count(args.input)
+    video_seconds=float(Fraction(total_frames,1)/rate)
+    if abs(video_seconds-duration)>.13:
+        raise ValueError("Video and container duration disagree by >130ms; normalize to CFR source")
+    segments=frame_segments(plan,total_frames,rate)
+    print(f"Segments: {len(segments)}, active: {sum(bool(e) for _, _, e in segments)}, exact frames: {total_frames}", flush=True)
     with tempfile.TemporaryDirectory(prefix="swarag_segments_") as temp:
         folder = Path(temp)
         chunks = []
-        for i, (start, end, effects) in enumerate(segments):
+        for i, (start_frame, count, effects) in enumerate(segments):
             src = folder / f"input_{i:02d}.mp4"
             dst = folder / f"edited_{i:02d}.mp4"
+            start_time=float(Fraction(start_frame,1)/rate)
+            end_time=float(Fraction(start_frame+count,1)/rate)
             run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-                 "-ss", str(start), "-i", str(args.input),
-                 "-t", str(end - start), "-vf",
-                 f"fps={fps},scale={w}:{h}:flags=lanczos", "-an",
+                 "-ss", f"{start_time:.9f}", "-i", str(args.input),
+                 "-vf", f"fps={fps},scale={w}:{h}:flags=lanczos",
+                 "-frames:v",str(count),"-an",
                  "-c:v", "libx264", "-preset", "veryfast", "-crf", str(args.crf),
                  "-pix_fmt", "yuv420p", str(src)])
+            if frame_count(src)!=count:
+                raise RuntimeError(f"Frame mismatch in input segment {i}: expected {count}")
             if effects:
                 plan_path = folder / f"plan_{i:02d}.json"
                 plan_path.write_text(json.dumps({"effects": effects}), encoding="utf8")
                 run([sys.executable, str(ROOT / "scripts/video_director.py"),
                      "render", str(src), str(plan_path), str(dst),
                      "--width", str(args.width), "--brand", args.brand])
+                if frame_count(dst)!=count:
+                    raise RuntimeError(f"42-effect engine changed frame count in segment {i}")
                 chunks.append(dst)
             else:
                 chunks.append(src)
-            print(f"{i+1}/{len(segments)}: {start:.2f}-{end:.2f}s; {len(effects)} effects", flush=True)
+            print(f"{i+1}/{len(segments)}: {start_time:.2f}-{end_time:.2f}s; {count} frames; {len(effects)} effects", flush=True)
 
         sources = []
         for part in chunks:
@@ -149,12 +193,14 @@ def main():
              *sources, "-filter_complex", filter_graph,
              "-map", "[v]", "-map", f"{len(chunks)}:a:0?",
              "-c:v", "libx264", "-preset", "veryfast",
-             "-crf", str(args.crf), "-r", fps,
+             "-crf", str(args.crf), "-r", fps, "-frames:v",str(total_frames),
              "-c:a", "copy", "-movflags", "+faststart",
              "-t", str(duration), str(args.output)])
     if not args.output.is_file() or args.output.stat().st_size < 1024:
         raise RuntimeError("Renderer did not produce a valid output file")
-    print(f"Saved: {args.output}")
+    if frame_count(args.output)!=total_frames:
+        raise RuntimeError("Final frame count differs from exact source frame count")
+    print(f"Saved: {args.output}; verified {total_frames} frames at {fps} fps")
 
 
 if __name__ == "__main__":
