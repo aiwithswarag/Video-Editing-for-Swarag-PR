@@ -62,6 +62,8 @@ class ProductionPipelineSmoke(unittest.TestCase):
             self.assertEqual('REVIEW REQUIRED — not certified natural/cinematic',final['creative_status'])
             self.assertEqual(final['original_audio_md5'],final['master_audio_md5'])
             self.assertEqual(3,len(final['platform_copies']))
+            self.assertTrue(Path(final['visual_review']['contact_sheet']).is_file())
+            self.assertGreaterEqual(final['visual_review']['frames'],4)
             for path in final['platform_copies'].values():
                 self.assertTrue(Path(path).is_file())
     def test_fractional_fps_59_over_2_end_to_end(self):
