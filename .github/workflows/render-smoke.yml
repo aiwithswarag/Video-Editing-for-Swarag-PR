@@ -102,6 +102,16 @@ jobs:
           assert report['audio_bitstream_identical'] is True
           assert report['creative_status'].startswith('NOT APPROVED')
           PY
+      - name: Verify pause-led virtual camera director
+        run: |
+          python scripts/render_directors_cut.py sample.mp4 examples/camera-reframes-demo.json camera-smoke.mp4 --width 360
+          python tools/master_quality_check.py sample.mp4 camera-smoke.mp4 --expected-width 360 --output camera-qa-smoke.json
+          python - <<'PY'
+          import json
+          report=json.load(open('camera-qa-smoke.json'))
+          assert report['technical_status']=='PASS'
+          assert report['audio_bitstream_identical'] is True
+          PY
       - name: Verify streams and duration
         run: |
           test -s smoke.mp4
@@ -120,6 +130,7 @@ jobs:
             cover-star-small.mp4
             editorial-smoke.mp4
             native-identity-smoke.mp4
+            camera-smoke.mp4
             smoke-plan.json
           if-no-files-found: ignore
           retention-days: 7
