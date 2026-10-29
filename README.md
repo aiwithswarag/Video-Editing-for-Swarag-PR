@@ -78,6 +78,14 @@ python scripts/render_editorial_master.py input.mp4 examples/identity-only-story
 
 This example adds **nameplates only** and does not claim to match unverified spoken words. It is intentionally a visual baseline, not the completed ten-effect edit. See `docs/NATIVE_EDITORIAL_MASTER.md`.
 
+## Automated release-grade technical checks
+
+```bash
+python tools/master_quality_check.py input.mp4 export.mp4 --output private/technical-qa.json
+```
+
+This fails on lost frames, changed resolution, substantial FPS/duration drift and modified original audio (when audio preservation was requested). **Technical PASS is not creative approval.** See `docs/MASTER_QA.md`.
+
 ## Executive design system
 Use navy #17283E, ink #101923, ivory #F5F2EC, restrained teal #2C9A90 and gold #C5A46D. Prefer legible Inter typography, subtle zooms, minimal charts and verified metrics. Avoid unnecessary stickers, flashing animations, or brand logos. Individual legacy effects have their own graphics; visually review output before publishing.
 
