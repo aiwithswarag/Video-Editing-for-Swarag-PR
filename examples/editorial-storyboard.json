@@ -1,0 +1,31 @@
+{
+  "duration": 60.71,
+  "status": "VISUAL LANGUAGE TEST — headings are illustrative; not speech aligned",
+  "beats": [
+    {
+      "kind": "opener",
+      "start": 0.4,
+      "end": 3.75,
+      "eyebrow": "SWARAG  /  EXECUTIVE NOTES",
+      "headline": "A clearer perspective.",
+      "name": "SWARAG",
+      "subline": "STRATEGY  /  DELIVERY"
+    },
+    {
+      "kind": "chapter",
+      "start": 4,
+      "end": 7.75,
+      "eyebrow": "01  /  THE PERSPECTIVE",
+      "headline": "Think with clarity.",
+      "subline": "MAKE THE COMPLEX USEFUL"
+    },
+    {
+      "kind": "chapter",
+      "start": 8,
+      "end": 11.8,
+      "eyebrow": "02  /  THE EXECUTION",
+      "headline": "Ideas into outcomes.",
+      "subline": "DIRECTION  /  DISCIPLINE"
+    }
+  ]
+}

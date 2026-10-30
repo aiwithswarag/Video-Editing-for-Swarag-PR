@@ -1,0 +1,45 @@
+name: Prebuilt 42-effect renderer container
+
+# Building only: no personal videos are uploaded and no public package is
+# automatically published from a draft PR.
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - requirements.txt
+      - scripts/**
+      - tools/**
+      - tests/test_produce_video.py
+      - .github/workflows/renderer-container.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build pre-provisioned editor
+        run: |
+          docker build --progress=plain -t swarag-editor:ci .
+
+      - name: Confirm FFmpeg, face tracking and all 42 effects are preinstalled
+        run: |
+          docker run --rm swarag-editor:ci python -c "import cv2, mediapipe, PIL; print('OpenCV/MediaPipe/Pillow OK')"
+          docker run --rm swarag-editor:ci ffmpeg -version
+          docker run --rm swarag-editor:ci python -c "import pathlib; assert pathlib.Path('models/yunet.onnx').is_file(); assert pathlib.Path('models/selfie_segmenter.tflite').is_file(); assert pathlib.Path('fonts/Inter.ttf').is_file()"
+          docker run --rm swarag-editor:ci python scripts/produce_video.py catalog
+
+      - name: Full synthetic editing/rendering acceptance without network
+        run: |
+          docker run --rm --network none --memory 5g swarag-editor:ci \
+            python -m unittest discover -s tests -p 'test_produce_video.py' -v
+
+      - name: Test confidential media is absent from image context
+        run: |
+          docker run --rm swarag-editor:ci python -c "import pathlib; assert not pathlib.Path('PRIVATE').exists(); assert not list(pathlib.Path('.').rglob('*.mp4')); print('No private/video source media baked into image')"
