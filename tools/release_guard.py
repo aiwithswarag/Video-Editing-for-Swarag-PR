@@ -73,6 +73,8 @@ def evaluate(qa,master,required_effects=(),review=None):
             for k in REVIEW_FIELDS:
                 if review.get(k) is not True:
                     evidence.append("Missing or incomplete human review: "+k)
+            if qa.get("visual_anomaly_qc",{}).get("flags") and review.get("visual_anomaly_warnings_reviewed") is not True:
+                evidence.append("Video contains automatic visual anomaly warnings; full review of those exact frames required")
             if not evidence:
                 status="CREATIVE_APPROVED"
     return {
