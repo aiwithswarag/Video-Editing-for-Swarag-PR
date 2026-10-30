@@ -23,6 +23,7 @@ from cinematic_finish import probe,audio_md5
 from master_quality_check import evaluate as check_master
 from production_lint import audit as audit_plan
 from visual_review import create as make_review_sheet
+from release_guard import sha256_file, evaluate as release_gate
 
 
 def run(args):
@@ -160,6 +161,11 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
         result={'schema_version':1,'technical_status':'PASS',
                 'creative_status':'REVIEW REQUIRED — not certified natural/cinematic',
                 'catalog_total':len(AVAILABLE_EFFECTS),
+                'renderer_provenance':{'engine_id':'swarag-repository-42-effect-engine',
+                    'entrypoint':'scripts/fx.py',
+                    'execution':'scripts/produce_video.py -> scripts/render_chunks.py -> scripts/video_director.py -> scripts/fx.py'},
+                'master_sha256':sha256_file(master),
+                'source_clean_status':'UNVERIFIED — editor must use and visually confirm original camera footage; previously edited social exports are not clean source',
                 'selected_effects':[x['fx'] for x in workplan],
                 'grade_before_graphics':look,'source':video.name,
                 'preview':preview_seconds is not None,
@@ -171,6 +177,9 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
                 'platform_note':'Same portrait H264/AAC master, no platform-specific video layout or bitrate.',
                 'creative_review':'Inspect motion, keyframes, masking, exact speech, exposure, skin, titles and music; do not publish solely on technical PASS.'}
         (outdir/'production_qa.json').write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n',encoding='utf8')
+        gate=release_gate(result,master,[x['fx'] for x in workplan])
+        (outdir/'release_gate.json').write_text(json.dumps(gate,indent=2,ensure_ascii=False)+'\n',encoding='utf8')
+        result['release_gate_status']=gate['release_status']
         return result
 
 
