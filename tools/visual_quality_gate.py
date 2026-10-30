@@ -10,9 +10,9 @@ import json
 import math
 import subprocess
 from pathlib import Path
-import numpy as np
 
 def inspect_luma(path,seconds=2.5,sample_fps=8):
+    import numpy as np
     if not Path(path).is_file():raise FileNotFoundError(path)
     if not 0<seconds<=10:raise ValueError("Sample only the opening 0..10 seconds")
     if not 1<=sample_fps<=30:raise ValueError("Sampling rate out of range")
