@@ -58,6 +58,17 @@ class ReleaseGuardTests(unittest.TestCase):
         self.path.write_bytes(b"changed"*2500)
         report=evaluate(self.sample,self.path,["slow-push"],review)
         self.assertEqual("BLOCKED",report["release_status"])
+    def test_visual_opening_warning_requires_separate_clearance(self):
+        sample={**self.sample,"visual_anomaly_qc":{"flags":[{"code":"POSSIBLE_WASHED_OUT_OPENING"}]}}
+        review={"reviewer":"Designated producer",
+                "master_sha256":self.sample["master_sha256"],
+                **{k:True for k in REVIEW_FIELDS}}
+        result=evaluate(sample,self.path,["slow-push"],review)
+        self.assertEqual("CREATIVE_REVIEW_REQUIRED",result["release_status"])
+        self.assertTrue(any("visual anomaly" in x for x in result["review_requirements"]))
+        review["visual_anomaly_warnings_reviewed"]=True
+        self.assertEqual("CREATIVE_APPROVED",evaluate(sample,self.path,["slow-push"],review)["release_status"])
+
     def test_preview_is_not_final(self):
         bad={**self.sample,"preview":True}
         self.assertEqual("BLOCKED",evaluate(bad,self.path)["release_status"])
