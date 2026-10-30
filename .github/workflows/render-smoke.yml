@@ -165,6 +165,9 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_resumable_cinematic_master.py' -v
           python -m unittest discover -s tests -p 'test_frame_continuity_report.py' -v
+      - name: Reject fallback renders and unapproved creative exports
+        run: |
+          python -m unittest discover -s tests -p 'test_release_guard.py' -v
       - name: Production CLI end-to-end 42-effect registry and real MP4 test
         run: |
           python -m unittest discover -s tests -p 'test_produce_video.py' -v
