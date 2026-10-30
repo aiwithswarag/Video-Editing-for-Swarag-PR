@@ -7,6 +7,16 @@ description: Create professional, branded talking-head videos for Swarag using 4
 
 Use the repository root as working directory. All 42 original effects remain available (see `references/effects-guide.md`). **Having all 42 available does not mean stacking all 42 in a single video.**
 
+## Mandatory production contract — reject substituted renderers
+
+**If the Swarag original 42-effect renderer is unavailable, return BLOCKED.** Do not silently replace `scripts/fx.py` or the full production pipeline with local OpenCV GrabCut, a single FFmpeg filter, generic Pillow motion graphics, a still, a generated video or sample footage. That is not the user's requested result.
+
+**Clean source verification is mandatory:** A previous export with burned-in subtitles, cartoon icons, decorative statistics, face-clone cards or previously added effect text is NOT the original camera footage. Re-encoding a flattened social reel cannot fully repair these overlays. Request the true clean camera master before claiming to redesign the complete video. The mere presence of a valid MP4 is insufficient.
+
+Run `tools/visual_quality_gate.py` on the *actual final MP4* and inspect any blown-out opening warning. Run `tools/release_guard.py` on the production QA and final master. The result must identify `swarag-repository-42-effect-engine` and the original `scripts/fx.py` entrypoint. Technical PASS with CREATIVE_REVIEW_REQUIRED is **not** publish-ready, and manual approval must bind to the actual MP4 checksum after a full video/audio review.
+
+If the user's job is blocked by missing clean source or unavailable runtime, state the exact blocker. Do not fabricate a fallback export or mark it as final successful rendering.
+
 ## Preferred production execution (new)
 
 Read `docs/PRODUCTION_WORKFLOW.md`. With a real video, approved script and creative prompt:
