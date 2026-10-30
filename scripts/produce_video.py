@@ -24,6 +24,7 @@ from master_quality_check import evaluate as check_master
 from production_lint import audit as audit_plan
 from visual_review import create as make_review_sheet
 from release_guard import sha256_file, evaluate as release_gate
+from visual_quality_gate import analyze as analyze_visual_opening
 
 
 def run(args):
@@ -153,6 +154,8 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
         run(['ffmpeg','-hide_banner','-loglevel','error','-xerror',
              '-i',str(master),'-map','0:v:0','-f','null','-'])
         review=make_review_sheet(master,workplan,media(master)['duration'],outdir/'visual_review.jpg')
+        visual_qc=analyze_visual_opening(master)
+        (outdir/'visual_anomaly_qa.json').write_text(json.dumps(visual_qc,indent=2,ensure_ascii=False)+'\n',encoding='utf8')
         outputs={}
         for name in ('instagram','linkedin','youtube-shorts'):
             dest=outdir/f'final_{name}.mp4'
@@ -170,7 +173,7 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
                 'grade_before_graphics':look,'source':video.name,
                 'preview':preview_seconds is not None,
                 'source_fps':original['fps'],'output_fps':report['output_media']['fps'],
-                'qa':report,'creative_lint':creative_lint,'visual_review':review,
+                'qa':report,'creative_lint':creative_lint,'visual_review':review,'visual_anomaly_qc':visual_qc,
                 'original_audio_md5':audio_md5(source),
                 'master_audio_md5':audio_md5(master),
                 'output':str(master),'platform_copies':outputs,
