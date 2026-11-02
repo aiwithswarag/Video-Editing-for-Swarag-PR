@@ -61,7 +61,8 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 </div>
 <label><input type="checkbox" id="clean"> I confirm this is unedited camera footage, with no burned-in graphics.</label>
 <label><input type="checkbox" id="verified"> I checked effect timestamps/text and script words against the actual video audio.</label>
-<button id="render" disabled>Render full MP4</button></section>
+<button id="render" disabled>Render full MP4</button>
+<p id="renderReason" role="status" style="color:#e7ca92">Confirm the clean source and exact spoken-word timings to enable rendering.</p></section>
 <section id="output" style="display:none"><h2>3. Download</h2><pre id="status"></pre>
 <button style="display:none" id="mp4">Download complete MP4</button>
 <button style="display:none" id="qa">Download technical QA</button>
@@ -121,7 +122,10 @@ function effects(){
  return result;
 }
 function collectRag(){
- if(!ragStages.length)return [];
+ // This must read the DOM, not a missing global JavaScript variable.
+ // The prior "ragStages.length" threw ReferenceError; check() swallowed it
+ // and permanently disabled Render even after valid user confirmations.
+ if(!el("ragStages").children.length)return [];
  const rows=[];
  for(const block of el("ragStages").children){
    const meta=block.stage;
@@ -146,13 +150,17 @@ function createStage(item){
  el("ragStages").append(block);
 }
 function check(){
- let enabled=el("clean").checked&&el("verified").checked;
+ let reason="";
+ if(!el("clean").checked)reason="Confirm that your video is clean, original camera footage.";
+ else if(!el("verified").checked)reason="Check the script/timestamps against the spoken audio, then confirm.";
  try{
    effects();
    const stages=collectRag();
-   if(el("editMode").value==="rag"&&stages.length!==8)enabled=false;
- }catch(e){enabled=false;}
- el("render").disabled=!enabled;
+   if(el("editMode").value==="rag"&&stages.length!==8)
+     reason="RAG mode requires all eight visual stages. Recreate the edit draft with the complete six-section script.";
+ }catch(e){reason=e.message||String(e);}
+ el("render").disabled=Boolean(reason);
+ el("renderReason").textContent=reason||"Ready to render. Original 42-effect pass and six-section graphics are selected.";
 }
 ["clean","verified","editMode"].forEach(x=>el(x).onchange=check);
 el("draft").onclick=async()=>{try{
