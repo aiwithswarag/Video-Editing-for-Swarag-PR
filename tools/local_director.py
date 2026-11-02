@@ -137,8 +137,19 @@ def draft(direction,script,duration):
                 warnings.append(f"{name}: supply intentional on-screen copy from the verified script. No placeholder was invented.")
         entries.append(entry)
     validated=validate_plan(entries,duration)
+    # Specialized source-grounded graphic direction complements the original
+    # catalog. Other scripts stay on the conservative original-effect path.
+    from rag_storyboard import compose as compose_rag_storyboard
+    semantic_beats=compose_rag_storyboard(script,duration)
+    if semantic_beats:
+        warnings.append("Recognized all six RAG/citation story sections and prepared eight reviewable graphic stages (the three checks enter sequentially).")
+        warnings.append("The fictional 2024/$100 and 2026/$150 figures are copied from YOUR script, not asserted to be real policies.")
+        warnings.append("Script-time scaling is provisional. Check each panel against the actual spoken video BEFORE approving the render.")
     return {
         "status":"DRAFT — NOT SPEECH VERIFIED",
+        "rag_storyboard":semantic_beats,
+        "requires_six_section_explainer":bool(semantic_beats),
+        "semantic_sections":list(dict.fromkeys(x['section'] for x in semantic_beats)),
         "effects":validated,"script_duration":script_total,
         "source_duration":round(duration,3),
         "effect_catalog_size":len(read_registry()[0]),
