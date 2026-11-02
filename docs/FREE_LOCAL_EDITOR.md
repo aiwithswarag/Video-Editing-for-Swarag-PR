@@ -80,6 +80,24 @@ If the marker is absent, Windows is still using a cached/older application;
 stop the previous `swarag-local-editor` container, download the updated
 branch ZIP into a **new** folder and double-click the new launcher.
 
+**Confirmed root cause of repeated old-editor confusion:** prior Windows
+launchers opened the browser on port 8765 before proving the NEW container
+was listening. If the old container was still bound to that port, the
+browser displayed the old editor. The updated launcher explicitly refuses
+to open when a stale `swarag-local-editor` container or any 8765 listener
+is detected; it does **not** kill an active private render.
+
+For the RAG Reel choose **RAG citation / fictional policy explainer —
+all six sections REQUIRED** in **Editing mode** (it is selected by
+default in this build). After uploading the six-section script, the draft
+must display all eight graphics stages. You cannot enable Render full
+MP4 in that mode without them. For unrelated videos switch explicitly
+to **Other video — original Swarag effect catalog**.
+The resulting `production_qa.json` now records `video_mode` and
+`editorial_guard_build` alongside `requires_six_section_explainer`,
+`editorial_sections_covered` and `rag_graphics_pass`.
+
+
 A RAG/citation/policy script that is incomplete or lacks six recognizable
 time headings now produces an **explicit error** instead of silently
 rendering `["slow-push"]`. Use a complete six-heading TXT or DOCX script,
