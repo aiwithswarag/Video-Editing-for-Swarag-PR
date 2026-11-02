@@ -71,6 +71,31 @@ and may not have a six-beat automated explainer. “DRAFT” never means
 full transcription, frame-aware art-direction approval or final publishing
 permission.
 
+## Verify the installed build and avoid the one-effect silent failure
+
+The editor header must display the build marker
+`RAG-SIX-SECTION-GUARD-2026-11-02` and the localhost
+`/local/version` endpoint must return `"rag_six_section_guard": true`.
+If the marker is absent, Windows is still using a cached/older application;
+stop the previous `swarag-local-editor` container, download the updated
+branch ZIP into a **new** folder and double-click the new launcher.
+
+A RAG/citation/policy script that is incomplete or lacks six recognizable
+time headings now produces an **explicit error** instead of silently
+rendering `["slow-push"]`. Use a complete six-heading TXT or DOCX script,
+including the fictional 2024/$100 versus 2026/$150 comparison, outdated
+citation, retrieval-augmented generation explanation, three checks and closing.
+Do not upload a speech-only excerpt and assume the six-section animator will
+infer unspoken policy years. The end-user should see exactly eight editable
+graphic stages before ticking audio verification or starting a render.
+
+After a successful export, confirm that the JSON technical QA contains
+`rag_graphics_pass` with `graphic_stages: 8`,
+`requires_six_section_explainer: true`, and six named
+`editorial_sections_covered`. A null graphics pass is a **creative failure**
+regardless of technical PASS. Send both the real MP4 and the QA here for
+full-motion and audio review; technical checks do not certify visual quality.
+
 ## For every video (simple browser workflow)
 
 1. Upload the **clean original MP4** and the matching **TXT, MD or DOCX**
