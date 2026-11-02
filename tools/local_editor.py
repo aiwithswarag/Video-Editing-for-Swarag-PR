@@ -68,7 +68,7 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 <p>This uses three frames from your real source footage, with the final policy/RAG/check layout. It is NOT a completed video or a motion/skin-quality approval.</p>
 <button id="preview" type="button">Generate 3-frame face-safe preview</button>
 <img id="previewImage" alt="Three private video frames with face-safe RAG editorial graphics" style="display:none;width:100%;height:auto;border:1px solid #587283;border-radius:8px">
-<label><input type="checkbox" id="layoutApproved"> I inspected the three actual layout frames and the graphics do NOT cover the speaker.</label>
+<label><input type="checkbox" id="layoutApproved" disabled> I inspected the three actual layout frames and the graphics do NOT cover the speaker.</label>
 </div>
 <label><input type="checkbox" id="clean"> I confirm this is unedited camera footage, with no burned-in graphics.</label>
 <label><input type="checkbox" id="verified"> I checked effect timestamps/text and script words against the actual video audio.</label>
@@ -83,7 +83,7 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 const TOKEN="__LOCAL_BEARER_TOKEN__";
 const EFFECTS=__ORIGINAL_EFFECT_NAMES__;
 const el=(id)=>document.getElementById(id);
-let duration=0,jobId=null;
+let duration=0,jobId=null,previewReady=false;
 function status(v){el("output").style.display="block";el("status").textContent=v;}
 async function call(path,method="GET",body=null,blob=false){
  const hdr={"Authorization":"Bearer "+TOKEN};
@@ -164,7 +164,7 @@ function check(){
  let reason="";
  if(!el("clean").checked)reason="Confirm that your video is clean, original camera footage.";
  else if(!el("verified").checked)reason="Check the script/timestamps against the spoken audio, then confirm.";
- else if(el("editMode").value==="rag"&&!el("layoutApproved").checked)
+ else if(el("editMode").value==="rag"&&(!previewReady||!el("layoutApproved").checked))
    reason="Generate and inspect the three real-video layout previews before the full render.";
  try{
    effects();
@@ -177,7 +177,9 @@ function check(){
 }
 ["clean","verified","editMode","layoutApproved"].forEach(x=>el(x).onchange=check);
 el("video").addEventListener("change",()=>{
+ previewReady=false;
  el("layoutApproved").checked=false;
+ el("layoutApproved").disabled=true;
  el("previewImage").style.display="none";
  check();
 });
@@ -194,7 +196,9 @@ el("draft").onclick=async()=>{try{
  (result.rag_storyboard||[]).forEach(createStage);
  el("ragPanel").style.display=(result.rag_storyboard||[]).length?"block":"none";
  el("layoutReview").style.display=(result.rag_storyboard||[]).length?"block":"none";
+ previewReady=false;
  el("layoutApproved").checked=false;
+ el("layoutApproved").disabled=true;
  el("previewImage").style.display="none";
  el("clean").checked=false;el("verified").checked=false;check();
  }catch(e){status(e.message);}};
@@ -202,7 +206,9 @@ el("add").onclick=()=>row({fx:"slow-push",start:Math.min(3,duration*.2),
  end:Math.min(duration,Math.min(3,duration*.2)+2),zoom:1.05,blur:0});
 el("preview").onclick=async()=>{
  const button=el("preview");button.disabled=true;
- el("layoutApproved").checked=false;check();
+ previewReady=false;
+ el("layoutApproved").checked=false;
+ el("layoutApproved").disabled=true;check();
  status("Generating three local real-footage composition previews (no full render)...");
  try{
   const picture=await call("/local/layout-preview","POST",el("video").files[0],true);
@@ -210,6 +216,8 @@ el("preview").onclick=async()=>{
   if(image.src&&image.src.startsWith("blob:"))URL.revokeObjectURL(image.src);
   image.src=URL.createObjectURL(picture);
   image.style.display="block";
+  previewReady=true;
+  el("layoutApproved").disabled=false;
   status("Layout preview ready. Inspect whether your head, beard and hands are unobstructed. Reject it if the design feels wrong.");
  }catch(e){status("Layout preview failed: "+String(e?.message||e));}
  finally{button.disabled=false;check();}
@@ -227,8 +235,8 @@ el("render").onclick=async()=>{
  let plannedRag=collectRag();
  if(el("editMode").value==="rag" && plannedRag.length!==8)
    throw Error("RAG Reel render blocked: all six sections and eight graphic stages must be present.");
- if(el("editMode").value==="rag" && !el("layoutApproved").checked)
-   throw Error("RAG Reel render blocked: inspect and approve the actual face-safe layout preview.");
+ if(el("editMode").value==="rag" && (!previewReady||!el("layoutApproved").checked))
+   throw Error("RAG Reel render blocked: generate, inspect and approve the actual face-safe layout preview.");
  let created=await call("/v1/jobs","POST",{
   effects:effects(),requires_transcript:true,transcript_verified:true,source_clean_confirmed:true,
   rag_storyboard:plannedRag,requires_six_section_explainer:el("editMode").value==="rag" || plannedRag.length>0,
