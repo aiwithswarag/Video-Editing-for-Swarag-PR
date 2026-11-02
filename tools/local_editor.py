@@ -48,6 +48,11 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 <section id="review" style="display:none"><h2>2. Check timing and titles</h2>
 <p>The plan is a draft based on your written time headings, NOT verified speech transcription. Review the actual video and correct timings below.</p>
 <pre id="warnings"></pre><div id="effects"></div><button id="add">Add another effect</button>
+<div id="ragPanel" style="display:none">
+<h3>Six-section script-aware explainer · fictional policy example</h3>
+<p>These graphics are separate from the original 42 effects. Check actual word timing against the uploaded video and adjust every start/end point. The three checks are revealed sequentially.</p>
+<div id="ragStages"></div>
+</div>
 <label><input type="checkbox" id="clean"> I confirm this is unedited camera footage, with no burned-in graphics.</label>
 <label><input type="checkbox" id="verified"> I checked effect timestamps/text and script words against the actual video audio.</label>
 <button id="render" disabled>Render full MP4</button></section>
@@ -109,7 +114,36 @@ function effects(){
  if(!result.length)throw Error("Add at least one effect");
  return result;
 }
-function check(){let enabled=el("clean").checked&&el("verified").checked;try{effects();}catch(e){enabled=false;}el("render").disabled=!enabled;}
+function collectRag(){
+ if(!ragStages.length)return [];
+ const rows=[];
+ for(const block of el("ragStages").children){
+   const meta=block.stage;
+   const a=Number(meta.start.value),b=Number(meta.end.value);
+   if(!Number.isFinite(a)||!Number.isFinite(b)||a<0||b<=a+.15||b>duration+.02)
+     throw Error("Please fix one RAG graphic time window.");
+   rows.push({kind:meta.kind,section:meta.section,start:a,end:b});
+ }
+ if(rows.length!==8||rows[0].start>.2||duration-rows[7].end>.2||
+    rows.some((x,i)=>i>0&&x.start<rows[i-1].end-.0001))
+     throw Error("RAG storyboard must cover all six script sections in their proper order.");
+ return rows;
+}
+function createStage(item){
+ const block=document.createElement("div");block.className="effect";
+ const label=document.createElement("label");label.textContent=item.section+" · "+item.kind;
+ const start=field("Start sec",item.start,"number"),end=field("End sec",item.end,"number");
+ const note=document.createElement("label");note.textContent="Graphic content is derived from matching script text";
+ [label,start[0],end[0],note].forEach(x=>block.append(x));
+ block.stage={kind:item.kind,section:item.section,start:start[1],end:end[1]};
+ start[1].addEventListener("input",check);end[1].addEventListener("input",check);
+ el("ragStages").append(block);
+}
+function check(){
+ let enabled=el("clean").checked&&el("verified").checked;
+ try{effects();collectRag();}catch(e){enabled=false;}
+ el("render").disabled=!enabled;
+}
 ["clean","verified"].forEach(x=>el(x).onchange=check);
 el("draft").onclick=async()=>{try{
  if(!duration||!el("video").files[0]||!el("script").files[0])throw Error("Select an MP4 and matching script first");
@@ -118,6 +152,9 @@ el("draft").onclick=async()=>{try{
    script_filename:sc.name,script_b64:b64(new Uint8Array(await sc.arrayBuffer()))});
  el("review").style.display="block";el("effects").replaceChildren();
  result.effects.forEach(row);el("warnings").textContent=result.warnings.join("\n");
+ el("ragStages").replaceChildren();
+ (result.rag_storyboard||[]).forEach(createStage);
+ el("ragPanel").style.display=(result.rag_storyboard||[]).length?"block":"none";
  el("clean").checked=false;el("verified").checked=false;check();
  }catch(e){status(e.message);}};
 el("add").onclick=()=>row({fx:"slow-push",start:Math.min(3,duration*.2),
@@ -130,7 +167,12 @@ el("qa").onclick=()=>download("qa","swarag_qa.json").catch(e=>status(e.message))
 el("render").onclick=async()=>{
  el("render").disabled=true;try{
  status("Creating verified local render job...");
- let created=await call("/v1/jobs","POST",{effects:effects(),requires_transcript:true,transcript_verified:true,source_clean_confirmed:true});
+ let plannedRag=collectRag();
+ let created=await call("/v1/jobs","POST",{
+  effects:effects(),requires_transcript:true,transcript_verified:true,source_clean_confirmed:true,
+  rag_storyboard:plannedRag,requires_six_section_explainer:plannedRag.length>0,
+  source_duration:duration,script_filename:el("script").files[0].name
+ });
  jobId=created.id;
  status("Copying your MP4 and script to the local rendering workspace...");
  await call("/v1/jobs/"+jobId+"/video","PUT",el("video").files[0]);
