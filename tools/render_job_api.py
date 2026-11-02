@@ -35,6 +35,11 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
+# The local browser runs this module through tools/local_editor.py, where
+# scripts/ is NOT on sys.path. RAG job-start uses cinematic_finish.probe from
+# scripts/; without this import path, its uncaught ModuleNotFoundError drops
+# the HTTP connection and Chrome reports only "Failed to fetch".
+sys.path.insert(0, str(ROOT / "scripts"))
 from plan_validation import validate_plan
 from rag_storyboard import (validate as validate_rag_beats, recognizable as recognizable_rag,
                             rag_intent, explain_unrecognized)
@@ -314,7 +319,9 @@ class Handler(BaseHTTPRequestHandler):
                 from cinematic_finish import probe
                 duration=probe(folder/"source.mp4")["duration"]
                 coverage(plan.get("rag_storyboard",[]),duration,transcript)
-        except (ValueError,KeyError,OSError,FileNotFoundError) as exc:
+        except (ValueError,KeyError,OSError,ImportError,RuntimeError) as exc:
+            # Return structured HTTP failure, never drop the socket in a
+            # request-handler thread. This avoids opaque browser fetch errors.
             self.answer(409,{"error":"Complete script-verified explainer required: "+str(exc)[:200]})
             return
         with LIVE:
