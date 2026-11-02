@@ -54,6 +54,17 @@ class LocalDraftTests(unittest.TestCase):
         with self.assertRaises(ValueError):d.document_text("script.pdf",b"%PDF-1.7")
 
 
+class WindowsLauncherGuards(unittest.TestCase):
+    def test_old_container_refused_before_browser_open(self):
+        bat=(ROOT/"START_FREE_EDITOR_WINDOWS.bat").read_text(encoding="utf-8")
+        self.assertIn('docker ps --format "{{.Names}}"',bat)
+        self.assertIn('netstat -ano',bat)
+        self.assertIn('Stop the previous editor/container',bat)
+        self.assertLess(bat.index('docker ps --format'),bat.index("docker build"))
+        self.assertLess(bat.index("netstat -ano"),bat.index("Start-Process"))
+        self.assertLess(bat.index("docker build"),bat.index("docker run --rm"))
+
+
 class LocalHostHTTPTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
@@ -88,6 +99,8 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertIn(b"slow-push",data)
         self.assertIn(b"backdrop-word",data)
         self.assertIn(b"RAG-SIX-SECTION-GUARD-2026-11-02",data)
+        self.assertIn(b'id="editMode"',data)
+        self.assertIn(b'value="rag" selected',data)
         code,version=self.request("GET","/local/version",token=False)
         self.assertEqual(200,code)
         self.assertTrue(json.loads(version)["rag_six_section_guard"])
