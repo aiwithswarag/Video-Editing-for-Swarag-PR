@@ -142,7 +142,7 @@ def draft(direction,script,duration):
     from rag_storyboard import compose as compose_rag_storyboard
     semantic_beats=compose_rag_storyboard(script,duration)
     from rag_storyboard import explain_unrecognized,rag_intent
-    if rag_intent(script) and not semantic_beats:
+    if rag_intent(script+"\n"+direction) and not semantic_beats:
         # Crucial: never "succeed" with just slow-push when a complete
         # six-section source-backed explainer is obviously requested.
         raise ValueError(explain_unrecognized(script) or
