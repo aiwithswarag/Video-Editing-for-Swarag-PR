@@ -35,6 +35,9 @@ def document_text(filename, body):
         return body.decode("utf-8-sig")
     if name.endswith(".docx"):
         with zipfile.ZipFile(io.BytesIO(body)) as archive:
+            info = archive.getinfo("word/document.xml")
+            if info.file_size > 2 * 1024 * 1024:
+                raise ValueError("Expanded DOCX script is too large")
             blob = archive.read("word/document.xml")
         root = ET.fromstring(blob)
         ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
