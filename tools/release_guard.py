@@ -59,6 +59,14 @@ def evaluate(qa,master,required_effects=(),review=None):
         faults.append("Master SHA-256 does not match the real MP4 bytes")
     if qa.get("preview") is True:
         faults.append("Preview output cannot be published as a complete master")
+    if qa.get("requires_six_section_explainer"):
+        expected=("hook","policies","outdated-answer","rag-flow",
+                  "verification-checks","closing")
+        if tuple(qa.get("editorial_sections_covered",()))!=expected:
+            faults.append("Required RAG narrative coverage is incomplete; missing six-step visual explanation")
+        pass_info=qa.get("rag_graphics_pass") or {}
+        if not pass_info.get("complete") or pass_info.get("graphic_stages")!=8:
+            faults.append("Six-section RAG graphics layer not produced by validated pipeline")
     if not qa.get("visual_review",{}).get("review_points"):
         faults.append("Actual exported frame-review samples absent")
     if faults:
