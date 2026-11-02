@@ -111,6 +111,8 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
     if isinstance(raw,dict) and raw.get('requires_transcript') and not raw.get('transcript_verified'):
         raise ValueError('Transcript-based plan must be explicitly verified before export')
     storyboard = raw.get('rag_storyboard',[]) if isinstance(raw,dict) else []
+    if isinstance(raw,dict) and raw.get('video_mode')=='rag' and not raw.get('requires_six_section_explainer'):
+        raise ValueError('RAG mode cannot disable the required six-section explainer')
     if isinstance(raw,dict) and raw.get('requires_six_section_explainer') and not storyboard:
         raise ValueError('Six-section RAG explainer was requested but the storyboard is absent. One slow-push is not a complete edit.')
     original=media(video)
@@ -196,6 +198,8 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
                 'rag_graphics_pass':graphic_pass,
                 'editorial_sections_covered':graphic_pass['actual_sections'] if graphic_pass else [],
                 'requires_six_section_explainer':bool(raw.get('requires_six_section_explainer',False)),
+                'editorial_guard_build':'RAG-SIX-SECTION-GUARD-2026-11-02',
+                'video_mode':raw.get('video_mode','general'),
                 'original_audio_md5':audio_md5(source),
                 'master_audio_md5':audio_md5(master),
                 'output':str(master),'platform_copies':outputs,
