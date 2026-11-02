@@ -21,6 +21,7 @@ from effect_catalog import read_registry
 from local_director import document_text,draft
 
 BUILD_ID="RAG-SIX-SECTION-GUARD-2026-11-02"
+RENDER_BUTTON_FIX_ID="RAG-RENDER-BUTTON-FIX-2026-11-02"
 
 PAGE = r'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -40,7 +41,7 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 </style></head><body>
 <header><h1>SWARAG / Free Video Director</h1>
 <p>Private on-device rendering · Original 42 effects · No monthly hosting</p>
-<div class="warning"><b>Editor build:</b> __LOCAL_BUILD_ID__ · Six-section RAG explainer detection and incomplete-plan protection enabled. If you do not see this build marker, stop and update your Windows ZIP/Docker image.</div>
+<div class="warning"><b>Editor build:</b> __LOCAL_BUILD_ID__ · <b>UI fix:</b> __RENDER_BUTTON_FIX_ID__ · Six-section RAG explainer detection and incomplete-plan protection enabled. If you do not see this build marker, stop and update your Windows ZIP/Docker image.</div>
 <div class="warning">Uses your actual footage and the same FFmpeg/MediaPipe engine. It does not fake subtitles, voice, or statistics. Script-based timings must be checked before export.</div></header>
 <section><h2>1. Upload and describe</h2>
 <label>Clean original video (.mp4)</label><input type="file" accept=".mp4" id="video">
@@ -228,11 +229,14 @@ class LocalHandler(api.Handler):
         if urlsplit(self.path).path=="/local/version":
             self.answer(200,{"build_id":BUILD_ID,
                              "rag_six_section_guard":True,
+                             "render_button_fixed":True,
+                             "render_button_fix_id":RENDER_BUTTON_FIX_ID,
                              "original_effect_catalog":len(read_registry()[0])})
             return
         if urlsplit(self.path).path=="/":
             data=PAGE.replace("__LOCAL_BEARER_TOKEN__",html.escape(api.TOKEN,quote=True))
             data=data.replace("__LOCAL_BUILD_ID__",BUILD_ID)
+            data=data.replace("__RENDER_BUTTON_FIX_ID__",RENDER_BUTTON_FIX_ID)
             data=data.replace("__ORIGINAL_EFFECT_NAMES__",json.dumps(sorted(read_registry()[0])))
             blob=data.encode("utf-8")
             self.send_response(200)
