@@ -43,6 +43,71 @@ class LocalDraftTests(unittest.TestCase):
                               text=True,capture_output=True)
         self.assertEqual(0,result.returncode,result.stderr)
 
+    @unittest.skipUnless(shutil.which("node"), "Node.js required to execute browser validation logic")
+    def test_rag_render_button_enables_for_eight_valid_stages(self):
+        """Regression: undefined ragStages variable previously disabled Render forever."""
+        source=ui.PAGE.split("<script>",1)[1].split("</script>",1)[0]
+        source=source.replace("__ORIGINAL_EFFECT_NAMES__",'["slow-push"]')
+        source=source.replace("__LOCAL_BEARER_TOKEN__","test-token")
+        starts=[0,2.749,10.996,18.327,30.24,35.127,40.015,44.902]
+        ends=[2.749,10.996,18.327,30.24,35.127,40.015,44.902,50.4]
+        node_source=r"""
+const vm=require("node:vm");
+const assert=require("node:assert/strict");
+const stageRows=JSON.parse(process.env.STAGES);
+const elements={};
+function elem(id){
+  if(!elements[id])elements[id]={checked:false,disabled:true,value:"",
+    textContent:"",style:{},children:[],files:[],addEventListener:()=>{}};
+  return elements[id];
+}
+elem("clean").checked=true;
+elem("verified").checked=true;
+elem("editMode").value="rag";
+elem("effects").children=[{data:{
+  fx:{fx:"slow-push",start:0.25,end:3.45,zoom:1.055,blur:0},
+  sel:{value:"slow-push"},from:{value:"0.25"},to:{value:"3.45"},title:{value:""}
+}}];
+elem("ragStages").children=stageRows.map(v=>({stage:{
+  kind:v.kind,section:v.section,
+  start:{value:String(v.start)},end:{value:String(v.end)}
+}}));
+const ctx=vm.createContext({
+  document:{getElementById:elem},
+  URL:{createObjectURL:()=>""},
+  fetch:async()=>{throw Error("Unexpected network request")},
+  setTimeout:()=>{},
+});
+vm.runInContext(JSON.parse(process.env.BROWSER_JS),ctx);
+vm.runInContext("duration=50.4;check();",ctx);
+assert.equal(elem("render").disabled,false,elem("renderReason").textContent);
+assert.match(elem("renderReason").textContent,/Ready to render/);
+elem("verified").checked=false;
+vm.runInContext("check();",ctx);
+assert.equal(elem("render").disabled,true);
+assert.match(elem("renderReason").textContent,/Check the script/);
+elem("verified").checked=true;
+elem("ragStages").children[7].stage.end.value="51";
+vm.runInContext("check();",ctx);
+assert.equal(elem("render").disabled,true);
+assert.match(elem("renderReason").textContent,/time window/);
+console.log("RAG render button enabled with eight valid stages; disabled for unchecked/invalid input");
+"""
+        import os
+        kinds=["hook","policies","outdated-answer","rag-flow",
+               "check-1","check-2","check-3","closing"]
+        sections=["hook","policies","outdated-answer","rag-flow",
+                  "verification-checks","verification-checks","verification-checks","closing"]
+        env=os.environ.copy()
+        env["BROWSER_JS"]=json.dumps(source)
+        env["STAGES"]=json.dumps([{
+            "kind":kind,"section":section,"start":a,"end":b
+        } for kind,section,a,b in zip(kinds,sections,starts,ends)])
+        result=subprocess.run(["node","-e",node_source],env=env,
+                              capture_output=True,text=True)
+        self.assertEqual(0,result.returncode,result.stderr)
+        self.assertIn("RAG render button enabled",result.stdout)
+
     def test_txt_and_docx_scripts(self):
         self.assertEqual("RAG explained",d.document_text("script.txt",b"RAG explained"))
         out=io.BytesIO()
