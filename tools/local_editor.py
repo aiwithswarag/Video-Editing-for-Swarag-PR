@@ -184,7 +184,7 @@ class LocalHandler(api.Handler):
                 script=document_text(payload["script_filename"],content)
                 result=draft(payload.get("direction",""),script,float(payload["duration"]))
                 self.answer(200,result)
-            except (ValueError,TypeError,KeyError,UnicodeError,OverflowError,ImportError,Exception) as exc:
+            except Exception as exc:
                 self.answer(422,{"error":str(exc)[:180]})
             return
         super().do_POST()
@@ -199,6 +199,14 @@ def main():
     api.JOB_DIR=Path(os.getenv("SWARAG_JOB_DIR",str(ROOT/"PRIVATE"/"local-jobs"))).resolve()
     api.JOB_DIR.mkdir(parents=True,exist_ok=True)
     api.erase_old_jobs()
+    import threading
+    import time
+    def purge_expired_local_jobs():
+        while True:
+            time.sleep(3600)
+            with api.LIVE:
+                api.erase_old_jobs()
+    threading.Thread(target=purge_expired_local_jobs,daemon=True).start()
     port=int(os.getenv("PORT","8765"))
     bind="0.0.0.0" if os.getenv("SWARAG_LOCAL_DOCKER")=="1" else "127.0.0.1"
     print("Swarag Free Local Editor: http://127.0.0.1:"+str(port),flush=True)
