@@ -39,9 +39,12 @@ def _font(fontdir,pixels,serif=False):
     path=fontdir/name
     if not path.is_file():
         raise FileNotFoundError("Swarag font assets missing; run tools/download_assets.py")
-    return ImageFont.truetype(str(path),max(12,int(pixels)))
+    return ImageFont.truetype(str(path),max(8,int(pixels)))
 
-def _fitted(draw,words,available,size,fontdir,serif=False,minimum=20):
+def _fitted(draw,words,available,size,fontdir,serif=False,minimum=None):
+    # Font size has already been scaled from 1080p to output width.
+    # A fixed 20px floor accidentally rejected every 360px preview headline.
+    minimum=max(8,round(size*.48)) if minimum is None else minimum
     while size>=minimum:
         f=_font(fontdir,size,serif)
         if draw.textlength(words,font=f)<=available:return f
