@@ -183,6 +183,9 @@ class LocalHostHTTPTests(unittest.TestCase):
                          json.loads(version)["face_safe_layout_id"])
         self.assertTrue(json.loads(version)["layout_preview_required"])
         self.assertIn(b"face-safe-editorial-split-v3",data)
+        self.assertIn(b'id="previewImage"',data)
+        self.assertIn(b'id="layoutApproved"',data)
+        self.assertIn(b"layout-preview",data)
         self.assertEqual("RAG-API-START-FIX-2026-11-02",
                          json.loads(version)["rag_api_start_fix_id"])
         self.assertEqual(403,self.request("GET","/",host="evil.example")[0])
