@@ -80,9 +80,14 @@ const ctx=vm.createContext({
   setTimeout:()=>{},
 });
 vm.runInContext(JSON.parse(process.env.BROWSER_JS),ctx);
-vm.runInContext("duration=50.4;check();",ctx);
+vm.runInContext("duration=50.4;previewReady=true;check();",ctx);
 assert.equal(elem("render").disabled,false,elem("renderReason").textContent);
 assert.match(elem("renderReason").textContent,/Ready to render/);
+vm.runInContext("previewReady=false;check();",ctx);
+assert.equal(elem("render").disabled,true);
+assert.match(elem("renderReason").textContent,/layout previews/);
+vm.runInContext("previewReady=true;check();",ctx);
+assert.equal(elem("render").disabled,false);
 elem("verified").checked=false;
 vm.runInContext("check();",ctx);
 assert.equal(elem("render").disabled,true);
