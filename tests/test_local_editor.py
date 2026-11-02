@@ -3,6 +3,8 @@ import base64
 import http.client
 import io
 import json
+import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -32,6 +34,15 @@ class LocalDraftTests(unittest.TestCase):
         result=d.draft("Put backdrop-word behind me", "The answer is different", 8)
         self.assertEqual("",result["effects"][0]["text"])
         self.assertTrue(any("supply intentional on-screen copy" in w for w in result["warnings"]))
+    @unittest.skipUnless(shutil.which("node"),"Node.js required to lint embedded browser JavaScript")
+    def test_local_browser_javascript_syntax(self):
+        source=ui.PAGE.split("<script>",1)[1].split("</script>",1)[0]
+        source=source.replace("__ORIGINAL_EFFECT_NAMES__",'["slow-push"]')
+        source=source.replace("__LOCAL_BEARER_TOKEN__","test-token")
+        result=subprocess.run(["node","--check","-"],input=source,
+                              text=True,capture_output=True)
+        self.assertEqual(0,result.returncode,result.stderr)
+
     def test_txt_and_docx_scripts(self):
         self.assertEqual("RAG explained",d.document_text("script.txt",b"RAG explained"))
         out=io.BytesIO()
