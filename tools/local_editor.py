@@ -101,6 +101,8 @@ function effects(){
  for(const n of el("effects").children){
    let d=n.data,x={...d.fx,fx:d.sel.value,start:Number(d.from.value),end:Number(d.to.value)};
    if(d.title.value.trim())x.text=d.title.value.trim();else delete x.text;
+   if(["backdrop-word","headline-box","led-sign","reject-stamp","split-headline","headline-wall","pastel-word"].includes(x.fx) && !x.text)
+     throw Error("Add verified on-screen text for "+x.fx);
    if(!Number.isFinite(x.start)||!Number.isFinite(x.end)||x.start<0||x.end<=x.start||x.end>duration+.01)throw Error("Invalid effect time window");
    result.push(x);
  }
