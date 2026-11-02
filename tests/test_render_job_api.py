@@ -73,6 +73,22 @@ class RenderAPITransportTests(unittest.TestCase):
         self.assertEqual(409,self.request("GET",f"/v1/jobs/{id}/master")[0])
         self.assertEqual(200,self.request("DELETE",f"/v1/jobs/{id}")[0])
         self.assertEqual(404,self.request("GET",f"/v1/jobs/{id}")[0])
+    def test_full_citation_rag_script_cannot_render_only_slow_push(self):
+        code,info=self.request("POST","/v1/jobs",{
+            "effects":[{"fx":"slow-push","start":0,"end":1,"zoom":1.05}],
+            "requires_transcript":True,"transcript_verified":True,
+            "source_clean_confirmed":True})
+        self.assertEqual(201,code,info)
+        job=info["id"]
+        source=b"\\x00\\x00\\x00\\x18ftypisom"+b"\\x00"*64
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/video",source)[0])
+        words=b"AI cited a citation. Fictional policies $100 and $150. RAG retrieval documents and the answer may not be current."
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/script",words)[0])
+        code,out=self.request("POST",f"/v1/jobs/{job}/start",{})
+        self.assertEqual(409,code,out)
+        self.assertIn("Incomplete RAG explainer",out["error"])
+        self.assertEqual("AWAITING_INPUT",self.request("GET",f"/v1/jobs/{job}")[1]["status"])
+
     def test_invalid_mp4_is_rejected_before_processing(self):
         id=self.job()
         code,_=self.request("PUT",f"/v1/jobs/{id}/video",b"NOT AN MP4")
