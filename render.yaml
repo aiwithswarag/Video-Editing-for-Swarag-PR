@@ -1,0 +1,33 @@
+# PROPOSAL ONLY. Committing this file does not create or bill a Render service.
+# Owner must explicitly review pricing, private-media handling, secrets and Apply
+# the Blueprint in the Render dashboard before any paid resource is created.
+previews:
+  generation: off
+
+services:
+  - type: web
+    name: swarag-private-video-render-api
+    runtime: docker
+    repo: https://github.com/aiwithswarag/Video-Editing-for-Swarag-PR
+    branch: feat/executive-editorial-v2
+    region: singapore
+    plan: 2c-4g
+    autoDeployTrigger: off
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: python tools/render_job_api.py
+    healthCheckPath: /health
+    numInstances: 1
+    disk:
+      name: swarag-private-media
+      mountPath: /workspace
+      sizeGB: 20
+    envVars:
+      - key: SWARAG_API_TOKEN
+        sync: false
+      - key: SWARAG_JOB_DIR
+        value: /workspace/jobs
+      - key: SWARAG_MAX_UPLOAD_MB
+        value: "512"
+      - key: PYTHONUNBUFFERED
+        value: "1"
