@@ -303,7 +303,7 @@ class LocalHandler(api.Handler):
             blob=data.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type","text/html; charset=utf-8")
-            self.send_header("Content-Security-Policy","default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; media-src blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'")
+            self.send_header("Content-Security-Policy","default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src blob:; media-src blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'")
             self.send_header("Cache-Control","no-store")
             self.send_header("X-Content-Type-Options","nosniff")
             self.send_header("Content-Length",str(len(blob)))
