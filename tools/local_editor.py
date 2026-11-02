@@ -20,7 +20,7 @@ sys.path.insert(0,str(ROOT/"tools"))
 import render_job_api as api
 from effect_catalog import read_registry
 from local_director import document_text,draft
-from rag_visuals import preview_contact_sheet
+from rag_visuals import preview_contact_sheet,LAYOUT_ID
 
 BUILD_ID="RAG-SIX-SECTION-GUARD-2026-11-02"
 RENDER_BUTTON_FIX_ID="RAG-RENDER-BUTTON-FIX-2026-11-02"
@@ -44,7 +44,7 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 </style></head><body>
 <header><h1>SWARAG / Free Video Director</h1>
 <p>Private on-device rendering · Original 42 effects · No monthly hosting</p>
-<div class="warning"><b>Editor build:</b> __LOCAL_BUILD_ID__ · <b>UI fix:</b> __RENDER_BUTTON_FIX_ID__ · <b>API fix:</b> __API_START_FIX_ID__ · Six-section RAG explainer detection and incomplete-plan protection enabled. If you do not see this build marker, stop and update your Windows ZIP/Docker image.</div>
+<div class="warning"><b>Editor build:</b> __LOCAL_BUILD_ID__ · <b>UI fix:</b> __RENDER_BUTTON_FIX_ID__ · <b>API fix:</b> __API_START_FIX_ID__ · <b>Creative layout:</b> __FACE_SAFE_LAYOUT_ID__ · Six-section RAG explainer detection and incomplete-plan protection enabled. If you do not see this build marker, stop and update your Windows ZIP/Docker image.</div>
 <div class="warning">Uses your actual footage and the same FFmpeg/MediaPipe engine. It does not fake subtitles, voice, or statistics. Script-based timings must be checked before export.</div></header>
 <section><h2>1. Upload and describe</h2>
 <label>Clean original video (.mp4)</label><input type="file" accept=".mp4" id="video">
@@ -289,6 +289,8 @@ class LocalHandler(api.Handler):
                              "render_button_fix_id":RENDER_BUTTON_FIX_ID,
                              "rag_api_start_fixed":True,
                              "rag_api_start_fix_id":API_START_FIX_ID,
+                             "face_safe_layout_id":LAYOUT_ID,
+                             "layout_preview_required":True,
                              "original_effect_catalog":len(read_registry()[0])})
             return
         if urlsplit(self.path).path=="/":
@@ -296,6 +298,7 @@ class LocalHandler(api.Handler):
             data=data.replace("__LOCAL_BUILD_ID__",BUILD_ID)
             data=data.replace("__RENDER_BUTTON_FIX_ID__",RENDER_BUTTON_FIX_ID)
             data=data.replace("__API_START_FIX_ID__",API_START_FIX_ID)
+            data=data.replace("__FACE_SAFE_LAYOUT_ID__",LAYOUT_ID)
             data=data.replace("__ORIGINAL_EFFECT_NAMES__",json.dumps(sorted(read_registry()[0])))
             blob=data.encode("utf-8")
             self.send_response(200)
