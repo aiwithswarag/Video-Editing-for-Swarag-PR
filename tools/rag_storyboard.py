@@ -54,6 +54,49 @@ def recognizable(script):
     )
     return all(check(chapters[i][2].casefold()) for i,check in enumerate(checks))
 
+def rag_intent(script):
+    """Identify a likely citation/policy/RAG video before accepting an effect-only plan.
+
+    This check is deliberately broader than the six-section storyboard template:
+    if a user supplies a relevant-but-incomplete script, fail with a useful error
+    instead of silently rendering a lone slow-push as a completed explainer.
+    """
+    if not isinstance(script,str):
+        return False
+    t=script.casefold()
+    return (("rag" in t or "retriev" in t) and
+            ("citation" in t or "cited" in t) and
+            ("polic" in t or ("$100" in t and "$150" in t)))
+
+
+def explain_unrecognized(script):
+    """Diagnostic, no user content copied into public logs."""
+    if not rag_intent(script):
+        return None
+    chapters=_chapters(script)
+    if chapters is None:
+        return ("RAG explainer detected, but six numbered time headings were not found. "
+                "Upload the complete script with six separate headings, e.g. "
+                "'0-3 sec | Hook' ... '49-55 sec | Close'; do not submit a spoken-text-only excerpt.")
+    checks=(
+        ("citation hook",lambda t:"cited" in t or "citation" in t),
+        ("fictional 2024/$100 vs 2026/$150 comparison",lambda t:all(x in t for x in
+          ("2024","2026","$100","$150","fictional"))),
+        ("outdated 2024 citation",lambda t:all(x in t for x in ("2024","$100","citat","outdated"))),
+        ("RAG retrieve-document-answer explanation",lambda t:all(x in t for x in
+          ("rag","retriev","document","answer"))),
+        ("three checks: version, source accuracy, access",lambda t:all(x in t for x in
+          ("version","answer","source","access"))),
+        ("verification closing",lambda t:"citation" in t and "verification" in t),
+    )
+    failures=[label for (_,_,seg),(label,check) in zip(chapters,checks) if not check(seg.casefold())]
+    if failures:
+        return ("RAG explainer detected but the uploaded script does not support: " +
+                "; ".join(failures) +
+                ". Supply the matching COMPLETE six-section script; no visuals or data will be invented.")
+    return "RAG six-section recognition failed; check the script time headings and ordering."
+
+
 def compose(script,duration):
     if not isinstance(duration,(int,float)) or not math.isfinite(duration) or duration<=0:
         raise ValueError("Actual source duration must be finite positive seconds")
