@@ -15,7 +15,7 @@ sys.path.insert(0,str(ROOT/"tools"))
 sys.path.insert(0,str(ROOT/"scripts"))
 from local_director import draft
 from rag_storyboard import compose,recognizable,validate,coverage,rag_intent,explain_unrecognized
-from rag_visuals import draw_overlay
+from rag_visuals import draw_overlay,geometry,sample_face_crop,LAYOUT_ID
 from release_guard import evaluate as gate
 from PIL import Image
 
@@ -92,13 +92,32 @@ class StoryboardTests(unittest.TestCase):
         corrupted=[dict(x) for x in beats];corrupted[2]["kind"]="hook"
         with self.assertRaises(ValueError):validate(corrupted,50.4)
     @unittest.skipUnless((ROOT/"fonts"/"Inter.ttf").is_file(),"Licensed fonts must be installed to draw graphics")
-    def test_transparent_graphic_layouts_are_real_rgba(self):
+    def test_entire_camera_is_pixel_transparent_all_eight_graphics(self):
+        top=geometry(360,640)["camera_bottom"]
         for item in compose(SAMPLE,50.4):
             image=draw_overlay(item["kind"],360,640,ROOT/"fonts")
             self.assertEqual("RGBA",image.mode)
             self.assertEqual((360,640),image.size)
-            self.assertEqual(0,image.getpixel((0,0))[3])
-            self.assertGreater(image.getpixel((30,50))[3],0)
+            # Strong contract: NO overlays touch any portion of camera tile,
+            # regardless of actor face position or segmentation accuracy.
+            self.assertIsNone(image.crop((0,0,360,top)).getchannel("A").getbbox(),
+                "Graphics have invaded the real-camera region")
+            self.assertEqual(255,image.getpixel((180,600))[3])
+    def test_face_safe_split_layout_metadata(self):
+        geo=geometry(1080,1920)
+        self.assertEqual(1228,geo["camera_bottom"])
+        self.assertEqual(1670,geo["text_bottom"])
+        self.assertEqual("face-safe-editorial-split-v3",LAYOUT_ID)
+    def test_missing_face_detection_always_preserves_original_full_frame(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            absent=Path(tmp)/"no_detector.onnx"
+            # No need for actual face pixels: without verified model we MUST
+            # fit the full original camera, not guess a risky crop.
+            result=sample_face_crop(Path(tmp)/"source.mp4",360,640,
+                                    geometry(360,640)["camera_bottom"],
+                                    model=absent)
+            self.assertEqual("contain-full-source",result["camera_mode"])
+            self.assertIsNone(result["crop_y"])
 
 @unittest.skipUnless(shutil.which("ffmpeg") and (ROOT/"models"/"selfie_segmenter.tflite").is_file(),
                      "Full offline MediaPipe/FFmpeg/fonts are required")
@@ -123,6 +142,10 @@ class FullPipelineTest(unittest.TestCase):
             self.assertEqual("PASS",report["technical_status"])
             self.assertEqual("CREATIVE_REVIEW_REQUIRED",report["release_gate_status"])
             self.assertEqual(8,report["rag_graphics_pass"]["graphic_stages"])
+            self.assertTrue(report["rag_graphics_pass"]["face_safe_layout"])
+            self.assertFalse(report["rag_graphics_pass"]["graphics_overlap_camera_pixels"])
+            self.assertEqual(LAYOUT_ID,report["rag_graphics_pass"]["layout_id"])
+            self.assertEqual("contain-full-source",report["rag_graphics_pass"]["camera"]["camera_mode"])
             self.assertEqual(6,len(report["editorial_sections_covered"]))
             self.assertEqual(48,report["qa"]["output_media"]["frames"])
             self.assertTrue(report["qa"]["audio_bitstream_identical"])
