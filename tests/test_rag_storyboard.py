@@ -39,7 +39,7 @@ class StoryboardTests(unittest.TestCase):
     def test_incomplete_six_section_plan_must_not_silently_fallback(self):
         self.assertTrue(rag_intent(SAMPLE))
         no_headings = __import__("re").sub(
-            r"(?m)^# \\d+[–-]\\d+ sec \\|.*$", "", SAMPLE)
+            r"(?m)^# \d+[–-]\d+ sec \|.*$", "", SAMPLE)
         self.assertTrue(rag_intent(no_headings))
         self.assertFalse(recognizable(no_headings))
         self.assertIn("six numbered time headings",explain_unrecognized(no_headings))
@@ -47,7 +47,7 @@ class StoryboardTests(unittest.TestCase):
             draft("subtle slow-push",no_headings,50.4)
     def test_markdown_bold_script_headings_are_recognized(self):
         bold = __import__("re").sub(
-            r"(?m)^# (\\d+[–-]\\d+ sec \\|.*)$",r"**\\1**",SAMPLE)
+            r"(?m)^# (\d+[–-]\d+ sec \|.*)$",r"**\1**",SAMPLE)
         self.assertTrue(recognizable(bold))
         self.assertEqual(8,len(compose(bold,50.4)))
 
