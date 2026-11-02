@@ -221,6 +221,64 @@ def sample_face_crop(video,width,height,top,model=None,max_samples=14):
         capture.release()
 
 
+def preview_contact_sheet(video,thumb_width=360):
+    """Actual source frames + EXACT face-safe split geometry and final graphics.
+
+    This is an art-direction PREVIEW only: the original effects/grade have not
+    yet run, and no final master is approved. It prevents rendering a full
+    50-second video merely to discover that cards obscure the speaker.
+    """
+    video=Path(video)
+    info=video_info(video)
+    if not 8<=float(info["fps"])<=60:
+        raise ValueError("Preview requires a valid MP4 video")
+    dims=geometry(info["width"],info["height"])
+    top=dims["camera_bottom"]
+    crop=sample_face_crop(video,info["width"],info["height"],top)
+    cap=None
+    try:
+        import cv2
+        cap=cv2.VideoCapture(str(video))
+        if not cap.isOpened():
+            raise ValueError("Could not open uploaded original MP4")
+        images=[]
+        labels=(("policies",.13),("rag-flow",.44),("check-3",.81))
+        for kind,part in labels:
+            cap.set(cv2.CAP_PROP_POS_MSEC,info["duration"]*part*1000.)
+            ok,frame=cap.read()
+            if not ok:raise ValueError("Missing a required original preview frame")
+            raw=Image.fromarray(cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)).convert("RGBA")
+            if raw.size!=(info["width"],info["height"]):
+                raw=raw.resize((info["width"],info["height"]),Image.Resampling.LANCZOS)
+            composed=Image.new("RGBA",(info["width"],info["height"]),INK)
+            if crop["camera_mode"]=="face-aware-crop":
+                y=crop["crop_y"]
+                camera=raw.crop((0,y,info["width"],y+top))
+                composed.alpha_composite(camera,(0,0))
+            else:
+                w=round(info["width"]*top/info["height"])
+                if w%2:w-=1
+                camera=raw.resize((w,top),Image.Resampling.LANCZOS)
+                composed.alpha_composite(camera,((info["width"]-w)//2,0))
+            composed.alpha_composite(draw_overlay(
+                kind,info["width"],info["height"],ROOT/"fonts"))
+            thumbnail=composed.convert("RGB").resize(
+                (thumb_width,round(thumb_width*info["height"]/info["width"])),
+                Image.Resampling.LANCZOS)
+            images.append(thumbnail)
+        contact=Image.new("RGB",(sum(im.width for im in images),
+                                 images[0].height),(18,27,38))
+        offset=0
+        for im in images:
+            contact.paste(im,(offset,0));offset+=im.width
+        return contact,{"layout_id":LAYOUT_ID,"face_safe_layout":True,
+                        "camera_mode":crop["camera_mode"],
+                        "graphics_overlap_camera_pixels":False,
+                        "creative_status":"PREVIEW ONLY - NOT A FINISHED MP4"}
+    finally:
+        if cap is not None:cap.release()
+
+
 def apply(source,output,beats,script=None,crf=18):
     source=Path(source);output=Path(output)
     if source.resolve()==output.resolve():
