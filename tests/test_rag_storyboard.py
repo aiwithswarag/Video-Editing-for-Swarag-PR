@@ -14,7 +14,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"tools"))
 sys.path.insert(0,str(ROOT/"scripts"))
 from local_director import draft
-from rag_storyboard import compose,recognizable,validate,coverage
+from rag_storyboard import compose,recognizable,validate,coverage,rag_intent,explain_unrecognized
 from rag_visuals import draw_overlay
 from release_guard import evaluate as gate
 from PIL import Image
@@ -36,6 +36,21 @@ SAMPLE=(
 )
 
 class StoryboardTests(unittest.TestCase):
+    def test_incomplete_six_section_plan_must_not_silently_fallback(self):
+        self.assertTrue(rag_intent(SAMPLE))
+        no_headings = __import__("re").sub(
+            r"(?m)^# \\d+[–-]\\d+ sec \\|.*$", "", SAMPLE)
+        self.assertTrue(rag_intent(no_headings))
+        self.assertFalse(recognizable(no_headings))
+        self.assertIn("six numbered time headings",explain_unrecognized(no_headings))
+        with self.assertRaisesRegex(ValueError,"six numbered time headings"):
+            draft("subtle slow-push",no_headings,50.4)
+    def test_markdown_bold_script_headings_are_recognized(self):
+        bold = __import__("re").sub(
+            r"(?m)^# (\\d+[–-]\\d+ sec \\|.*)$",r"**\\1**",SAMPLE)
+        self.assertTrue(recognizable(bold))
+        self.assertEqual(8,len(compose(bold,50.4)))
+
     def test_rag_detection_is_grounded(self):
         self.assertTrue(recognizable(SAMPLE))
         plan=draft("premium executive reel with a subtle slow-push",SAMPLE,50.4)
