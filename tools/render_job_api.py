@@ -355,6 +355,12 @@ def main():
             except (ValueError, OSError, KeyError):
                 continue
     erase_old_jobs()
+    def janitor():
+        while True:
+            time.sleep(3600)
+            with LIVE:
+                erase_old_jobs()
+    threading.Thread(target=janitor,daemon=True).start()
     port = int(os.getenv("PORT", "10000"))
     with ThreadingHTTPServer(("0.0.0.0", port), Handler) as app:
         print(f"Swarag Render API listening on port {port}", flush=True)
