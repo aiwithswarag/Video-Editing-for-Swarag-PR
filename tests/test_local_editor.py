@@ -165,12 +165,16 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertIn(b"backdrop-word",data)
         self.assertIn(b"RAG-SIX-SECTION-GUARD-2026-11-02",data)
         self.assertIn(b"RAG-RENDER-BUTTON-FIX-2026-11-02",data)
+        self.assertIn(b"RAG-API-START-FIX-2026-11-02",data)
         self.assertIn(b'id="editMode"',data)
         self.assertIn(b'value="rag" selected',data)
         code,version=self.request("GET","/local/version",token=False)
         self.assertEqual(200,code)
         self.assertTrue(json.loads(version)["rag_six_section_guard"])
         self.assertTrue(json.loads(version)["render_button_fixed"])
+        self.assertTrue(json.loads(version)["rag_api_start_fixed"])
+        self.assertEqual("RAG-API-START-FIX-2026-11-02",
+                         json.loads(version)["rag_api_start_fix_id"])
         self.assertEqual(403,self.request("GET","/",host="evil.example")[0])
         self.assertEqual(403,self.request("POST","/local/draft",{},origin="https://evil.example")[0])
     def test_draft_endpoint_requires_token_and_returns_review_not_certification(self):
