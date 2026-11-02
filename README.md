@@ -4,6 +4,16 @@ A **Codex/ChatGPT-compatible** personal video-editing skill for executive video 
 
 **Release status:** engineering prototype. The rendering engine is integrated, but an end-to-end MP4 render still requires a supported Python environment, FFmpeg and model/font assets. It is not a deployed ChatGPT app.
 
+## Free local editor — no hosted rendering subscription
+
+**Recommended when you don't want the Render hosting bill:** download this repository and start the bundled one-click launcher after installing Docker Desktop or Docker Engine. The editor opens at http://127.0.0.1:8765/ on your own computer, accepts your **clean MP4, matching TXT/DOCX script and a plain-English effect request**, creates an editable draft timeline from the source script headings, and runs the **same original 42-effect engine and grade-first release QA**. All media stays local. The first Docker image build needs internet access; later renders run offline.
+
+- Windows: double-click `START_FREE_EDITOR_WINDOWS.bat`
+- Mac/Linux: launch `START_FREE_EDITOR_MAC_LINUX.sh`
+- Complete setup and privacy boundaries: [FREE LOCAL EDITOR](docs/FREE_LOCAL_EDITOR.md).
+
+**Important:** The free local browser is **not** magically connected to video attachments inside a ChatGPT Project. If you upload your file only to ChatGPT, you must also select it from the local editor. The paid Render API is prepared but **not deployed**. Human confirmation of actual spoken words and timing, full video inspection, and final creative approval remain required. Technical success does not guarantee a cinematic-looking edit.
+
 ## Install (Python 3.11/3.12 recommended)
 
 1. Install FFmpeg (including ffprobe) and Python.
