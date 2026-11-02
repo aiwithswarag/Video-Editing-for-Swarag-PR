@@ -22,7 +22,6 @@ from fractions import Fraction
 from pathlib import Path
 from statistics import median
 
-import cv2
 from PIL import Image, ImageDraw, ImageFont
 
 from rag_storyboard import COPY, validate, coverage
@@ -172,6 +171,13 @@ def sample_face_crop(video,width,height,top,model=None,max_samples=14):
     fallback={"camera_mode":"contain-full-source","crop_y":None,
               "face_detections":0,"face_protection":"unobstructed-camera-band"}
     if not model.is_file():
+        return fallback
+    # A host-side plan/QA pass may not install OpenCV; the full original
+    # Docker runtime does. Never fail media validation just to import a
+    # detector when a conservative unobstructed-camera fallback is possible.
+    try:
+        import cv2
+    except ImportError:
         return fallback
     capture=cv2.VideoCapture(str(video))
     if not capture.isOpened():
