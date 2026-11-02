@@ -13,6 +13,7 @@ on:
       - tests/test_produce_video.py
       - tests/test_render_job_api.py
       - tests/test_local_editor.py
+      - tests/test_rag_storyboard.py
       - tools/local_editor.py
       - tools/local_director.py
       - .github/workflows/renderer-container.yml
@@ -47,6 +48,8 @@ jobs:
             python -m unittest discover -s tests -p 'test_render_job_api.py' -v
           docker run --rm --network none --memory 5g swarag-editor:ci \
             python -m unittest discover -s tests -p 'test_local_editor.py' -v
+          docker run --rm --network none --memory 5g swarag-editor:ci \
+            python -m unittest discover -s tests -p 'test_rag_storyboard.py' -v
 
       - name: Test confidential media is absent from image context
         run: |
