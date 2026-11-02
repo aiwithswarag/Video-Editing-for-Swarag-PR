@@ -36,7 +36,8 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from plan_validation import validate_plan
-from rag_storyboard import validate as validate_rag_beats,recognizable as recognizable_rag
+from rag_storyboard import (validate as validate_rag_beats, recognizable as recognizable_rag,
+                            rag_intent, explain_unrecognized)
 from local_director import document_text
 
 JOB_DIR = Path(os.getenv("SWARAG_JOB_DIR", "/workspace/jobs")).resolve()
@@ -289,19 +290,29 @@ class Handler(BaseHTTPRequestHandler):
         if not state.get("source_clean_confirmed"):
             self.answer(409, {"error": "Clean original camera footage must be confirmed"})
             return
-        if plan.get("requires_six_section_explainer"):
-            try:
-                transcript=document_text(plan.get("script_filename","script.txt"),
-                                         (folder/"script.bin").read_bytes())
+        # Read the actual private uploaded script (never copied to GitHub or
+        # HTTP status) and detect RAG-explainer intent independently of UI flags.
+        # A stale local browser may submit an effect-only plan with "requires"
+        # false; it must never turn that into an accepted final MP4.
+        try:
+            script_path=folder/"script.bin"
+            transcript=(document_text(plan.get("script_filename","script.txt"),
+                                       script_path.read_bytes()) if script_path.is_file() else "")
+            is_rag=rag_intent(transcript)
+            if is_rag and not plan.get("requires_six_section_explainer"):
+                self.answer(409,{"error":"Incomplete RAG explainer: server detected citation/policy/RAG script but no six-section graphics plan. Restart the UPDATED editor, upload the COMPLETE six-section script, and verify eight stages before rendering."})
+                return
+            if plan.get("requires_six_section_explainer"):
                 if not recognizable_rag(transcript):
-                    raise ValueError("Actual script does not support the six RAG sections and fictional figures")
+                    raise ValueError(explain_unrecognized(transcript) or
+                                     "Script does not support required fictional policy figures")
                 from rag_storyboard import coverage
                 from cinematic_finish import probe
                 duration=probe(folder/"source.mp4")["duration"]
                 coverage(plan.get("rag_storyboard",[]),duration,transcript)
-            except (ValueError,KeyError,OSError,FileNotFoundError) as exc:
-                self.answer(409,{"error":"Complete script-verified explainer required: "+str(exc)[:160]})
-                return
+        except (ValueError,KeyError,OSError,FileNotFoundError) as exc:
+            self.answer(409,{"error":"Complete script-verified explainer required: "+str(exc)[:200]})
+            return
         with LIVE:
             if ACTIVE["id"] is not None or state["status"] not in ("AWAITING_INPUT", "FAILED", "INTERRUPTED"):
                 self.answer(409, {"error": "Busy or already started"})
