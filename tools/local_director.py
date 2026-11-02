@@ -141,6 +141,12 @@ def draft(direction,script,duration):
     # catalog. Other scripts stay on the conservative original-effect path.
     from rag_storyboard import compose as compose_rag_storyboard
     semantic_beats=compose_rag_storyboard(script,duration)
+    from rag_storyboard import explain_unrecognized,rag_intent
+    if rag_intent(script) and not semantic_beats:
+        # Crucial: never "succeed" with just slow-push when a complete
+        # six-section source-backed explainer is obviously requested.
+        raise ValueError(explain_unrecognized(script) or
+                         "RAG explainer requested but source-backed visual stages are missing")
     if semantic_beats:
         warnings.append("Recognized all six RAG/citation story sections and prepared eight reviewable graphic stages (the three checks enter sequentially).")
         warnings.append("The fictional 2024/$100 and 2026/$150 figures are copied from YOUR script, not asserted to be real policies.")
