@@ -89,6 +89,17 @@ class RenderAPITransportTests(unittest.TestCase):
         self.assertIn("Incomplete RAG explainer",out["error"])
         self.assertEqual("AWAITING_INPUT",self.request("GET",f"/v1/jobs/{job}")[1]["status"])
 
+    def test_explicit_rag_mode_cannot_fall_back_to_slow_push(self):
+        status,data=self.request("POST","/v1/jobs",{
+            "video_mode":"rag",
+            "effects":[{"fx":"slow-push","start":0.5,"end":2.0,"zoom":1.04}],
+            "requires_transcript":True,"transcript_verified":True,
+            "source_clean_confirmed":True,
+            "requires_six_section_explainer":False,
+            "rag_storyboard":[]})
+        self.assertEqual(422,status,data)
+        self.assertIn("Six-section explainer required",data["error"])
+
     def test_invalid_mp4_is_rejected_before_processing(self):
         id=self.job()
         code,_=self.request("PUT",f"/v1/jobs/{id}/video",b"NOT AN MP4")
