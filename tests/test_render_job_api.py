@@ -237,6 +237,63 @@ class RenderAPITransportTests(unittest.TestCase):
         self.assertEqual(b"ftyp",payload[4:8])
         self.assertGreater(len(payload),8000)
 
+    @unittest.skipUnless(shutil.which("ffmpeg") and (ROOT/"models"/"selfie_segmenter.tflite").is_file(),
+                         "Real FFmpeg/MediaPipe/font model assets required")
+    def test_complete_six_section_rag_http_upload_render_and_download(self):
+        """End-to-end browser API contract: authentic engine, six sections, original audio."""
+        from rag_storyboard import compose
+        source_script=(
+            "# 0-3 sec | hook\nYour AI cited a source. Can it still be wrong? Yes.\n"
+            "# 3-12 sec | fictional policy comparison\nTwo fictional policies: 2024 $100 per night; 2026 $150 per night.\n"
+            "# 12-20 sec | outdated AI citation\nAI answers $100 with an outdated 2024 citation.\n"
+            "# 20-33 sec | RAG documents\nRAG retrieval searches a document and generates an answer.\n"
+            "# 33-49 sec | three verification checks\nCheck the version, that the answer matches the source, and authorized access.\n"
+            "# 49-55 sec | final takeaway\nA citation is where verification starts, not where it ends.\n"
+        )
+        original=Path(self.dir.name)/"rag_synthetic.mp4"
+        subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y",
+            "-f","lavfi","-i","testsrc2=size=360x640:rate=8:duration=6",
+            "-f","lavfi","-i","sine=frequency=400:sample_rate=48000:duration=6",
+            "-c:v","libx264","-preset","ultrafast","-pix_fmt","yuv420p",
+            "-c:a","aac","-shortest",str(original)],check=True)
+        status,result=self.request("POST","/v1/jobs",{
+            "video_mode":"rag","source_duration":6,"script_filename":"script.txt",
+            "effects":[{"fx":"slow-push","start":0.2,"end":0.9,"zoom":1.04}],
+            "source_clean_confirmed":True,"requires_transcript":True,
+            "transcript_verified":True,"requires_six_section_explainer":True,
+            "rag_storyboard":compose(source_script,6)})
+        self.assertEqual(201,status,result)
+        job=result["id"]
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/video",original.read_bytes())[0])
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/script",source_script.encode())[0])
+        status,response=self.request("POST",f"/v1/jobs/{job}/start",{})
+        self.assertEqual(202,status,response)
+        deadline=time.monotonic()+180
+        state=None
+        while time.monotonic()<deadline:
+            _,state=self.request("GET",f"/v1/jobs/{job}")
+            if state["status"]!="RUNNING":break
+            time.sleep(.5)
+        self.assertIsNotNone(state)
+        self.assertEqual("REVIEW_REQUIRED",state["status"],state)
+        status,qa=self.request("GET",f"/v1/jobs/{job}/qa")
+        self.assertEqual(200,status)
+        self.assertEqual("PASS",qa["technical_status"])
+        self.assertTrue(qa["requires_six_section_explainer"])
+        self.assertEqual(8,qa["rag_graphics_pass"]["graphic_stages"])
+        self.assertEqual(6,len(qa["editorial_sections_covered"]))
+        self.assertEqual(48,qa["qa"]["output_media"]["frames"])
+        self.assertTrue(qa["qa"]["audio_bitstream_identical"])
+        self.assertEqual("rag",qa["video_mode"])
+        self.assertEqual(200,self.request("GET",f"/v1/jobs/{job}/release")[0])
+        con=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=60)
+        con.request("GET",f"/v1/jobs/{job}/master",
+                    headers={"Authorization":"Bearer "+mod.TOKEN})
+        mp4=con.getresponse()
+        header=mp4.read(12)
+        con.close()
+        self.assertEqual(b"ftyp",header[4:8])
+
     def test_no_script_or_video_leak_in_status(self):
         id=self.job()
         code,body=self.request("GET",f"/v1/jobs/{id}")
