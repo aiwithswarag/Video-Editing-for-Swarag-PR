@@ -186,7 +186,9 @@ async function download(path,name){let data=await call("/v1/jobs/"+jobId+"/"+pat
 el("mp4").onclick=()=>download("master","swarag_master.mp4").catch(e=>status(e.message));
 el("qa").onclick=()=>download("qa","swarag_qa.json").catch(e=>status(e.message));
 el("render").onclick=async()=>{
- el("render").disabled=true;try{
+ el("render").disabled=true;
+ let phase="creating the job";
+ try{
  status("Creating verified local render job...");
  let plannedRag=collectRag();
  if(el("editMode").value==="rag" && plannedRag.length!==8)
@@ -197,10 +199,16 @@ el("render").onclick=async()=>{
   video_mode:el("editMode").value,source_duration:duration,script_filename:el("script").files[0].name
  });
  jobId=created.id;
- status("Copying your MP4 and script to the local rendering workspace...");
+ phase="uploading the original MP4";
+ status("Copying your MP4 privately to the local rendering workspace...");
  await call("/v1/jobs/"+jobId+"/video","PUT",el("video").files[0]);
+ phase="uploading the script";
+ status("Copying your script privately to the local rendering workspace...");
  await call("/v1/jobs/"+jobId+"/script","PUT",el("script").files[0]);
+ phase="starting the RAG render";
+ status("Validating the six-section edit plan and starting the original renderer...");
  await call("/v1/jobs/"+jobId+"/start","POST",{});
+ phase="checking render progress";
  status("Swarag 42-effect renderer is working. Keep this window open.");
  while(true){await new Promise(done=>setTimeout(done,2500));
  let state=await call("/v1/jobs/"+jobId);
@@ -209,7 +217,19 @@ el("render").onclick=async()=>{
  break;}
  status("Technical MP4 PASS. Review the complete result before publishing.");
  el("mp4").style.display="inline-block";el("qa").style.display="inline-block";
- }catch(e){status("Not completed: "+e.message);}finally{check();}
+ }catch(e){
+   const message=String(e?.message||e);
+   if(/Failed to fetch|NetworkError|Load failed/i.test(message)){
+     status("Local editor connection was lost while "+phase+".\n"+
+       "The video MAY still be processing; do not launch another render blindly.\n"+
+       "Open http://127.0.0.1:8765/local/version on this PC.\n"+
+       "If it does not open: check Docker Desktop > Containers > swarag-local-editor "+
+       "for stopped/exited/OOM status and read the Logs.\n"+
+       "If it does open: keep this container running and check the job folder "+
+       "under PRIVATE\\jobs for state.json / render.log.\n"+
+       "The original footage stays private on your machine. No MP4 is certified yet.");
+   }else status("Render was not confirmed at stage '"+phase+"': "+message);
+ }finally{check();}
 };
 </script></body></html>'''
 
