@@ -9,6 +9,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -99,6 +100,77 @@ class RenderAPITransportTests(unittest.TestCase):
             "rag_storyboard":[]})
         self.assertEqual(422,status,data)
         self.assertIn("Six-section explainer required",data["error"])
+
+    def test_six_section_rag_start_imports_cinematic_probe_and_returns_http(self):
+        """Regression: missing scripts/ path crashed request handler ("Failed to fetch")."""
+        from rag_storyboard import compose
+        import cinematic_finish
+        source_script=(
+            "# 0-3 sec | hook\nYour AI cited a source. Can a citation be wrong?\n"
+            "# 3-12 sec | fictional policies\nThese fictional policies: 2024 $100 per night versus 2026 $150 per night.\n"
+            "# 12-20 sec | outdated answer\nAI answers $100, with an outdated 2024 citation.\n"
+            "# 20-33 sec | rag flow\nRAG retrieval searches a document and generates an answer.\n"
+            "# 33-49 sec | verification checks\nCheck version, answer matches source, and authorized access.\n"
+            "# 49-55 sec | closing\nA citation is where verification starts, not ends.\n"
+        )
+        code,info=self.request("POST","/v1/jobs",{
+            "effects":[{"fx":"slow-push","start":0.25,"end":3.45,"zoom":1.055}],
+            "requires_transcript":True,"transcript_verified":True,
+            "source_clean_confirmed":True,"video_mode":"rag",
+            "source_duration":50.4,"script_filename":"rag.txt",
+            "rag_storyboard":compose(source_script,50.4)})
+        self.assertEqual(201,code,info)
+        job=info["id"]
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/video",
+                                    b"\x00\x00\x00\x18ftypisom"+b"\x00"*64)[0])
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/script",
+                                    source_script.encode("utf8"))[0])
+        ran=threading.Event()
+        def fake_producer(id):
+            try:
+                state=mod.metadata(id)
+                state["status"]="REVIEW_REQUIRED"
+                mod.save(id,state)
+            finally:
+                with mod.LIVE:
+                    mod.ACTIVE["id"]=None
+                ran.set()
+        with patch.object(cinematic_finish,"probe",return_value={"duration":50.4}),\
+                patch.object(mod,"run_production",fake_producer):
+            status,response=self.request("POST",f"/v1/jobs/{job}/start",{})
+            self.assertEqual(202,status,response)
+            self.assertTrue(ran.wait(5),"Render thread was not launched")
+        self.assertEqual("REVIEW_REQUIRED",
+                         self.request("GET",f"/v1/jobs/{job}")[1]["status"])
+
+    def test_probe_dependency_errors_return_json_instead_of_dropped_socket(self):
+        """Unexpected RAG video-probe imports must be converted into HTTP errors."""
+        from rag_storyboard import compose
+        script=(
+            "# 0-3 sec | hook\nYour AI cited a source.\n"
+            "# 3-12 sec | fictional policies\nTwo fictional policies, 2024 $100 versus 2026 $150.\n"
+            "# 12-20 sec | outdated citation\nAI answered $100 citing outdated 2024 source.\n"
+            "# 20-33 sec | RAG process\nRAG retrieval searches a document then generates an answer.\n"
+            "# 33-49 sec | three checks\nVersion, answer matches source, authorized access.\n"
+            "# 49-55 sec | closing\nA citation is where verification starts.\n"
+        )
+        code,item=self.request("POST","/v1/jobs",{
+            "video_mode":"rag","source_duration":50.4,"script_filename":"rag.txt",
+            "requires_transcript":True,"transcript_verified":True,
+            "source_clean_confirmed":True,
+            "effects":[{"fx":"slow-push","start":0.2,"end":2.2,"zoom":1.03}],
+            "rag_storyboard":compose(script,50.4)})
+        self.assertEqual(201,code,item)
+        job=item["id"]
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/video",
+                                    b"\x00\x00\x00\x18ftypisom"+b"\x00"*64)[0])
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/script",script.encode())[0])
+        with patch.dict(sys.modules,{"cinematic_finish":None}):
+            status,response=self.request("POST",f"/v1/jobs/{job}/start",{})
+        self.assertEqual(409,status,response)
+        self.assertIn("script-verified explainer",response["error"])
+        self.assertEqual("AWAITING_INPUT",
+                         self.request("GET",f"/v1/jobs/{job}")[1]["status"])
 
     def test_invalid_mp4_is_rejected_before_processing(self):
         id=self.job()
