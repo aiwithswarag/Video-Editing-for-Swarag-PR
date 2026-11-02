@@ -46,6 +46,9 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 <label>Clean original video (.mp4)</label><input type="file" accept=".mp4" id="video">
 <label>Script (.txt / .md / .docx)</label><input type="file" accept=".txt,.md,.docx" id="script">
 <video id="player" controls playsinline style="display:none"></video>
+<label>Editing mode (required)</label>
+<select id="editMode"><option value="rag" selected>RAG citation / fictional policy explainer — all six sections REQUIRED</option>
+<option value="general">Other video — original Swarag effect catalog</option></select>
 <label>What effects do you want?</label><textarea id="direction" placeholder='Example: cinematic slow-push and backdrop-word, text="RAG". Keep natural skin and restrained typography.'></textarea>
 <button id="draft">Create edit draft</button></section>
 <section id="review" style="display:none"><h2>2. Check timing and titles</h2>
@@ -144,16 +147,22 @@ function createStage(item){
 }
 function check(){
  let enabled=el("clean").checked&&el("verified").checked;
- try{effects();collectRag();}catch(e){enabled=false;}
+ try{
+   effects();
+   const stages=collectRag();
+   if(el("editMode").value==="rag"&&stages.length!==8)enabled=false;
+ }catch(e){enabled=false;}
  el("render").disabled=!enabled;
 }
-["clean","verified"].forEach(x=>el(x).onchange=check);
+["clean","verified","editMode"].forEach(x=>el(x).onchange=check);
 el("draft").onclick=async()=>{try{
  if(!duration||!el("video").files[0]||!el("script").files[0])throw Error("Select an MP4 and matching script first");
  let sc=el("script").files[0];
  let result=await call("/local/draft","POST",{duration:duration,direction:el("direction").value,
    script_filename:sc.name,script_b64:b64(new Uint8Array(await sc.arrayBuffer()))});
  el("review").style.display="block";el("effects").replaceChildren();
+ if(el("editMode").value==="rag" && (result.rag_storyboard||[]).length!==8)
+   throw Error("Six-section RAG mode requires all eight graphic stages. Upload the full six-part citation/policy script, not an excerpt. Rendering is blocked.");
  result.effects.forEach(row);el("warnings").textContent=result.warnings.join("\n");
  el("ragStages").replaceChildren();
  (result.rag_storyboard||[]).forEach(createStage);
@@ -171,10 +180,12 @@ el("render").onclick=async()=>{
  el("render").disabled=true;try{
  status("Creating verified local render job...");
  let plannedRag=collectRag();
+ if(el("editMode").value==="rag" && plannedRag.length!==8)
+   throw Error("RAG Reel render blocked: all six sections and eight graphic stages must be present.");
  let created=await call("/v1/jobs","POST",{
   effects:effects(),requires_transcript:true,transcript_verified:true,source_clean_confirmed:true,
-  rag_storyboard:plannedRag,requires_six_section_explainer:plannedRag.length>0,
-  source_duration:duration,script_filename:el("script").files[0].name
+  rag_storyboard:plannedRag,requires_six_section_explainer:el("editMode").value==="rag" || plannedRag.length>0,
+  video_mode:el("editMode").value,source_duration:duration,script_filename:el("script").files[0].name
  });
  jobId=created.id;
  status("Copying your MP4 and script to the local rendering workspace...");
