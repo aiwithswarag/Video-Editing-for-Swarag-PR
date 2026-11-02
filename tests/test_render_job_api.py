@@ -80,7 +80,7 @@ class RenderAPITransportTests(unittest.TestCase):
             "source_clean_confirmed":True})
         self.assertEqual(201,code,info)
         job=info["id"]
-        source=b"\\x00\\x00\\x00\\x18ftypisom"+b"\\x00"*64
+        source=b"\x00\x00\x00\x18ftypisom"+b"\x00"*64
         self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/video",source)[0])
         words=b"AI cited a citation. Fictional policies $100 and $150. RAG retrieval documents and the answer may not be current."
         self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/script",words)[0])
