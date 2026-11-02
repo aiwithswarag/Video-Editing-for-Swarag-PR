@@ -46,7 +46,7 @@ class StoryboardTests(unittest.TestCase):
         self.assertEqual("DRAFT — NOT SPEECH VERIFIED",plan["status"])
         self.assertEqual(42,plan["effect_catalog_size"])
     def test_real_2024_2026_evidence_is_required(self):
-        altered=SAMPLE.replace("fictional policies","real company policies")
+        altered=SAMPLE.replace("Fictional comparison","Policy comparison").replace("fictional policies","real company policies")
         self.assertFalse(recognizable(altered))
         self.assertEqual([],compose(altered,50.4))
         altered=SAMPLE.replace("$150","$500")
