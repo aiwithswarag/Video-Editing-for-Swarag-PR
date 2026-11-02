@@ -7,6 +7,12 @@ description: Create professional, branded talking-head videos for Swarag using 4
 
 Use the repository root as working directory. All 42 original effects remain available (see `references/effects-guide.md`). **Having all 42 available does not mean stacking all 42 in a single video.**
 
+## Zero-hosting-cost execution path (user preference)
+
+When the user declines paid hosting, **do not suggest Render again as the only execution path**. Use the original 42-effect engine locally through [docs/FREE_LOCAL_EDITOR.md](../../docs/FREE_LOCAL_EDITOR.md) and `tools/local_editor.py`. Windows launcher: `START_FREE_EDITOR_WINDOWS.bat`. Mac/Linux launcher: `START_FREE_EDITOR_MAC_LINUX.sh`. The free editor runs only on `http://127.0.0.1:8765/` and does not upload private media to GitHub or cloud infrastructure.
+
+This is the same source rendering engine with **no recurring service bill**, but it requires the user's computer and a one-time Docker build. It creates a **draft** from plain-language effect requests and scripted time headings; it **does not automatically align actual spoken words** or approve creative quality. The user must verify real audio/timing and inspect the complete final MP4. A regular ChatGPT Project upload is **not automatically synchronized** to this local browser; do not promise direct Project-to-local file transfer without a separately authorized connector. Do not claim to have rendered a private video just because the local app exists.
+
 ## Mandatory production contract — reject substituted renderers
 
 **If the Swarag original 42-effect renderer is unavailable, return BLOCKED.** Do not silently replace `scripts/fx.py` or the full production pipeline with local OpenCV GrabCut, a single FFmpeg filter, generic Pillow motion graphics, a still, a generated video or sample footage. That is not the user's requested result.
