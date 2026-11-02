@@ -25,6 +25,8 @@ from production_lint import audit as audit_plan
 from visual_review import create as make_review_sheet
 from release_guard import sha256_file, evaluate as release_gate
 from visual_quality_gate import analyze as analyze_visual_opening
+from rag_storyboard import validate as validate_rag_beats
+from rag_visuals import apply as apply_rag_visuals
 
 
 def run(args):
@@ -108,8 +110,15 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
     raw=json.loads(plan_path.read_text(encoding='utf8'))
     if isinstance(raw,dict) and raw.get('requires_transcript') and not raw.get('transcript_verified'):
         raise ValueError('Transcript-based plan must be explicitly verified before export')
+    storyboard = raw.get('rag_storyboard',[]) if isinstance(raw,dict) else []
+    if isinstance(raw,dict) and raw.get('requires_six_section_explainer') and not storyboard:
+        raise ValueError('Six-section RAG explainer was requested but the storyboard is absent. One slow-push is not a complete edit.')
     original=media(video)
     plan=validate_plan(raw,original['duration'])
+    if storyboard:
+        if not raw.get('transcript_verified'):
+            raise ValueError('Explainer graphics require verified script/spoken content')
+        validate_rag_beats(storyboard,original['duration'])
     creative_lint=audit_plan(plan,original['duration'],style)
     if creative_lint['blocking_errors']:
         raise ValueError('Premium edit rejected by creative lint: '+json.dumps(creative_lint['blocking_errors']))
@@ -146,6 +155,13 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
              '--fps','auto','--brand',brand,'--crf',str(crf),
              '--cache-dir',str(outdir/'effect_cache')]
         run(cmd)
+        graphic_pass=None
+        if storyboard:
+            original_fx_master=outdir/'original_42_effects_intermediate.mp4'
+            master.replace(original_fx_master)
+            # This supplements (never replaces) the real 42-effect render.
+            graphic_pass=apply_rag_visuals(original_fx_master,master,storyboard,crf=crf)
+            (outdir/'rag_graphics_qa.json').write_text(json.dumps(graphic_pass,indent=2,ensure_ascii=False)+'\n',encoding='utf8')
         report=check_master(graded,master,expected_width=width)
         if report['technical_status']!='PASS':
             raise RuntimeError('Final QA FAIL: '+', '.join(report['errors']))
@@ -153,7 +169,10 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
             raise RuntimeError('Final QA FAIL: effect editor added or removed a frame')
         run(['ffmpeg','-hide_banner','-loglevel','error','-xerror',
              '-i',str(master),'-map','0:v:0','-f','null','-'])
-        review=make_review_sheet(master,workplan,media(master)['duration'],outdir/'visual_review.jpg')
+        # Review actual final graphics at the centre of each visual section.
+        visual_cues=workplan+[{'fx':'RAG '+item['kind'],'start':item['start'],'end':item['end']}
+                             for item in storyboard]
+        review=make_review_sheet(master,visual_cues,media(master)['duration'],outdir/'visual_review.jpg',limit=36)
         visual_qc=analyze_visual_opening(master)
         (outdir/'visual_anomaly_qa.json').write_text(json.dumps(visual_qc,indent=2,ensure_ascii=False)+'\n',encoding='utf8')
         outputs={}
@@ -174,6 +193,9 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
                 'preview':preview_seconds is not None,
                 'source_fps':original['fps'],'output_fps':report['output_media']['fps'],
                 'qa':report,'creative_lint':creative_lint,'visual_review':review,'visual_anomaly_qc':visual_qc,
+                'rag_graphics_pass':graphic_pass,
+                'editorial_sections_covered':graphic_pass['actual_sections'] if graphic_pass else [],
+                'requires_six_section_explainer':bool(raw.get('requires_six_section_explainer',False)),
                 'original_audio_md5':audio_md5(source),
                 'master_audio_md5':audio_md5(master),
                 'output':str(master),'platform_copies':outputs,
