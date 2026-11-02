@@ -232,7 +232,10 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("Supply one or more validated effect cues")
                 effects = validate_plan(effects)
                 rag= data.get("rag_storyboard",[])
-                requires= data.get("requires_six_section_explainer") is True
+                mode=data.get("video_mode","general")
+                if mode not in ("rag","general"):
+                    raise ValueError("Select RAG explainer or general video mode")
+                requires= data.get("requires_six_section_explainer") is True or mode=="rag"
                 if requires and not rag:
                     raise ValueError("Six-section explainer required but no visual storyboard supplied")
                 if rag:
@@ -254,6 +257,7 @@ class Handler(BaseHTTPRequestHandler):
                     "transcript_verified": data.get("transcript_verified") is True,
                     "requires_six_section_explainer":requires,
                     "rag_storyboard":rag,
+                    "video_mode":mode,
                     "script_filename":script_filename,
                     "effects": effects,
                 }
