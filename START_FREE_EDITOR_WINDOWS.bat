@@ -28,7 +28,7 @@ echo.
 echo This is your local-only editor: http://127.0.0.1:8765/
 echo Your media stays in the PRIVATE folder on this computer.
 echo Close this command window or press Ctrl+C when finished.
-start "" /b cmd /c "timeout /t 5 /nobreak >nul && start "" "http://127.0.0.1:8765/""
+start "" /min powershell -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Seconds 6; Start-Process 'http://127.0.0.1:8765/'"
 docker run --rm --name swarag-local-editor --network bridge -p 127.0.0.1:8765:8765 -e SWARAG_LOCAL_DOCKER=1 -e PORT=8765 -e SWARAG_JOB_DIR=/workspace/jobs -v "%CD%\PRIVATE:/workspace" swarag-free-editor:local python tools/local_editor.py
 if errorlevel 1 (
   echo The local editor stopped unexpectedly. Check the message above.
