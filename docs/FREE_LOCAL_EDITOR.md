@@ -114,6 +114,60 @@ After a successful export, confirm that the JSON technical QA contains
 regardless of technical PASS. Send both the real MP4 and the QA here for
 full-motion and audio review; technical checks do not certify visual quality.
 
+## Face-safe Executive Editorial V2 (corrected RAG video layout)
+
+The older dedicated RAG graphics compositor used fixed opaque cards across
+approximately 60–85% of the image, obscuring the actual speaker's beard,
+face, hands or torso. **That was a creative failure despite technical PASS**
+and did not match the face-first policy of the original 42-effect engine
+or `branding/editorial-v2.json`. Do not publish that render.
+
+**Face-safe layout ID:** `face-safe-editorial-split-v3`.
+
+The corrected version uses the original 42-effect engine first, followed by
+a restrained source-backed Executive Editorial V2 split composition.
+The real camera lives entirely in the upper 64% of the portrait, while the
+fictional policy comparison, outdated citation, retrieval flow and three
+checks sit in their own lower ink/ivory/gold typography region. There is
+**zero alpha overlay in the live camera region**. When the repository YuNet
+face detector sees the source face reliably, the editor selects a static,
+non-distorting crop that keeps the face clear. If detection is uncertain,
+it fits the ENTIRE original portrait into the top camera region rather
+than risk cutting off the speaker. The frame is not stretched or replaced
+by a fake person; the original audio remains bit-identical.
+
+**The local editor now requires a three-frame visual preview before a
+full RAG export:**
+
+1. Confirm the updated build: open
+   `http://127.0.0.1:8765/local/version`. It must contain
+   `"face_safe_layout_id": "face-safe-editorial-split-v3"` and
+   `"layout_preview_required": true`.
+2. Select your original clean MP4 and full six-section script; create
+   the draft, and review all eight editable effect/graphic stages.
+3. Click **Generate 3-frame face-safe preview**. It makes a local contact
+   sheet using actual frames from the same recording and the same
+   graphic geometry for policy cards, RAG flow and checks.
+   This does not render or replace the full film; the preview is pre-grade
+   and pre-effects and is not a substitute for watching actual motion.
+4. Inspect the three preview frames. If the design is wrong or clips
+   your head, **DO NOT approve or render**; report it. Only tick
+   **I inspected the three actual layout frames and the graphics do NOT
+   cover the speaker** when true, after checking clean source and audio.
+5. Render the full MP4. The final QA's `rag_graphics_pass` must report
+   `layout_id: face-safe-editorial-split-v3`,
+   `face_safe_layout: true` and
+   `graphics_overlap_camera_pixels: false` in addition to all
+   eight stages and all six story sections.
+6. Upload the real output MP4 and QA to the ChatGPT conversation for
+   normal-motion/phone-size/skin/speech review. Automated bounds checks
+   are not equivalent to human creative approval.
+
+**Windows:** stop any previous `swarag-local-editor` container and
+leave old `PRIVATE` media untouched. Download the latest branch ZIP to
+a NEW extracted folder and double-click `START_FREE_EDITOR_WINDOWS.bat`;
+Docker recompiles the code. This preserves zero monthly hosting fees.
+
 ## For every video (simple browser workflow)
 
 1. Upload the **clean original MP4** and the matching **TXT, MD or DOCX**
