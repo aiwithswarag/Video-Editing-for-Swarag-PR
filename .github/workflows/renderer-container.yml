@@ -38,7 +38,7 @@ jobs:
       - name: Full synthetic editing/rendering acceptance without network
         run: |
           docker run --rm --network none --memory 5g swarag-editor:ci \
-            python -m unittest discover -s tests -p 'test_produce_video.py' -v
+            python -m unittest discover -s tests -p 'test_produce_video.py' -v && python -m unittest discover -s tests -p 'test_render_job_api.py' -v
 
       - name: Test confidential media is absent from image context
         run: |
