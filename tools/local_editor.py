@@ -10,6 +10,7 @@ import html
 import json
 import os
 import secrets
+import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -19,6 +20,7 @@ sys.path.insert(0,str(ROOT/"tools"))
 import render_job_api as api
 from effect_catalog import read_registry
 from local_director import document_text,draft
+from rag_visuals import preview_contact_sheet
 
 BUILD_ID="RAG-SIX-SECTION-GUARD-2026-11-02"
 RENDER_BUTTON_FIX_ID="RAG-RENDER-BUTTON-FIX-2026-11-02"
@@ -60,6 +62,13 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 <h3>Six-section script-aware explainer · fictional policy example</h3>
 <p>These graphics are separate from the original 42 effects. Check actual word timing against the uploaded video and adjust every start/end point. The three checks are revealed sequentially.</p>
 <div id="ragStages"></div>
+</div>
+<div id="layoutReview" style="display:none">
+<h3>Face-safe preview before full render</h3>
+<p>This uses three frames from your real source footage, with the final policy/RAG/check layout. It is NOT a completed video or a motion/skin-quality approval.</p>
+<button id="preview" type="button">Generate 3-frame face-safe preview</button>
+<img id="previewImage" alt="Three private video frames with face-safe RAG editorial graphics" style="display:none;width:100%;height:auto;border:1px solid #587283;border-radius:8px">
+<label><input type="checkbox" id="layoutApproved"> I inspected the three actual layout frames and the graphics do NOT cover the speaker.</label>
 </div>
 <label><input type="checkbox" id="clean"> I confirm this is unedited camera footage, with no burned-in graphics.</label>
 <label><input type="checkbox" id="verified"> I checked effect timestamps/text and script words against the actual video audio.</label>
@@ -155,6 +164,8 @@ function check(){
  let reason="";
  if(!el("clean").checked)reason="Confirm that your video is clean, original camera footage.";
  else if(!el("verified").checked)reason="Check the script/timestamps against the spoken audio, then confirm.";
+ else if(el("editMode").value==="rag"&&!el("layoutApproved").checked)
+   reason="Generate and inspect the three real-video layout previews before the full render.";
  try{
    effects();
    const stages=collectRag();
@@ -164,7 +175,12 @@ function check(){
  el("render").disabled=Boolean(reason);
  el("renderReason").textContent=reason||"Ready to render. Original 42-effect pass and six-section graphics are selected.";
 }
-["clean","verified","editMode"].forEach(x=>el(x).onchange=check);
+["clean","verified","editMode","layoutApproved"].forEach(x=>el(x).onchange=check);
+el("video").addEventListener("change",()=>{
+ el("layoutApproved").checked=false;
+ el("previewImage").style.display="none";
+ check();
+});
 el("draft").onclick=async()=>{try{
  if(!duration||!el("video").files[0]||!el("script").files[0])throw Error("Select an MP4 and matching script first");
  let sc=el("script").files[0];
@@ -177,10 +193,27 @@ el("draft").onclick=async()=>{try{
  el("ragStages").replaceChildren();
  (result.rag_storyboard||[]).forEach(createStage);
  el("ragPanel").style.display=(result.rag_storyboard||[]).length?"block":"none";
+ el("layoutReview").style.display=(result.rag_storyboard||[]).length?"block":"none";
+ el("layoutApproved").checked=false;
+ el("previewImage").style.display="none";
  el("clean").checked=false;el("verified").checked=false;check();
  }catch(e){status(e.message);}};
 el("add").onclick=()=>row({fx:"slow-push",start:Math.min(3,duration*.2),
  end:Math.min(duration,Math.min(3,duration*.2)+2),zoom:1.05,blur:0});
+el("preview").onclick=async()=>{
+ const button=el("preview");button.disabled=true;
+ el("layoutApproved").checked=false;check();
+ status("Generating three local real-footage composition previews (no full render)...");
+ try{
+  const picture=await call("/local/layout-preview","POST",el("video").files[0],true);
+  const image=el("previewImage");
+  if(image.src&&image.src.startsWith("blob:"))URL.revokeObjectURL(image.src);
+  image.src=URL.createObjectURL(picture);
+  image.style.display="block";
+  status("Layout preview ready. Inspect whether your head, beard and hands are unobstructed. Reject it if the design feels wrong.");
+ }catch(e){status("Layout preview failed: "+String(e?.message||e));}
+ finally{button.disabled=false;check();}
+};
 async function download(path,name){let data=await call("/v1/jobs/"+jobId+"/"+path,"GET",null,true);
  let url=URL.createObjectURL(data),a=document.createElement("a");a.href=url;a.download=name;a.click();
  setTimeout(()=>URL.revokeObjectURL(url),30000);}
@@ -194,6 +227,8 @@ el("render").onclick=async()=>{
  let plannedRag=collectRag();
  if(el("editMode").value==="rag" && plannedRag.length!==8)
    throw Error("RAG Reel render blocked: all six sections and eight graphic stages must be present.");
+ if(el("editMode").value==="rag" && !el("layoutApproved").checked)
+   throw Error("RAG Reel render blocked: inspect and approve the actual face-safe layout preview.");
  let created=await call("/v1/jobs","POST",{
   effects:effects(),requires_transcript:true,transcript_verified:true,source_clean_confirmed:true,
   rag_storyboard:plannedRag,requires_six_section_explainer:el("editMode").value==="rag" || plannedRag.length>0,
@@ -273,6 +308,36 @@ class LocalHandler(api.Handler):
         super().do_GET()
     def do_POST(self):
         if not self.local_request():return
+        if urlsplit(self.path).path=="/local/layout-preview":
+            if not self.authorized():return
+            import io
+            import tempfile
+            try:
+                n=self.body(api.MAX_UPLOAD)
+                with tempfile.TemporaryDirectory(prefix="swarag_private_layout_") as d:
+                    source=Path(d)/"preview_source.mp4"
+                    with source.open("wb") as file:
+                        remaining=n
+                        while remaining:
+                            chunk=self.rfile.read(min(1024*1024,remaining))
+                            if not chunk:raise ValueError("Incomplete local preview upload")
+                            file.write(chunk);remaining-=len(chunk)
+                    with source.open("rb") as file:header=file.read(12)
+                    if len(header)<12 or header[4:8]!=b"ftyp":
+                        raise ValueError("Preview requires original MP4 bytes")
+                    image,report=preview_contact_sheet(source)
+                    data=io.BytesIO()
+                    image.save(data,format="JPEG",quality=86)
+                    content=data.getvalue()
+                self.send_response(200)
+                self.send_header("Content-Type","image/jpeg")
+                self.send_header("Cache-Control","private, no-store")
+                self.send_header("X-Content-Type-Options","nosniff")
+                self.send_header("Content-Length",str(len(content)))
+                self.end_headers();self.wfile.write(content)
+            except (ValueError,OSError,RuntimeError,ImportError,subprocess.SubprocessError) as exc:
+                self.answer(422,{"error":"Local composition preview failed: "+str(exc)[:180]})
+            return
         if urlsplit(self.path).path=="/local/draft":
             if not self.authorized():return
             try:
