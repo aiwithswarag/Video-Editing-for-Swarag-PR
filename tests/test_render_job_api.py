@@ -2,6 +2,9 @@
 import http.client
 import importlib.util
 import json
+import shutil
+import subprocess
+import time
 import sys
 import tempfile
 import threading
@@ -94,6 +97,47 @@ class RenderAPITransportTests(unittest.TestCase):
         mod.save(id2,state)
         mod.erase_old_jobs(now=100_000,max_age=100)
         self.assertTrue(mod.jobdir(id2).exists())
+    @unittest.skipUnless(shutil.which("ffmpeg") and (ROOT/"models"/"selfie_segmenter.tflite").is_file(),
+                         "Full FFmpeg/MediaPipe model assets required")
+    def test_private_api_can_render_real_synthetic_mp4(self):
+        source=Path(self.dir.name)/"synthetic.mp4"
+        subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-nostdin","-y",
+            "-f","lavfi","-i","testsrc2=size=360x640:rate=8:duration=2",
+            "-f","lavfi","-i","sine=frequency=400:sample_rate=48000:duration=2",
+            "-c:v","libx264","-preset","ultrafast","-pix_fmt","yuv420p",
+            "-c:a","aac","-shortest",str(source)],check=True)
+        code,info=self.request("POST","/v1/jobs",{
+            "effects":[{"fx":"slow-push","start":0.2,"end":1.5,"zoom":1.05}],
+            "source_clean_confirmed":True,
+            "transcript_verified":True,
+            "requires_transcript":True})
+        self.assertEqual(201,code,info)
+        job=info["id"]
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/video",source.read_bytes())[0])
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/script",b"Verified spoken dialogue")[0])
+        self.assertEqual(202,self.request("POST",f"/v1/jobs/{job}/start",{})[0])
+        deadline=time.monotonic()+180
+        status=None
+        while time.monotonic()<deadline:
+            code,status=self.request("GET",f"/v1/jobs/{job}")
+            if status["status"]!="RUNNING":break
+            time.sleep(.5)
+        self.assertIsNotNone(status)
+        self.assertEqual("REVIEW_REQUIRED",status["status"],status)
+        code,body=self.request("GET",f"/v1/jobs/{job}/qa")
+        self.assertEqual(200,code,body)
+        self.assertEqual("PASS",body["technical_status"])
+        code,release=self.request("GET",f"/v1/jobs/{job}/release")
+        self.assertEqual(200,code)
+        self.assertEqual("CREATIVE_REVIEW_REQUIRED",release["release_status"])
+        # Test token-protected MP4 bytes can be returned to an agent.
+        con=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=60)
+        con.request("GET",f"/v1/jobs/{job}/master",headers={"Authorization":"Bearer "+mod.TOKEN})
+        res=con.getresponse();payload=res.read();con.close()
+        self.assertEqual(200,res.status)
+        self.assertEqual(b"ftyp",payload[4:8])
+        self.assertGreater(len(payload),8000)
+
     def test_no_script_or_video_leak_in_status(self):
         id=self.job()
         code,body=self.request("GET",f"/v1/jobs/{id}")
