@@ -20,11 +20,11 @@ import local_editor as ui
 class LocalDraftTests(unittest.TestCase):
     def test_rag_script_time_windows_marked_unverified(self):
         script="# 0–3 sec | Hook\nYour AI cited a source.\n# 3–12 sec | Two policies\nThe old one says $100; the current one says $150.\n# 12–20 sec | Answer\n"
-        result=d.draft('Subtle slow-push and backdrop-word, text="RAG"',script,50.4)
+        result=d.draft('Subtle slow-push and backdrop-word, text="POLICIES"',script,50.4)
         self.assertEqual(42,result["effect_catalog_size"])
         self.assertEqual({"slow-push","backdrop-word"},{x["fx"] for x in result["effects"]})
         self.assertTrue(any("scaled proportionally" in w for w in result["warnings"]))
-        self.assertEqual("RAG",next(x for x in result["effects"] if x["fx"]=="backdrop-word")["text"])
+        self.assertEqual("POLICIES",next(x for x in result["effects"] if x["fx"]=="backdrop-word")["text"])
         self.assertIn("NOT SPEECH VERIFIED",result["status"])
     def test_named_42_options_are_never_faked(self):
         result=d.draft("orbit and glass-widgets with slow-push", "Hello.", 20)
