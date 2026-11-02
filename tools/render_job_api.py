@@ -36,6 +36,8 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from plan_validation import validate_plan
+from rag_storyboard import validate as validate_rag_beats,recognizable as recognizable_rag
+from local_director import document_text
 
 JOB_DIR = Path(os.getenv("SWARAG_JOB_DIR", "/workspace/jobs")).resolve()
 MAX_UPLOAD = int(os.getenv("SWARAG_MAX_UPLOAD_MB", "512")) * 1024 * 1024
@@ -228,6 +230,17 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(effects, list) or not 1 <= len(effects) <= 42:
                     raise ValueError("Supply one or more validated effect cues")
                 effects = validate_plan(effects)
+                rag= data.get("rag_storyboard",[])
+                requires= data.get("requires_six_section_explainer") is True
+                if requires and not rag:
+                    raise ValueError("Six-section explainer required but no visual storyboard supplied")
+                if rag:
+                    # Duration verified again by producer against actual MP4.
+                    validate_rag_beats(rag,float(data.get("source_duration",0)))
+                    requires=True
+                script_filename=data.get("script_filename","script.txt")
+                if not isinstance(script_filename,str) or not script_filename.casefold().endswith((".txt",".md",".docx")) or len(script_filename)>150:
+                    raise ValueError("Script filename must be TXT, MD or DOCX")
                 # Explicitly disable user-submitted local file paths; optional
                 # image/B-roll uploads need a separate approved asset interface.
                 if any("images" in e or "video" in e or "asset" in e for e in effects):
@@ -238,6 +251,9 @@ class Handler(BaseHTTPRequestHandler):
                 plan = {
                     "requires_transcript": bool(data.get("requires_transcript", True)),
                     "transcript_verified": data.get("transcript_verified") is True,
+                    "requires_six_section_explainer":requires,
+                    "rag_storyboard":rag,
+                    "script_filename":script_filename,
                     "effects": effects,
                 }
                 (folder / "plan.json").write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
@@ -273,6 +289,19 @@ class Handler(BaseHTTPRequestHandler):
         if not state.get("source_clean_confirmed"):
             self.answer(409, {"error": "Clean original camera footage must be confirmed"})
             return
+        if plan.get("requires_six_section_explainer"):
+            try:
+                transcript=document_text(plan.get("script_filename","script.txt"),
+                                         (folder/"script.bin").read_bytes())
+                if not recognizable_rag(transcript):
+                    raise ValueError("Actual script does not support the six RAG sections and fictional figures")
+                from rag_storyboard import coverage
+                from cinematic_finish import probe
+                duration=probe(folder/"source.mp4")["duration"]
+                coverage(plan.get("rag_storyboard",[]),duration,transcript)
+            except (ValueError,KeyError,OSError,FileNotFoundError) as exc:
+                self.answer(409,{"error":"Complete script-verified explainer required: "+str(exc)[:160]})
+                return
         with LIVE:
             if ACTIVE["id"] is not None or state["status"] not in ("AWAITING_INPUT", "FAILED", "INTERRUPTED"):
                 self.answer(409, {"error": "Busy or already started"})
