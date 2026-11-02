@@ -34,6 +34,43 @@ costs remain yours. You still need technical/creative review of the output.
 5. Open http://127.0.0.1:8765/ on **the same computer**.
    This is a local/private browser interface, not a public Render URL.
 
+## Update an existing Windows installation after the RAG Reel fix
+
+If you already rendered your 50.4-second AI-citation Reel and saw only
+`"selected_effects": ["slow-push"]`, that MP4 is technically valid but
+editorially incomplete. **Do not simply re-render using the old ZIP**.
+
+1. Keep a safe local copy of the original camera video, script and first render.
+2. Close the old local-editor command window and stop the `swarag-local-editor`
+   container in Docker Desktop. The old port `8765` must be free.
+3. Download the **latest ZIP of branch `feat/executive-editorial-v2`** from
+   GitHub, extract it into a NEW private folder, and ensure Docker Desktop is
+   running. Do not overwrite the old `PRIVATE` media files.
+4. Double-click `START_FREE_EDITOR_WINDOWS.bat`. Docker rebuilds the
+   changed code, reusing downloaded dependency layers where possible.
+5. At http://127.0.0.1:8765/ choose your original clean recording and the
+   matching script with all six time-labelled sections (0–3, 3–12, 12–20,
+   20–33, 33–49, 49–55). Describe the intended premium RAG explainer.
+6. **Create edit draft** now recognizes the supported fictional policy
+   script and displays a separate **six-section explainer** with eight stages:
+   hook, fictional comparison, outdated citation, document-to-answer RAG
+   explanation, three progressively appearing verification checks, and
+   closing. The script's 55-second headings are scaled to the 50.4-second
+   source *only as a draft*; manually review/adjust actual speech timing.
+7. Confirm clean original footage and verified audio/timing. Then render.
+   The canonical 42-effect engine runs first; an additional original
+   source-grounded graphic overlay renders second. The final QA must report
+   `requires_six_section_explainer: true`,
+   `rag_graphics_pass.graphic_stages: 8`, and six
+   `editorial_sections_covered`. A lone slow-push without those graphics
+   is now blocked as incomplete for this recognized script.
+
+**Boundary:** This template is specific to the six-section citation/RAG script.
+For unrelated scripts, effects still require actual speech timing verification
+and may not have a six-beat automated explainer. “DRAFT” never means
+full transcription, frame-aware art-direction approval or final publishing
+permission.
+
 ## For every video (simple browser workflow)
 
 1. Upload the **clean original MP4** and the matching **TXT, MD or DOCX**
