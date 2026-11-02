@@ -63,6 +63,7 @@ function elem(id){
 }
 elem("clean").checked=true;
 elem("verified").checked=true;
+elem("layoutApproved").checked=true;
 elem("editMode").value="rag";
 elem("effects").children=[{data:{
   fx:{fx:"slow-push",start:0.25,end:3.45,zoom:1.055,blur:0},
@@ -87,6 +88,11 @@ vm.runInContext("check();",ctx);
 assert.equal(elem("render").disabled,true);
 assert.match(elem("renderReason").textContent,/Check the script/);
 elem("verified").checked=true;
+elem("layoutApproved").checked=false;
+vm.runInContext("check();",ctx);
+assert.equal(elem("render").disabled,true);
+assert.match(elem("renderReason").textContent,/layout previews/);
+elem("layoutApproved").checked=true;
 elem("ragStages").children[7].stage.end.value="51";
 vm.runInContext("check();",ctx);
 assert.equal(elem("render").disabled,true);
@@ -177,6 +183,31 @@ class LocalHostHTTPTests(unittest.TestCase):
                          json.loads(version)["rag_api_start_fix_id"])
         self.assertEqual(403,self.request("GET","/",host="evil.example")[0])
         self.assertEqual(403,self.request("POST","/local/draft",{},origin="https://evil.example")[0])
+    def test_layout_preview_rejects_unauthenticated_or_fake_media(self):
+        self.assertEqual(401,self.request("POST","/local/layout-preview",
+                                          b"not a video",token=False)[0])
+        status,body=self.request("POST","/local/layout-preview",b"not a real MP4")
+        self.assertEqual(422,status)
+        self.assertIn(b"MP4",body)
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and
+                         (ROOT/"fonts"/"Inter.ttf").is_file(),
+                         "Actual video/fonts required for local preview test")
+    def test_local_preview_renders_three_real_source_stills(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            movie=Path(tmp)/"synthetic.mp4"
+            subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-nostdin","-y",
+               "-f","lavfi","-i","testsrc2=size=360x640:rate=8:duration=3",
+               "-f","lavfi","-i","sine=frequency=400:sample_rate=48000:duration=3",
+               "-c:v","libx264","-preset","ultrafast","-pix_fmt","yuv420p",
+               "-c:a","aac","-shortest",str(movie)],check=True)
+            status,body=self.request("POST","/local/layout-preview",movie.read_bytes())
+            self.assertEqual(200,status,body[:220])
+            self.assertTrue(body.startswith(b"\xff\xd8"))
+            from PIL import Image
+            im=Image.open(io.BytesIO(body))
+            self.assertEqual((1080,640),im.size)
+
     def test_draft_endpoint_requires_token_and_returns_review_not_certification(self):
         body={"duration":50.4,"direction":'slow-push and backdrop-word, text="RAG"',
               "script_filename":"rag.txt",
