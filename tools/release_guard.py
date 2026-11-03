@@ -67,10 +67,15 @@ def evaluate(qa,master,required_effects=(),review=None):
         pass_info=qa.get("rag_graphics_pass") or {}
         if not pass_info.get("complete") or pass_info.get("graphic_stages")!=8:
             faults.append("Six-section RAG graphics layer not produced by validated pipeline")
-        if (pass_info.get("layout_id")!="face-safe-editorial-split-v3" or
-            pass_info.get("face_safe_layout") is not True or
-            pass_info.get("graphics_overlap_camera_pixels") is not False):
-            faults.append("RAG graphics must use verified face-safe editorial composition; opaque overlays over the speaker are rejected")
+        if (pass_info.get("layout_id")!="subject-masked-glass-v5" or
+            pass_info.get("effect_name")!="glass-widgets" or
+            pass_info.get("effect_look")!="rag-evidence" or
+            pass_info.get("subject_depth_mask") is not True or
+            pass_info.get("full_frame_camera_preserved") is not True or
+            pass_info.get("no_fabricated_demo_widgets") is not True):
+            faults.append("RAG must be rendered through the original subject-masked glass-widgets effect without stock/demo panels")
+        if "glass-widgets" not in effects:
+            faults.append("Original fx.py glass-widgets effect absent from rendered RAG stages")
     if not qa.get("visual_review",{}).get("review_points"):
         faults.append("Actual exported frame-review samples absent")
     if faults:
