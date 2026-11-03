@@ -21,6 +21,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"tools"))
 from effect_catalog import read_registry
 from render_effect_gallery import NAMED_VARIANTS
+from effect_motion_review import create_motion_review
 
 
 def probe(source):
@@ -64,6 +65,11 @@ def report_from_gallery(folder,source_duration,source_start,original_dims):
                     (by_name[key].get("media_qc") or {}).get("full_video_and_audio_decode")]
     low_change=[name for name in names if
                 (by_name.get(name,{}).get("preview_qc") or {}).get("visible_change_detected_in_sample") is False]
+    per_effect_review_flags = {
+        label: list((by_name.get(label, {}).get('preview_qc') or {}).get('warnings') or [])
+        for label in expected
+        if (by_name.get(label, {}).get('preview_qc') or {}).get('warnings')
+    }
     return {
         "schema_version":1,"purpose":"PRIVATE LOCAL DIAGNOSTIC — NOT A PUBLISHABLE EDIT",
         "registered_effects":len(names),
@@ -80,6 +86,7 @@ def report_from_gallery(folder,source_duration,source_start,original_dims):
         "source_dimensions":{"width":int(original_dims["width"]),
                              "height":int(original_dims["height"])},
         "no_visible_change_in_one_sample_frame":low_change,
+        "per_effect_review_flags":per_effect_review_flags,
         "technical_status":("ALL_42_SHORT_SAMPLE_DECODE_PASS" if
             len(passed)==42 and not variant_failed and not absent else
             "FAIL_OR_INCOMPLETE — SEE EFFECT-BY-EFFECT RESULTS"),
@@ -156,6 +163,10 @@ def run(source,output,*,only=None):
         # Even if one original effect crashes, show a genuine partial review
         # sheet with explicit missing/failed slots. Don't hide failed visuals.
         make_review_sheet(gallery,review/"all-47-effects.jpg")
+        labels=names+[name for name,_,_ in NAMED_VARIANTS]
+        report["motion_review"]=create_motion_review(gallery,review,labels)
+        if report["motion_review"]["status"]!="MOTION_SAMPLES_AVAILABLE":
+            report["technical_status"]="FAIL_OR_INCOMPLETE — MOTION REVIEW ARTIFACTS MISSING"
     if only:
         report["purpose"]="LIMITED INTERNAL SUBSET TEST — NOT ALL 42 EFFECTS"
         report["technical_status"]="INCOMPLETE_SUBSET" if proc.returncode==0 else "FAIL_OR_INCOMPLETE"
