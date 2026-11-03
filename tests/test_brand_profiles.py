@@ -15,6 +15,16 @@ class TestExecutiveBrand(unittest.TestCase):
         plan=[{"fx":"glass-widgets","start":0,"end":1}]
         self.assertNotIn("look",apply_brand(plan,"none")[0])
         self.assertEqual("simple",apply_brand(plan)[0]["look"])
+    def test_face_priority_is_default_for_every_executive_effect(self):
+        names=["slow-push","glass-widgets","broll-split","match-cut","red-collage"]
+        result=apply_brand([{"fx":name,"start":0,"end":1} for name in names])
+        self.assertTrue(all(x["face_priority"] is True for x in result))
+        # User opt-out remains available for intentionally face-touching art
+        edited=apply_brand([{"fx":"scribble","start":0,"end":1,
+                             "face_priority":False}])
+        self.assertIs(edited[0]["face_priority"],False)
+        self.assertNotIn("face_priority",apply_brand(
+            [{"fx":"slow-push","start":0,"end":1}],"none")[0])
     def test_brand_name_validation(self):
         with self.assertRaises(ValueError):
             apply_brand([{"fx":"slow-push","start":0,"end":1}],"unknown")

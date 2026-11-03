@@ -16,5 +16,5 @@ def apply_brand(plan, name="executive"):
     for item in plan:
         effect = item["fx"]
         # User-specified options always win over brand defaults.
-        output.append({**defaults.get(effect, {}), **item})
+        output.append({"face_priority": True, **defaults.get(effect, {}), **item})
     return output

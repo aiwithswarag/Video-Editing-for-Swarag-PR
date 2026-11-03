@@ -204,6 +204,13 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertIn(b'id="motionPreview"',data)
         self.assertIn(b'id="motionVideo"',data)
         self.assertIn(b'id="check42MotionSheet"',data)
+        self.assertIn(b'id="effectClipPick"',data)
+        self.assertIn(b'id="effectClipPlayer"',data)
+        self.assertIn(b'id="previousClip"',data)
+        self.assertIn(b'id="nextClip"',data)
+        self.assertIn(b'EXECUTIVE-CAMERA-GALLERY-2026-11-03',data)
+        self.assertEqual("EXECUTIVE-CAMERA-GALLERY-2026-11-03",
+                         json.loads(version)["executive_camera_qa_build_id"])
         self.assertEqual("ORIGINAL-42-MOTION-REVIEW-2026-11-03",
                          json.loads(version)["motion_review_build_id"])
         self.assertIn(b"Test all 42 effects on my camera footage",data)
@@ -288,6 +295,36 @@ class LocalHostHTTPTests(unittest.TestCase):
         code,body=self.request("POST","/local/effect-diagnostic/recover-latest")
         self.assertEqual(409,code)
         self.assertIn(b"No retained completed effect gallery",body)
+    def test_private_single_effect_playback_is_authorized_and_allowlisted(self):
+        import uuid
+        from render_effect_gallery import NAMED_VARIANTS
+        from effect_catalog import read_registry
+        import local_effect_health_service as h
+        name=uuid.uuid4().hex
+        folder=ui.api.jobdir(name)
+        folder.mkdir(parents=True,exist_ok=True)
+        ui.api.save(name,{"id":name,"type":"effect_diagnostic",
+                          "status":"REVIEW_REQUIRED","created_at":1.0})
+        clips=folder/"diagnostic"/"effect-gallery"
+        clips.mkdir(parents=True,exist_ok=True)
+        marker=b"x"*4096
+        (clips/"slow-push.mp4").write_bytes(marker)
+        path="/local/effect-diagnostic/"+name+"/clip/slow-push"
+        self.assertEqual(401,self.request("GET",path,token=False)[0])
+        status,blob=self.request("GET",path)
+        self.assertEqual(200,status)
+        self.assertEqual(marker,blob)
+        self.assertEqual(404,self.request("GET",
+            "/local/effect-diagnostic/"+name+"/clip/../../source.mp4")[0])
+        self.assertEqual(404,self.request("GET",
+            "/local/effect-diagnostic/"+name+"/clip/not-an-effect")[0])
+        self.assertEqual(409,self.request("GET",
+            "/local/effect-diagnostic/"+name+"/clip/noise")[0])
+        self.assertEqual(47,len(h.safe_clip_labels()))
+        status,body=self.request("GET","/local/effect-diagnostic/"+name)
+        self.assertEqual(200,status)
+        self.assertEqual(47,len(json.loads(body)["effect_labels"]))
+
     def test_private_diagnostic_refuses_unauthorized_and_malformed_video(self):
         self.assertEqual(401,self.request("POST","/local/effect-diagnostic",
                                           b"not a video",token=False)[0])

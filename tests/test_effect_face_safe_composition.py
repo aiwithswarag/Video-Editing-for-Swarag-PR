@@ -42,6 +42,23 @@ class FaceSafeEffectTests(unittest.TestCase):
         self.assertLess(float(c.img[215,180,0]),.03)
         self.assertGreater(float(c.img[115,85,0]),.9)
 
+    def test_executive_face_priority_guards_all_graphical_layers(self):
+        c=self.canvas()
+        c.face_priority=True
+        panel=self.Image.new("RGBA",(220,280),(255,0,0,255))
+        # The original renderer used unguarded overlays in some effect
+        # functions; brand face priority now protects these automatically.
+        self.fx.comp(c,panel,70,100)
+        self.assertLess(float(c.img[215,180,0]),.03)
+        self.assertGreater(float(c.img[115,85,0]),.9)
+
+    def test_unbranded_original_can_intentionally_overlay(self):
+        c=self.canvas()
+        c.face_priority=False
+        panel=self.Image.new("RGBA",(220,280),(255,0,0,255))
+        self.fx.comp(c,panel,70,100)
+        self.assertGreater(float(c.img[215,180,0]),.9)
+
     def test_guard_keeps_face_even_on_empty_person_mask(self):
         c=self.canvas()
         panel=self.Image.new("RGBA",(220,280),(255,0,0,255))

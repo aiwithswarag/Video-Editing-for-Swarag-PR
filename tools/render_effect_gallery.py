@@ -21,6 +21,51 @@ NAMED_VARIANTS = [
     ("apple-toggles-below", "apple-toggles", {"pos":"below"})
 ]
 
+
+# These are neutral visual fixtures for diagnostics ONLY, never publishable
+# video facts. Original 42-effect implementations stay unchanged, while the
+# user's real camera is shown against authored Swarag concept cards instead
+# of duplicated raw selfie thumbnails or unverified business statistics.
+DIAGNOSTIC_CARD_FX = frozenset((
+    "noise","orbit","carousel-spin","check-pills","profile-wall",
+    "phone-fan","broll-split"
+))
+ILLUSTRATIVE_LABELS = ("STRATEGY|EXECUTION|GOVERNANCE|"
+                       "DELIVERY|MEASURABLE VALUE|AI ADOPTION")
+SAFE_EXAMPLE_TEXT = {
+    "the-bill": {"text":"SWARAG DEMO|STRATEGY|EXECUTION|OUTCOMES"},
+    "cover-star": {"text":"EXECUTION",
+                   "lines":"STRATEGY|DELIVERY|EXAMPLE ONLY",
+                   "look":"standard"},
+    "red-collage": {"text":"STRATEGY",
+                    "lines":"CLEAR DIRECTION.|SMART EXECUTION.|REAL IMPACT."},
+    "headline-wall": {"text":"Governance framework::Example|"
+                                 "AI delivery guide::Demo|"
+                                 "Execution priorities::Illustration",
+                       "total":"DEMO","label":"example only"},
+    "profile-wall": {"label":"EXAMPLE ONLY","name":"Swarag demo","sub":"illustrative"},
+    "broll-split": {"text":"ILLUSTRATIVE DEMO"},
+    "match-cut": {"text":"EXAMPLE",
+                  "article_text":"Illustrative layout and motion sample. "
+                                 "This is not an actual published article."},
+    "liquid-glass-graph": {"text":"ILLUSTRATIVE TREND","from":0,"to":42,
+                           "hypothetical_example":True},
+    "glass-widgets": {"look":"standard"},
+    "todo": {"text":"STRATEGY|EXECUTION|OUTCOMES"},
+    "checklist": {"text":"Direction::example|Delivery::example|"
+                           "Outcomes::example"},
+    "phone-fan": {"text":"STRATEGY.|EXECUTION."},
+}
+
+def diagnostic_options(label, fx, variants=None):
+    """Demo examples with explicit illustrative provenance; no fake facts."""
+    options=dict(SAFE_EXAMPLE_TEXT.get(fx,{}))
+    if fx in DIAGNOSTIC_CARD_FX:
+        options.update({"brand_cards":True,"labels":ILLUSTRATIVE_LABELS})
+    options.update(variants or {})
+    return options
+
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--video",required=True)
@@ -33,6 +78,8 @@ def main():
     ap.add_argument("--brand",choices=["none","executive"],default="none")
     ap.add_argument("--include-variants",action="store_true")
     ap.add_argument("--render-motion",action="store_true",help="Also render MP4 clips")
+    ap.add_argument("--illustrative-executive-examples",action="store_true",
+        help="Style private original-camera gallery with neutral Swarag examples; effects are NOT publishable claims")
     ap.add_argument("--only",action="append",default=[],
        help="LIMITED developer test subset only. Omit this option for 42-effect certification.")
     args=ap.parse_args()
@@ -71,6 +118,8 @@ def main():
     assigned=[task for idx,task in enumerate(tasks) if idx % args.shards==args.shard]
     statuses=[]
     for label,fx,options in assigned:
+        if args.illustrative_executive_examples:
+            options=diagnostic_options(label,fx,options)
         plan=out / (label+".json")
         image=out / (label+".png")
         plan.write_text(json.dumps({"effects":[{"fx":fx,"start":0.0,"end":1.7,**options}]}),encoding="utf8")
@@ -105,6 +154,7 @@ def main():
                          "media_qc":motion_qc,
                          "preview_qc":preview_qc,
                          "creative_status":"REVIEW REQUIRED — technical smoke is not professional approval",
+                         "illustrative_example":bool(args.illustrative_executive_examples),
                          "log":message if not ok else ""})
         print(f"{'PASS' if ok else 'FAIL'} {label} ({statuses[-1]['elapsed_seconds']}s)",flush=True)
     (out/"results.json").write_text(json.dumps(statuses,indent=2),encoding="utf8")

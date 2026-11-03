@@ -73,6 +73,9 @@ def report_from_gallery(folder,source_duration,source_start,original_dims):
     }
     return {
         "schema_version":1,"purpose":"PRIVATE LOCAL DIAGNOSTIC — NOT A PUBLISHABLE EDIT",
+        "presentation":"Swarag executive illustrative examples (not original effect default UI)",
+        "original_effect_implementations_tested":True,
+        "illustrative_fixture_content":True,
         "registered_effects":len(names),
         "tested_effects":len([n for n in names if n in by_name]),
         "technically_passed_effects":len(passed),
@@ -96,7 +99,8 @@ def report_from_gallery(folder,source_duration,source_start,original_dims):
         "limitations":[
             "Only 2.25 seconds of real camera footage are sampled",
             "No automatic speech/caption alignment or cinematic artistic approval",
-            "Demo text/widgets in individual tests are TEST FIXTURES, never production claims",
+            "All on-screen numbers, charts and concepts are illustrative gallery fixtures, never production claims",
+            "Executive palette and options are enabled; tests run all original effect FUNCTIONS but not every unstyled original default",
             "Technical decode/visual change on a small sample cannot certify a complete 1080p video"
         ]
     }
@@ -155,7 +159,8 @@ def run(source,output,*,only=None):
     subprocess.run(cmd,check=True,timeout=120)
     command=[sys.executable,str(ROOT/"tools"/"render_effect_gallery.py"),
         "--video",str(short),"--output-dir",str(gallery),"--width","360",
-        "--at","0.95","--timeout","120","--brand","none",
+        "--at","0.95","--timeout","120","--brand","executive",
+        "--illustrative-executive-examples",
         "--include-variants","--render-motion"]
     if only:
         for name in only:command+=["--only",name]

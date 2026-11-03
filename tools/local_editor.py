@@ -31,6 +31,7 @@ API_START_FIX_ID="RAG-API-START-FIX-2026-11-02"
 GLASS_LEGIBILITY_FIX_ID="GLASS-MOBILE-LEGIBILITY-2026-11-03"
 EFFECT_QA_BUILD_ID="ORIGINAL-42-EFFECT-QA-2026-11-03"
 MOTION_REVIEW_BUILD_ID="ORIGINAL-42-MOTION-REVIEW-2026-11-03"
+EXECUTIVE_CAMERA_QA_BUILD_ID="EXECUTIVE-CAMERA-GALLERY-2026-11-03"
 RAG_MOTION_PREVIEW_BUILD_ID="RAG-MOTION-PREVIEW-2026-11-03"
 
 PAGE = r'''<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -51,13 +52,13 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 </style></head><body>
 <header><h1>SWARAG / Free Video Director</h1>
 <p>Private on-device rendering · Original 42 effects · No monthly hosting</p>
-<div class="warning"><b>Editor build:</b> __LOCAL_BUILD_ID__ · <b>UI fix:</b> __RENDER_BUTTON_FIX_ID__ · <b>API fix:</b> __API_START_FIX_ID__ · <b>Creative layout:</b> __FACE_SAFE_LAYOUT_ID__ · <b>Typography:</b> __GLASS_LEGIBILITY_FIX_ID__ · <b>42-effect QA:</b> __EFFECT_QA_BUILD_ID__ · <b>Motion review:</b> __MOTION_REVIEW_BUILD_ID__ · <b>RAG motion:</b> __RAG_MOTION_PREVIEW_BUILD_ID__ · Six-section RAG explainer detection and incomplete-plan protection enabled. If you do not see this build marker, stop and update your Windows ZIP/Docker image.</div>
+<div class="warning"><b>Editor build:</b> __LOCAL_BUILD_ID__ · <b>UI fix:</b> __RENDER_BUTTON_FIX_ID__ · <b>API fix:</b> __API_START_FIX_ID__ · <b>Creative layout:</b> __FACE_SAFE_LAYOUT_ID__ · <b>Typography:</b> __GLASS_LEGIBILITY_FIX_ID__ · <b>42-effect QA:</b> __EFFECT_QA_BUILD_ID__ · <b>Motion review:</b> __MOTION_REVIEW_BUILD_ID__ · <b>Executive camera samples:</b> __EXECUTIVE_CAMERA_QA_BUILD_ID__ · <b>RAG motion:</b> __RAG_MOTION_PREVIEW_BUILD_ID__ · Six-section RAG explainer detection and incomplete-plan protection enabled. If you do not see this build marker, stop and update your Windows ZIP/Docker image.</div>
 <div class="warning">Uses your actual footage and the same FFmpeg/MediaPipe engine. It does not fake subtitles, voice, or statistics. Script-based timings must be checked before export.</div></header>
 <section><h2>1. Upload and describe</h2>
 <label>Clean original video (.mp4)</label><input type="file" accept=".mp4" id="video">
 <div class="warning" style="margin-top:12px">
 <h3>Check all 42 original effects — before another full render</h3>
-<p>Optional private diagnostic. Tests all 42 effects and five named looks on a short sample of your ACTUAL selected camera video. Reports decode errors, missing audio/frames, observable visual changes, and a 3-frame motion review of each effect. The full 47 short MP4 clips can be played individually. This is not a finished MP4 or artistic certification. No footage goes to GitHub or a hosted service.</p>
+<p>Private diagnostic. Executes all 42 original effect implementations and five named looks on a short sample of your ACTUAL selected camera video, using Swarag executive-color illustrative fixtures instead of unsourced numerical claims or repeated portraits. These examples are not a verbatim preview of each original default. Reports decode errors, missing audio/frames, observable visual changes, and a 3-frame motion review of each effect. The full 47 short MP4 clips can be played individually. This is not a finished MP4 or artistic certification. No footage goes to GitHub or a hosted service.</p>
 <button id="checkEngine" type="button">Check my local 42-effect engine first (no rendering)</button>
 <pre id="engineHealth" aria-live="polite" style="display:none"></pre>
 <button id="check42" type="button">Test all 42 effects on my camera footage</button>
@@ -67,6 +68,16 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 <button id="download42" style="display:none" type="button">Download effect-by-effect diagnostic JSON</button>
 <button id="download42Motion" style="display:none" type="button">Download all 47 playable effect previews (ZIP)</button>
 <img id="check42MotionSheet" alt="Three sequential frames from each actual original-effect motion clip" style="width:100%;height:auto;display:none;border:1px solid #587283;border-radius:8px">
+<div id="effectClipReview" style="display:none;margin-top:12px;padding:12px;border:1px solid #587283;border-radius:8px">
+<h4>Review each effect in motion (phone-sized playback)</h4>
+<p>The overview sheet is only a directory. Select and play each MP4; inspect eyes, hair, hands, motion and text size. No effect is creatively certified by a technical pass.</p>
+<select id="effectClipPick" aria-label="Select effect for private moving video review"></select>
+<button id="previousClip" type="button">Previous effect</button>
+<button id="playClip" type="button">Play selected effect</button>
+<button id="nextClip" type="button">Next effect</button>
+<video id="effectClipPlayer" controls playsinline preload="none" style="display:none;width:min(100%,360px);max-height:640px;margin-top:10px"></video>
+<pre id="effectClipNotes" aria-live="polite" style="white-space:pre-wrap"></pre>
+</div>
 </div>
 <label>Script (.txt / .md / .docx)</label><input type="file" accept=".txt,.md,.docx" id="script">
 <video id="player" controls playsinline style="display:none"></video>
@@ -239,6 +250,7 @@ el("check42").onclick=async()=>{
  output.textContent="Uploading a private camera sample for the original 42-effect diagnostic...";
  el("check42Sheet").style.display="none";el("download42").style.display="none";
  el("check42MotionSheet").style.display="none";el("download42Motion").style.display="none";
+ el("effectClipReview").style.display="none";
  try{
    const started=await call("/local/effect-diagnostic","POST",file);
    healthJobId=started.id;
@@ -258,6 +270,7 @@ el("check42").onclick=async()=>{
        if(state.review_artifact_error_type)output.textContent+=" ("+state.review_artifact_error_type+")";
        if(state.error)output.textContent+="\n"+state.error;
        if(state.motion_review_status==="MOTION_SAMPLES_AVAILABLE"){
+         enableEffectClipReview(state);
          el("download42Motion").style.display="inline-block";
          try{
            const motionSheet=await call("/local/effect-diagnostic/"+healthJobId+"/motion-sheet","GET",null,true);
@@ -292,6 +305,7 @@ el("recover42").onclick=async()=>{
  output.textContent="Checking previously saved private effect results. No camera footage will be uploaded or rerendered...";
  el("check42Sheet").style.display="none";el("check42MotionSheet").style.display="none";
  el("download42").style.display="none";el("download42Motion").style.display="none";
+ el("effectClipReview").style.display="none";
  try{
    const started=await call("/local/effect-diagnostic/recover-latest","POST");
    healthJobId=started.id;
@@ -309,6 +323,7 @@ el("recover42").onclick=async()=>{
        if(state.review_artifact_error_type)output.textContent+=" ("+state.review_artifact_error_type+")";
        el("download42").style.display="inline-block";
        if(state.motion_review_status==="MOTION_SAMPLES_AVAILABLE"){
+         enableEffectClipReview(state);
          el("download42Motion").style.display="inline-block";
          try{
            const jpg=await call("/local/effect-diagnostic/"+healthJobId+"/motion-sheet","GET",null,true);
@@ -331,6 +346,53 @@ el("recover42").onclick=async()=>{
       "\\nYour original footage remains untouched. You can run a new diagnostic only if previous files have expired."; }
  finally{button.disabled=false;}
 };
+let clipReviewReport=null;
+function enableEffectClipReview(state){
+ if(!healthJobId)return;
+ const select=el("effectClipPick"), old=select.value;
+ select.replaceChildren();
+ (state.effect_labels||[]).forEach(name=>{
+   const option=document.createElement("option");option.value=name;option.textContent=name;
+   select.appendChild(option);
+ });
+ if(old && [...select.options].some(option=>option.value===old))select.value=old;
+ el("effectClipReview").style.display="block";
+ el("effectClipNotes").textContent="Select an effect, then play the original moving MP4. Check eyes and hands over the entire clip. This is a small diagnostic excerpt.";
+ clipReviewReport=null;
+}
+async function playEffectClip(){
+ if(!healthJobId)return;
+ const name=el("effectClipPick").value;
+ if(!/^[a-z0-9-]{1,60}$/.test(name))throw Error("Unrecognized effect label");
+ const player=el("effectClipPlayer");
+ try{
+   const clip=await call("/local/effect-diagnostic/"+healthJobId+"/clip/"+name,"GET",null,true);
+   if(player.src?.startsWith("blob:"))URL.revokeObjectURL(player.src);
+   player.src=URL.createObjectURL(clip);player.style.display="block";player.load();
+   el("effectClipNotes").textContent="Loading individual camera motion: "+name+"...";
+   if(!clipReviewReport){
+     clipReviewReport=await call("/local/effect-diagnostic/"+healthJobId+"/report");
+   }
+   const focus=(clipReviewReport.human_creative_review_focus||{})[name]||[];
+   const fail=[...(clipReviewReport.technically_failed_or_unverified_effects||[]),
+               ...(clipReviewReport.named_looks_failed_or_unverified||[])].includes(name);
+   el("effectClipNotes").textContent=name+" | technical sample: "+(fail?"FAILED/UNVERIFIED":"decoded, not creatively approved")+
+       "\nReview: "+(focus.length?focus.join("\n"):"Check face, hands, typography and movement")+
+       "\nThis 240px excerpt cannot certify your 1080p production render.";
+   try{await player.play();}catch(_err){/* user can press native video Play */}
+ }catch(err){
+   el("effectClipNotes").textContent="Individual video unavailable: "+String(err?.message||err);
+ }
+}
+el("playClip").onclick=playEffectClip;
+for(const [id,step] of [["previousClip",-1],["nextClip",1]]){
+ el(id).onclick=()=>{
+   const select=el("effectClipPick");
+   if(!select.options.length)return;
+   select.selectedIndex=(select.selectedIndex+step+select.options.length)%select.options.length;
+   playEffectClip();
+ };
+}
 el("download42").onclick=async()=>{
  if(!healthJobId)return;
  try{
@@ -501,6 +563,7 @@ class LocalHandler(api.Handler):
                              "private_real_camera_42_effect_diagnostic":True,
                              "effect_qa_build_id":EFFECT_QA_BUILD_ID,
                              "motion_review_build_id":MOTION_REVIEW_BUILD_ID,
+                             "executive_camera_qa_build_id":EXECUTIVE_CAMERA_QA_BUILD_ID,
                              "rag_motion_preview_build_id":RAG_MOTION_PREVIEW_BUILD_ID})
             return
         if urlsplit(self.path).path=="/":
@@ -512,6 +575,7 @@ class LocalHandler(api.Handler):
             data=data.replace("__GLASS_LEGIBILITY_FIX_ID__",GLASS_LEGIBILITY_FIX_ID)
             data=data.replace("__EFFECT_QA_BUILD_ID__",EFFECT_QA_BUILD_ID)
             data=data.replace("__MOTION_REVIEW_BUILD_ID__",MOTION_REVIEW_BUILD_ID)
+            data=data.replace("__EXECUTIVE_CAMERA_QA_BUILD_ID__",EXECUTIVE_CAMERA_QA_BUILD_ID)
             data=data.replace("__RAG_MOTION_PREVIEW_BUILD_ID__",RAG_MOTION_PREVIEW_BUILD_ID)
             data=data.replace("__ORIGINAL_EFFECT_NAMES__",json.dumps(sorted(read_registry()[0])))
             blob=data.encode("utf-8")
