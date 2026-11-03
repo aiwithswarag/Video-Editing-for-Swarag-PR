@@ -21,7 +21,7 @@ sys.path.insert(0,str(ROOT/"tools"))
 import render_job_api as api
 from effect_catalog import read_registry
 from local_director import document_text,draft
-from rag_glass_preview import preview_contact_sheet,LAYOUT_ID
+from rag_glass_preview import preview_contact_sheet,preview_motion_clip,LAYOUT_ID
 import local_effect_health_service as effect_health
 from local_runtime_health import runtime_diagnostics
 
@@ -31,6 +31,7 @@ API_START_FIX_ID="RAG-API-START-FIX-2026-11-02"
 GLASS_LEGIBILITY_FIX_ID="GLASS-MOBILE-LEGIBILITY-2026-11-03"
 EFFECT_QA_BUILD_ID="ORIGINAL-42-EFFECT-QA-2026-11-03"
 MOTION_REVIEW_BUILD_ID="ORIGINAL-42-MOTION-REVIEW-2026-11-03"
+RAG_MOTION_PREVIEW_BUILD_ID="RAG-MOTION-PREVIEW-2026-11-03"
 
 PAGE = r'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -50,7 +51,7 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 </style></head><body>
 <header><h1>SWARAG / Free Video Director</h1>
 <p>Private on-device rendering · Original 42 effects · No monthly hosting</p>
-<div class="warning"><b>Editor build:</b> __LOCAL_BUILD_ID__ · <b>UI fix:</b> __RENDER_BUTTON_FIX_ID__ · <b>API fix:</b> __API_START_FIX_ID__ · <b>Creative layout:</b> __FACE_SAFE_LAYOUT_ID__ · <b>Typography:</b> __GLASS_LEGIBILITY_FIX_ID__ · <b>42-effect QA:</b> __EFFECT_QA_BUILD_ID__ · <b>Motion review:</b> __MOTION_REVIEW_BUILD_ID__ · Six-section RAG explainer detection and incomplete-plan protection enabled. If you do not see this build marker, stop and update your Windows ZIP/Docker image.</div>
+<div class="warning"><b>Editor build:</b> __LOCAL_BUILD_ID__ · <b>UI fix:</b> __RENDER_BUTTON_FIX_ID__ · <b>API fix:</b> __API_START_FIX_ID__ · <b>Creative layout:</b> __FACE_SAFE_LAYOUT_ID__ · <b>Typography:</b> __GLASS_LEGIBILITY_FIX_ID__ · <b>42-effect QA:</b> __EFFECT_QA_BUILD_ID__ · <b>Motion review:</b> __MOTION_REVIEW_BUILD_ID__ · <b>RAG motion:</b> __RAG_MOTION_PREVIEW_BUILD_ID__ · Six-section RAG explainer detection and incomplete-plan protection enabled. If you do not see this build marker, stop and update your Windows ZIP/Docker image.</div>
 <div class="warning">Uses your actual footage and the same FFmpeg/MediaPipe engine. It does not fake subtitles, voice, or statistics. Script-based timings must be checked before export.</div></header>
 <section><h2>1. Upload and describe</h2>
 <label>Clean original video (.mp4)</label><input type="file" accept=".mp4" id="video">
@@ -85,8 +86,11 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 <h3>Original glass-widgets effect — real video preview</h3>
 <p>Three frames are rendered by the REAL fx.py/MediaPipe engine: policy evidence, RAG retrieval and access check. Glass floats BEHIND your silhouette on full-frame source footage. This is not a completed video or creative approval.</p>
 <button id="preview" type="button">Render 3 genuine glass-widget preview frames</button>
+<button id="motionPreview" type="button">Render 3 short moving RAG glass samples with real speech</button>
 <img id="previewImage" alt="Three actual depth-masked glass-widget RAG frames" style="display:none;width:100%;height:auto;border:1px solid #587283;border-radius:8px">
-<label><input type="checkbox" id="layoutApproved" disabled> I inspected the genuine glass-widget frames; the design is professional and does NOT obscure my face.</label>
+<video id="motionVideo" controls playsinline style="display:none;width:100%;max-height:550px"></video>
+<p>Motion sample sequence: fictional policy cards → RAG retrieval → access verification. This is reduced-resolution review footage; phone legibility and full-resolution masking still need final inspection.</p>
+<label><input type="checkbox" id="layoutApproved" disabled> I inspected the still frames AND moving glass-widget samples; the graphics preserve my face and are readable.</label>
 </div>
 <label><input type="checkbox" id="clean"> I confirm this is unedited camera footage, with no burned-in graphics.</label>
 <label><input type="checkbox" id="verified"> I checked effect timestamps/text and script words against the actual video audio.</label>
@@ -101,7 +105,7 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 const TOKEN="__LOCAL_BEARER_TOKEN__";
 const EFFECTS=__ORIGINAL_EFFECT_NAMES__;
 const el=(id)=>document.getElementById(id);
-let duration=0,jobId=null,previewReady=false,healthJobId=null;
+let duration=0,jobId=null,previewReady=false,motionPreviewReady=false,healthJobId=null;
 function status(v){el("output").style.display="block";el("status").textContent=v;}
 async function call(path,method="GET",body=null,blob=false,extraHeaders={}){
  const hdr={"Authorization":"Bearer "+TOKEN,...extraHeaders};
@@ -181,6 +185,10 @@ function createStage(item){
 }
 function invalidatePreview(){
  previewReady=false;
+ motionPreviewReady=false;
+ const moving=el("motionVideo");
+ if(moving.src?.startsWith("blob:"))URL.revokeObjectURL(moving.src);
+ moving.removeAttribute("src");moving.style.display="none";
  el("layoutApproved").checked=false;
  el("layoutApproved").disabled=true;
  el("previewImage").style.display="none";
@@ -189,8 +197,8 @@ function check(){
  let reason="";
  if(!el("clean").checked)reason="Confirm that your video is clean, original camera footage.";
  else if(!el("verified").checked)reason="Check the script/timestamps against the spoken audio, then confirm.";
- else if(el("editMode").value==="rag"&&(!previewReady||!el("layoutApproved").checked))
-   reason="Render and inspect the three authentic glass-widget frames before full video production.";
+ else if(el("editMode").value==="rag"&&(!previewReady||!motionPreviewReady||!el("layoutApproved").checked))
+   reason="Inspect three original glass-widget frames AND moving RAG samples before full rendering.";
  try{
    effects();
    const stages=collectRag();
@@ -204,10 +212,7 @@ function check(){
 el("editMode").onchange=()=>{invalidatePreview();check();};
 el("script").addEventListener("change",()=>{invalidatePreview();check();});
 el("video").addEventListener("change",()=>{
- previewReady=false;
- el("layoutApproved").checked=false;
- el("layoutApproved").disabled=true;
- el("previewImage").style.display="none";
+ invalidatePreview();
  check();
 });
 el("checkEngine").onclick=async()=>{
@@ -307,10 +312,7 @@ el("draft").onclick=async()=>{try{
  (result.rag_storyboard||[]).forEach(createStage);
  el("ragPanel").style.display=(result.rag_storyboard||[]).length?"block":"none";
  el("layoutReview").style.display=(result.rag_storyboard||[]).length?"block":"none";
- previewReady=false;
- el("layoutApproved").checked=false;
- el("layoutApproved").disabled=true;
- el("previewImage").style.display="none";
+ invalidatePreview();
  el("clean").checked=false;el("verified").checked=false;check();
  }catch(e){status(e.message);}};
 el("add").onclick=()=>row({fx:"slow-push",start:Math.min(3,duration*.2),
@@ -331,9 +333,28 @@ el("preview").onclick=async()=>{
   image.src=URL.createObjectURL(picture);
   image.style.display="block";
   previewReady=true;
-  el("layoutApproved").disabled=false;
-  status("Real Swarag glass-widgets preview ready. Inspect readability, subtle motion direction and whether the original person remains in front. Reject if the design feels wrong.");
+  el("layoutApproved").disabled=!motionPreviewReady;
+  status("Authentic Swarag still frames ready. Also render and inspect the moving RAG glass samples before approval.");
  }catch(e){status("Layout preview failed: "+String(e?.message||e));}
+ finally{button.disabled=false;check();}
+};
+el("motionPreview").onclick=async()=>{
+ const button=el("motionPreview");button.disabled=true;
+ motionPreviewReady=false;
+ el("layoutApproved").checked=false;el("layoutApproved").disabled=true;check();
+ status("Rendering three short original-engine RAG motion samples with the actual camera audio...");
+ try{
+   const stages=collectRag();
+   if(stages.length!==8)throw Error("All eight RAG stages are required for motion review.");
+   const result=await call("/local/layout-motion-preview","POST",el("video").files[0],true,
+     {"X-Swarag-Storyboard":btoa(JSON.stringify(stages))});
+   const player=el("motionVideo");
+   if(player.src?.startsWith("blob:"))URL.revokeObjectURL(player.src);
+   player.src=URL.createObjectURL(result);player.style.display="block";
+   motionPreviewReady=true;
+   el("layoutApproved").disabled=!previewReady;
+   status("Moving RAG glass samples ready. Watch each segment, check face/hair/hand masking and listen to the original speech before approving.");
+ }catch(err){status("Moving RAG preview failed: "+String(err?.message||err));}
  finally{button.disabled=false;check();}
 };
 async function download(path,name){let data=await call("/v1/jobs/"+jobId+"/"+path,"GET",null,true);
@@ -349,8 +370,8 @@ el("render").onclick=async()=>{
  let plannedRag=collectRag();
  if(el("editMode").value==="rag" && plannedRag.length!==8)
    throw Error("RAG Reel render blocked: all six sections and eight graphic stages must be present.");
- if(el("editMode").value==="rag" && (!previewReady||!el("layoutApproved").checked))
-   throw Error("RAG Reel render blocked: generate, inspect and approve the actual face-safe layout preview.");
+ if(el("editMode").value==="rag" && (!previewReady||!motionPreviewReady||!el("layoutApproved").checked))
+   throw Error("RAG Reel render blocked: inspect both real glass-widget stills and moving samples.");
  let created=await call("/v1/jobs","POST",{
   effects:effects(),requires_transcript:true,transcript_verified:true,source_clean_confirmed:true,
   rag_storyboard:plannedRag,requires_six_section_explainer:el("editMode").value==="rag" || plannedRag.length>0,
@@ -424,7 +445,8 @@ class LocalHandler(api.Handler):
                              "original_effect_catalog":len(read_registry()[0]),
                              "private_real_camera_42_effect_diagnostic":True,
                              "effect_qa_build_id":EFFECT_QA_BUILD_ID,
-                             "motion_review_build_id":MOTION_REVIEW_BUILD_ID})
+                             "motion_review_build_id":MOTION_REVIEW_BUILD_ID,
+                             "rag_motion_preview_build_id":RAG_MOTION_PREVIEW_BUILD_ID})
             return
         if urlsplit(self.path).path=="/":
             data=PAGE.replace("__LOCAL_BEARER_TOKEN__",html.escape(api.TOKEN,quote=True))
@@ -435,6 +457,7 @@ class LocalHandler(api.Handler):
             data=data.replace("__GLASS_LEGIBILITY_FIX_ID__",GLASS_LEGIBILITY_FIX_ID)
             data=data.replace("__EFFECT_QA_BUILD_ID__",EFFECT_QA_BUILD_ID)
             data=data.replace("__MOTION_REVIEW_BUILD_ID__",MOTION_REVIEW_BUILD_ID)
+            data=data.replace("__RAG_MOTION_PREVIEW_BUILD_ID__",RAG_MOTION_PREVIEW_BUILD_ID)
             data=data.replace("__ORIGINAL_EFFECT_NAMES__",json.dumps(sorted(read_registry()[0])))
             blob=data.encode("utf-8")
             self.send_response(200)
@@ -450,7 +473,7 @@ class LocalHandler(api.Handler):
         if urlsplit(self.path).path=="/local/effect-diagnostic":
             effect_health.begin(self)
             return
-        if urlsplit(self.path).path=="/local/layout-preview":
+        if urlsplit(self.path).path in ("/local/layout-preview","/local/layout-motion-preview"):
             if not self.authorized():return
             import io
             import tempfile
@@ -471,19 +494,26 @@ class LocalHandler(api.Handler):
                     if not (40<len(header_data)<8000):
                         raise ValueError("Eight edited RAG stages must be supplied for true-effect preview")
                     stages=json.loads(base64.b64decode(header_data,validate=True).decode("utf-8"))
-                    image,report=preview_contact_sheet(source,stages)
-                    data=io.BytesIO()
-                    image.save(data,format="JPEG",quality=86)
-                    content=data.getvalue()
+                    if urlsplit(self.path).path=="/local/layout-motion-preview":
+                        destination=Path(d)/"rag-motion-preview.mp4"
+                        preview_motion_clip(source,stages,destination)
+                        content=destination.read_bytes()
+                        media_type="video/mp4"
+                    else:
+                        image,report=preview_contact_sheet(source,stages)
+                        data=io.BytesIO()
+                        image.save(data,format="JPEG",quality=86)
+                        content=data.getvalue()
+                        media_type="image/jpeg"
                 self.send_response(200)
-                self.send_header("Content-Type","image/jpeg")
+                self.send_header("Content-Type",media_type)
                 self.send_header("Cache-Control","private, no-store")
                 self.send_header("X-Content-Type-Options","nosniff")
                 self.send_header("Content-Length",str(len(content)))
                 self.end_headers();self.wfile.write(content)
             except (ValueError,OSError,RuntimeError,ImportError,binascii.Error,
                     subprocess.SubprocessError) as exc:
-                self.answer(422,{"error":"Local glass-widget preview failed: "+str(exc)[:180]})
+                self.answer(422,{"error":"Local glass-widget still/motion preview failed: "+str(exc)[:180]})
             return
         if urlsplit(self.path).path=="/local/draft":
             if not self.authorized():return
