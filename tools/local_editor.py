@@ -23,6 +23,7 @@ from effect_catalog import read_registry
 from local_director import document_text,draft
 from rag_glass_preview import preview_contact_sheet,LAYOUT_ID
 import local_effect_health_service as effect_health
+from local_runtime_health import runtime_diagnostics
 
 BUILD_ID="RAG-SIX-SECTION-GUARD-2026-11-02"
 RENDER_BUTTON_FIX_ID="RAG-RENDER-BUTTON-FIX-2026-11-02"
@@ -55,6 +56,8 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 <div class="warning" style="margin-top:12px">
 <h3>Check all 42 original effects — before another full render</h3>
 <p>Optional private diagnostic. Tests all 42 effects and five named looks on a short sample of your ACTUAL selected camera video. Reports decode errors, missing audio/frames, and observable single-frame changes. This is not a finished MP4 or artistic certification. No footage goes to GitHub or a hosted service.</p>
+<button id="checkEngine" type="button">Check my local 42-effect engine first (no rendering)</button>
+<pre id="engineHealth" aria-live="polite" style="display:none"></pre>
 <button id="check42" type="button">Test all 42 effects on my camera footage</button>
 <pre id="check42Status" aria-live="polite" style="display:none"></pre>
 <img id="check42Sheet" alt="Private 42-effect preview contact sheet from your actual original camera video" style="width:100%;height:auto;display:none;border:1px solid #587283;border-radius:8px">
@@ -204,6 +207,20 @@ el("video").addEventListener("change",()=>{
  el("previewImage").style.display="none";
  check();
 });
+el("checkEngine").onclick=async()=>{
+ const output=el("engineHealth");output.style.display="block";
+ try{
+  const data=await call("/local/diagnostics");
+  output.textContent="Renderer: "+data.status+"; original effects: "+data.effect_registry_count+"/42\\n"+
+    "Dependencies: "+JSON.stringify(data.python_dependencies_installed)+"\\n"+
+    "FFmpeg/ffprobe: "+JSON.stringify(data.runtime_executables)+"\\n"+
+    "Model/fonts: "+JSON.stringify(data.required_assets_present)+"\\n"+
+    "Private workspace free MB: "+data.private_workspace_free_mb+
+    "; container memory limit MB: "+(data.docker_container_memory_limit_mb??"not set")+
+    "\\nIssues: "+(data.issues.length?data.issues.join("; "):"none detected")+
+    "\\nRuntime READY does not certify visual quality.";
+ }catch(err){output.textContent="Cannot verify local renderer: "+String(err?.message||err);}
+};
 el("check42").onclick=async()=>{
  const button=el("check42"),file=el("video").files[0];
  if(!file){el("check42Status").style.display="block";el("check42Status").textContent="Select your clean original MP4 above first.";return;}
@@ -364,6 +381,10 @@ class LocalHandler(api.Handler):
         if not self.local_request():return
         if urlsplit(self.path).path.startswith("/local/effect-diagnostic/"):
             effect_health.get(self,urlsplit(self.path).path)
+            return
+        if urlsplit(self.path).path=="/local/diagnostics":
+            if not self.authorized():return
+            self.answer(200,runtime_diagnostics())
             return
         if urlsplit(self.path).path=="/local/version":
             self.answer(200,{"build_id":BUILD_ID,
