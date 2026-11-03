@@ -33,8 +33,16 @@ def main():
     runs=list(root.rglob("results.json"))
     results=[r for path in runs for r in json.loads(path.read_text(encoding="utf8"))]
     failed=[r["effect"] for r in results if not r["ok"]]
-    if missing or missing_motion or unexpected or failed or len(results)!=len(expected):
-        raise SystemExit(f"Coverage error: previews={missing}, motions={missing_motion}, extra={unexpected}, failed={failed}, results={len(results)} expected={len(expected)}")
+    incomplete_qc=[r["effect"] for r in results if not (
+        isinstance(r.get("preview_qc"),dict) and
+        isinstance(r.get("media_qc"),dict) and
+        r["media_qc"].get("full_video_and_audio_decode") is True and
+        int(r["media_qc"].get("decoded_frames",0))>=10 and
+        r["media_qc"].get("audio_streams",0)>=1)]
+    duplicate_results=sorted(x for x in {r["effect"] for r in results}
+                             if sum(v["effect"]==x for v in results)>1)
+    if missing or missing_motion or unexpected or failed or incomplete_qc or duplicate_results or len(results)!=len(expected):
+        raise SystemExit(f"Coverage error: previews={missing}, motions={missing_motion}, extra={unexpected}, failed={failed}, incomplete_qc={incomplete_qc}, duplicate_results={duplicate_results}, results={len(results)} expected={len(expected)}")
     ordered=list(names)+[label for label,_,_ in NAMED_VARIANTS]
     cols=6;cellw=205;cellh=390;rows=(len(ordered)+cols-1)//cols
     sheet=Image.new("RGB",(cols*cellw,rows*cellh),(239,240,242))
@@ -47,8 +55,26 @@ def main():
         sheet.paste(original,(x,y))
         dr.text(((i%cols)*cellw+6,(i//cols)*cellh+5),name,fill=(18,25,33))
     sheet.save(output/"all-47-effects.jpg",quality=86)
-    report={"registered_effects":42,"named_looks":5,"rendered_previews":len(results),"rendered_motion_clips":len(clips_by_stem),
-            "missing":[],"duplicates":[],"failed":[],"visual_review":"NOT YET APPROVED"}
+    observable=[r["effect"] for r in results if
+                r["preview_qc"].get("visible_change_detected_in_sample") is True]
+    low_change=[r["effect"] for r in results if
+                r["preview_qc"].get("visible_change_detected_in_sample") is False]
+    report={"registered_effects":len(names),"named_looks":len(NAMED_VARIANTS),
+            "rendered_previews":len(results),"rendered_motion_clips":len(clips_by_stem),
+            "decoded_motion_clips":len(results),
+            "all_video_and_audio_fully_decoded":True,
+            "missing":[],"duplicates":[],"failed":[],
+            "visible_change_detected_in_single_synthetic_frame":observable,
+            "no_clear_change_in_single_synthetic_frame":low_change,
+            "test_scope":"2-second 360x640 8fps SYNTHETIC fixture; 240px motion outputs",
+            "technical_status":"BASIC_EFFECT_SMOKE_PASS",
+            "person_masking_status":"NOT VERIFIED ON REAL MOVING SUBJECT",
+            "phone_typography_status":"NOT VERIFIED",
+            "creative_status":"NOT APPROVED — full-motion 1080x1920 real footage review required"}
     (output/"coverage-report.json").write_text(json.dumps(report,indent=2),encoding="utf8")
-    print(json.dumps(report))
+    (output/"effect-by-effect.json").write_text(
+        json.dumps(sorted(results,key=lambda x:x["effect"]),indent=2),encoding="utf8")
+    print(json.dumps({k:v for k,v in report.items() if k not in
+          ("visible_change_detected_in_single_synthetic_frame",
+           "no_clear_change_in_single_synthetic_frame")}))
 if __name__=="__main__":main()
