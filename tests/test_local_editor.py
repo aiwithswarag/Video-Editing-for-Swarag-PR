@@ -189,6 +189,11 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertTrue(json.loads(version)["layout_preview_required"])
         self.assertIn(b"subject-masked-glass-v5",data)
         self.assertIn(b"GLASS-MOBILE-LEGIBILITY-2026-11-03",data)
+        self.assertIn(b'id="check42"',data)
+        self.assertIn(b'id="check42Status"',data)
+        self.assertIn(b'id="download42"',data)
+        self.assertIn(b"Test all 42 effects on my camera footage",data)
+        self.assertTrue(json.loads(version)["private_real_camera_42_effect_diagnostic"])
         self.assertEqual("GLASS-MOBILE-LEGIBILITY-2026-11-03",
                          json.loads(version)["glass_legibility_fix_id"])
         self.assertIn(b"Original glass-widgets",data)
@@ -235,6 +240,16 @@ class LocalHostHTTPTests(unittest.TestCase):
             from PIL import Image
             im=Image.open(io.BytesIO(body))
             self.assertEqual((1080,640),im.size)
+
+    def test_private_diagnostic_refuses_unauthorized_and_malformed_video(self):
+        self.assertEqual(401,self.request("POST","/local/effect-diagnostic",
+                                          b"not a video",token=False)[0])
+        code,data=self.request("POST","/local/effect-diagnostic",b"not a real MP4")
+        self.assertEqual(422,code,data)
+        self.assertIn(b"MP4",data)
+        self.assertEqual(401,self.request("GET","/local/effect-diagnostic/"+"0"*32,
+                                          token=False)[0])
+        self.assertEqual(404,self.request("GET","/local/effect-diagnostic/"+"0"*32)[0])
 
     def test_draft_endpoint_requires_token_and_returns_review_not_certification(self):
         body={"duration":50.4,"direction":'slow-push and backdrop-word, text="RAG"',
