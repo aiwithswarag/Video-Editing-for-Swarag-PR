@@ -150,6 +150,51 @@ def begin(handler):
         handler.answer(422,{"error":"Diagnostic could not start: "+str(exc)[-190:]})
 
 
+
+def recover_latest(handler):
+    """Rebuild latest FAILED diagnostic from retained local clips only.
+
+    User-initiated, authenticated, localhost-only. No upload, no FX rerender
+    and no remote data transfer. The original 47-entry manifest is mandatory.
+    """
+    if not handler.authorized():
+        return
+    with api.LIVE:
+        if api.ACTIVE.get("id") is not None:
+            handler.answer(409,{"error":"A diagnostic or render is already active"})
+            return
+        candidates=[]
+        for folder in api.JOB_DIR.iterdir():
+            if not folder.is_dir() or not api.ID_RE.fullmatch(folder.name):
+                continue
+            try:
+                state=api.metadata(folder.name)
+            except (ValueError,OSError,KeyError,json.JSONDecodeError):
+                continue
+            if (state.get("type")=="effect_diagnostic" and
+                state.get("status")=="FAILED" and
+                (folder/"source.mp4").is_file() and
+                (folder/"diagnostic"/"effect-gallery"/"results.json").is_file()):
+                candidates.append((float(state.get("created_at",0)),folder.name,state))
+        if not candidates:
+            handler.answer(409,{"error":"No retained completed effect gallery was found. Your previous local job may have been cleaned up; no rerender was started."})
+            return
+        _,job_id,state=max(candidates,key=lambda item:(item[0],item[1]))
+        api.ACTIVE["id"]=job_id
+        try:
+            state["status"]="RUNNING"
+            state["error"]=None
+            state["recovery_requested"]=True
+            api.save(job_id,state)
+        except (ValueError,OSError) as exc:
+            api.ACTIVE["id"]=None
+            handler.answer(422,{"error":"Could not start local recovery: "+type(exc).__name__})
+            return
+    threading.Thread(target=process_diagnostic,kwargs={"job_id":job_id,"recover":True},daemon=True).start()
+    handler.answer(202,{"id":job_id,"status":"RUNNING",
+                   "message":"Recovering private 47-effect report and motion review from stored clips; no effect rerender or upload"})
+
+
 def get(handler,path):
     if not handler.authorized():return
     match=ROUTE.fullmatch(path)
