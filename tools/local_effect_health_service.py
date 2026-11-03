@@ -19,7 +19,7 @@ import render_job_api as api
 from effect_catalog import read_registry
 
 ROOT=Path(__file__).resolve().parents[1]
-ROUTE=re.compile(r"^/local/effect-diagnostic/([0-9a-f]{32})(?:/(report|contact-sheet))?$")
+ROUTE=re.compile(r"^/local/effect-diagnostic/([0-9a-f]{32})(?:/(report|contact-sheet|motion-sheet|motion-clips))?$")
 
 
 def safe_health_state(job_id):
@@ -48,6 +48,8 @@ def safe_health_state(job_id):
         returned["technically_failed_or_unverified_effects"]=r.get(
             "technically_failed_or_unverified_effects",[])
         returned["creative_status"]=r.get("creative_status")
+        returned["motion_review_status"]=(r.get("motion_review") or {}).get("status")
+        returned["motion_clips_packaged"]=(r.get("motion_review") or {}).get("clips_packaged",0)
     return returned
 
 
@@ -72,11 +74,12 @@ def process_diagnostic(job_id):
         data=json.loads(report.read_text(encoding="utf8"))
         state["status"]=(
             "REVIEW_REQUIRED" if proc.returncode==0 and
-            data.get("technical_status")=="ALL_42_SHORT_SAMPLE_DECODE_PASS"
+            data.get("technical_status")=="ALL_42_SHORT_SAMPLE_DECODE_PASS" and
+            (data.get("motion_review") or {}).get("status")=="MOTION_SAMPLES_AVAILABLE"
             else "FAILED"
         )
         if state["status"]=="FAILED":
-            state["error"]="At least one effect or named variant failed short real-camera testing. Review the per-effect report."
+            state["error"]="An effect, motion review artifact, or named variant failed short real-camera testing. Review the per-effect report."
         state["finished_at"]=time.time()
         api.save(job_id,state)
     except (subprocess.TimeoutExpired,ValueError,KeyError,OSError,RuntimeError,
@@ -153,14 +156,23 @@ def get(handler,path):
         handler.answer(200,info)
         return
     folder=api.jobdir(job_id)/"diagnostic"
-    target=(folder/"effect-health-report.json" if kind=="report" else
-            folder/"review"/"all-47-effects.jpg")
+    targets={
+        "report":folder/"effect-health-report.json",
+        "contact-sheet":folder/"review"/"all-47-effects.jpg",
+        "motion-sheet":folder/"review"/"all-47-motion-review.jpg",
+        "motion-clips":folder/"review"/"all-47-motion-clips.zip",
+    }
+    target=targets[kind]
     if not target.is_file():
         handler.answer(409,{"error":"Diagnostic artifact not ready; see status and effect-health.log"})
         return
     blob=target.read_bytes()
     handler.send_response(200)
-    handler.send_header("Content-Type",("application/json" if kind=="report" else "image/jpeg"))
+    handler.send_header("Content-Type",
+        "application/json" if kind=="report" else
+        "application/zip" if kind=="motion-clips" else "image/jpeg")
+    if kind=="motion-clips":
+        handler.send_header("Content-Disposition",'attachment; filename="Swarag_47_Motion_Clips.zip"')
     handler.send_header("Cache-Control","private, no-store")
     handler.send_header("X-Content-Type-Options","nosniff")
     handler.send_header("Content-Length",str(len(blob)))
