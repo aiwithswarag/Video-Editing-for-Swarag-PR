@@ -127,6 +127,12 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
         # registry, not an unmasked post-production Pillow card overlay.
         plan=validate_plan(plan+rag_glass_effects(storyboard,original['duration']),
                            original['duration'])
+    # Premium checks must inspect the SAME effective options that the
+    # original video_director applies during rendering. Otherwise brand
+    # defaults (e.g., genuinely authored conceptual cards) are invisible
+    # to the release guard and produce false warnings / unsafe surprises.
+    from brand_presets import apply_brand
+    plan=apply_brand(plan,brand)
     creative_lint=audit_plan(plan,original['duration'],style)
     if creative_lint['blocking_errors']:
         raise ValueError('Premium edit rejected by creative lint: '+json.dumps(creative_lint['blocking_errors']))
