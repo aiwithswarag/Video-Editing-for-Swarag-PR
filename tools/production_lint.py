@@ -53,9 +53,9 @@ def audit(plan,duration,style='premium'):
                      f'{label} needs intentional title AND approved cover lines; generic demo typography is not a publishable claim')
         if name=='the-bill':
             chunks=[x.strip() for x in str(item.get('text','')).split('|') if x.strip()]
-            if len(chunks)>4 or any(len(x)>31 for x in chunks):
+            if len(chunks)>4 or any(len(x)>24 for x in chunks):
                 flag('error','MOBILE_TICKET_OVERFLOW',
-                     f'{label} must use four or fewer concise approved lines (at most 31 characters) for phone readability')
+                     f'{label} must use four or fewer concise approved lines (at most 24 characters) for phone readability')
         if name in TEMPLATE_UI:
             flag('warning','TEMPLATE_UI',f'{label} can look like an app-template overlay; inspect against real footage')
         # The catalog includes artist demo UIs with baked sample values,
