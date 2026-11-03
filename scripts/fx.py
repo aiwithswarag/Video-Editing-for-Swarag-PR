@@ -1360,8 +1360,115 @@ def glass_widgets_v2(c, e):
     show(shadowed(q, 14, 6, 70), W / 2, py, 7, front=True)
 
 
+def rag_evidence_glass_widgets(c, e):
+    """REPOSITORY glass-widgets: factual RAG proof cards BEHIND the real person.
+
+    No demo views, social profile clones, fabricated rendering percentages or
+    chart values. Reuses the ORIGINAL glass() blur, original place(...behind)
+    person-depth segmentation, fonts and modest reveal animation. The backdrop
+    and subject remain the ACTUAL source camera footage, full-screen.
+    """
+    kind = e.o.get('stage')
+    approved = ('hook','policies','outdated-answer','rag-flow',
+                'check-1','check-2','check-3','closing')
+    if kind not in approved:
+        raise ValueError('RAG glass-widgets requires a verified eight-stage storyboard')
+    W, H = c.W, c.H
+    u = W / 1080.0
+    white, subdued, gold = (242,239,233,255), (205,213,213,255), (183,150,96,255)
+    teal, coral = (44,154,144,255), (208,144,119,255)
+    alpha = ramp(c,e,0.30,0.24)
+    if alpha <= 0:return
+    progress=ease_out(c.lt/0.40)
+    # Executive Editorial V2 copy zone; automatic person segmentation ensures
+    # all glass pixels, including blurred panel interiors, stay BEHIND Swarag.
+    # Crucially, cards are never painted on top of eyes, hair or expressions.
+    card_top = H * 0.083
+    def f(which, pt):
+        return font(which, max(8,pt*u))
+    def position(panel,cx,top,index=0):
+        y=top+panel.height/2.0 - (1-progress)*12*u
+        place(c,panel,cx,y,0.965+0.035*progress,0,
+              alpha*clamp((c.lt-index*.065)/0.18),behind=True)
+    def pane(width,height,accent):
+        panel=glass(c,width,height,min(width,height)*0.105,
+                    W/2,card_top+height/2,
+                    amt=0.10,tint=(18,27,38),blur=max(5,int(W/90)),
+                    alpha=245,dark=0.58)
+        d=ImageDraw.Draw(panel)
+        d.rounded_rectangle((14*u,15*u,width-14*u,24*u),
+                            radius=4*u,fill=accent)
+        return panel,d
+    def tx(d,xy,value,kind='uim',pt=42,color=white,maxw=None):
+        # This copy is intentionally concise, already verified against the
+        # uploaded six-part fictional-policy script.
+        if maxw:
+            sz=pt*u
+            while sz>12*u and font(kind,sz).getlength(value)>maxw:sz*=.94
+        else:sz=pt*u
+        d.text(xy,value,font=font(kind,sz),fill=color)
+    if kind=='policies':
+        w=437*u; h=287*u
+        labels=(('2024','OLD POLICY','$100',coral),
+                ('2026','CURRENT POLICY','$150',teal))
+        for i,(year,meta,amount,accent) in enumerate(labels):
+            panel,d=pane(w,h,accent)
+            tx(d,(34*u,43*u),'FICTIONAL / PER NIGHT',pt=28,color=subdued,maxw=w-55*u)
+            tx(d,(34*u,103*u),year,pt=47,color=white)
+            tx(d,(w-35*u,105*u),meta,pt=25,color=accent)
+            tx(d,(34*u,163*u),amount,'serif',106,white)
+            cx=W*(0.267 if i==0 else 0.733)
+            position(panel,cx,card_top,i)
+    elif kind=='rag-flow':
+        terms=('SEARCH','RETRIEVE','GENERATE')
+        w=304*u;h=221*u
+        for i,term in enumerate(terms):
+            panel,d=pane(w,h,gold if i==1 else teal)
+            tx(d,(29*u,43*u),f'STEP {i+1:02d}',pt=29,color=subdued)
+            tx(d,(29*u,92*u),term,'uim',49,white,maxw=w-48*u)
+            tx(d,(29*u,157*u),('DOCUMENTS','RELEVANT TEXT','ANSWER')[i],
+               'uim',25,subdued,maxw=w-48*u)
+            position(panel,W*(.18+.32*i),card_top,i)
+        lab=fit_text('RELEVANT DOES NOT ALWAYS MEAN CURRENT',
+                     W*.83,'uim',start=42*u,fill=gold[:3])
+        place(c,lab,W/2,H*.284,alpha=alpha,behind=True)
+    elif kind in ('check-1','check-2','check-3'):
+        idx=int(kind[-1])
+        statement=('RIGHT VERSION?','ANSWER MATCHES SOURCE?','AUTHORIZED ACCESS?')[idx-1]
+        w=905*u;h=267*u
+        panel,d=pane(w,h,teal)
+        tx(d,(36*u,54*u),f'VERIFICATION CHECK  {idx:02d} / 03',
+           pt=34,color=subdued)
+        tx(d,(36*u,124*u),statement,'uib',72,white,maxw=w-72*u)
+        position(panel,W/2,card_top)
+    elif kind=='hook':
+        w=922*u;h=259*u
+        panel,d=pane(w,h,gold)
+        tx(d,(42*u,54*u),'YOUR AI CITED A SOURCE',pt=41,color=subdued)
+        tx(d,(42*u,122*u),'CAN IT STILL BE WRONG?', 'serif',83,white,maxw=w-85*u)
+        position(panel,W/2,card_top)
+    elif kind=='outdated-answer':
+        w=913*u;h=297*u
+        panel,d=pane(w,h,coral)
+        tx(d,(37*u,49*u),'FICTIONAL AI ANSWER',pt=34,color=subdued)
+        tx(d,(37*u,111*u),'$100 / NIGHT', 'serif',92,white)
+        tx(d,(37*u,213*u),'CITED: 2024 POLICY  ·  OUTDATED',
+           pt=37,color=coral,maxw=w-65*u)
+        position(panel,W/2,card_top)
+    elif kind=='closing':
+        w=916*u;h=275*u
+        panel,d=pane(w,h,gold)
+        tx(d,(38*u,48*u),'A CITATION IS WHERE',pt=46,color=subdued)
+        tx(d,(38*u,106*u),'VERIFICATION STARTS', 'serif',94,white,
+           maxw=w-75*u)
+        tx(d,(38*u,212*u),'NOT WHERE IT ENDS',pt=36,color=gold)
+        position(panel,W/2,card_top)
+
+
 @effect('glass-widgets', 'minimalist floating data widgets and mini artifacts')
 def fx_glass_widgets(c, e):
+    if e.o.get('look') == 'rag-evidence':
+        return rag_evidence_glass_widgets(c,e)
     (glass_widgets_v1 if e.o.get('look') == 'simple' else glass_widgets_v2)(c, e)
 
 
