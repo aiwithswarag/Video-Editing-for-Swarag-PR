@@ -85,7 +85,7 @@ assert.equal(elem("render").disabled,false,elem("renderReason").textContent);
 assert.match(elem("renderReason").textContent,/Ready to render/);
 vm.runInContext("previewReady=false;check();",ctx);
 assert.equal(elem("render").disabled,true);
-assert.match(elem("renderReason").textContent,/layout previews/);
+assert.match(elem("renderReason").textContent,/glass-widget/);
 vm.runInContext("previewReady=true;check();",ctx);
 assert.equal(elem("render").disabled,false);
 elem("verified").checked=false;
@@ -96,7 +96,7 @@ elem("verified").checked=true;
 elem("layoutApproved").checked=false;
 vm.runInContext("check();",ctx);
 assert.equal(elem("render").disabled,true);
-assert.match(elem("renderReason").textContent,/layout previews/);
+assert.match(elem("renderReason").textContent,/glass-widget/);
 elem("layoutApproved").checked=true;
 elem("ragStages").children[7].stage.end.value="51";
 vm.runInContext("check();",ctx);
@@ -160,9 +160,9 @@ class LocalHostHTTPTests(unittest.TestCase):
         ui.api.TOKEN=self.old_token;ui.api.JOB_DIR=self.old_path
         if self.old_port is None:__import__("os").environ.pop("PORT",None)
         else:__import__("os").environ["PORT"]=self.old_port
-    def request(self,method,path,body=None,host="127.0.0.1:8765",origin=None,token=True):
+    def request(self,method,path,body=None,host="127.0.0.1:8765",origin=None,token=True,extra_headers=None):
         c=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=5)
-        hdr={"Host":host,"Content-Type":"application/json"}
+        hdr={"Host":host,"Content-Type":"application/json",**(extra_headers or {})}
         if token:hdr["Authorization"]="Bearer "+ui.api.TOKEN
         if origin:hdr["Origin"]=origin
         c.request(method,path,json.dumps(body).encode() if isinstance(body,dict) else body,headers=hdr)
@@ -184,10 +184,11 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertTrue(json.loads(version)["rag_six_section_guard"])
         self.assertTrue(json.loads(version)["render_button_fixed"])
         self.assertTrue(json.loads(version)["rag_api_start_fixed"])
-        self.assertEqual("face-safe-editorial-split-v3",
+        self.assertEqual("subject-masked-glass-v5",
                          json.loads(version)["face_safe_layout_id"])
         self.assertTrue(json.loads(version)["layout_preview_required"])
-        self.assertIn(b"face-safe-editorial-split-v3",data)
+        self.assertIn(b"subject-masked-glass-v5",data)
+        self.assertIn(b"original glass-widgets",data)
         self.assertIn(b'id="previewImage"',data)
         self.assertIn(b'id="layoutApproved"',data)
         self.assertIn(b"layout-preview",data)
@@ -198,7 +199,13 @@ class LocalHostHTTPTests(unittest.TestCase):
     def test_layout_preview_rejects_unauthenticated_or_fake_media(self):
         self.assertEqual(401,self.request("POST","/local/layout-preview",
                                           b"not a video",token=False)[0])
-        status,body=self.request("POST","/local/layout-preview",b"not a real MP4")
+        from rag_storyboard import KIND_NAMES,KIND_TO_SECTION
+        stages=[{"kind":kind,"section":KIND_TO_SECTION[kind],
+                 "start":round(i*3/8,3),"end":round((i+1)*3/8,3)}
+                for i,kind in enumerate(KIND_NAMES)]
+        header=base64.b64encode(json.dumps(stages).encode()).decode()
+        status,body=self.request("POST","/local/layout-preview",b"not a real MP4",
+                    extra_headers={"X-Swarag-Storyboard":header})
         self.assertEqual(422,status)
         self.assertIn(b"MP4",body)
 
@@ -213,7 +220,13 @@ class LocalHostHTTPTests(unittest.TestCase):
                "-f","lavfi","-i","sine=frequency=400:sample_rate=48000:duration=3",
                "-c:v","libx264","-preset","ultrafast","-pix_fmt","yuv420p",
                "-c:a","aac","-shortest",str(movie)],check=True)
-            status,body=self.request("POST","/local/layout-preview",movie.read_bytes())
+            from rag_storyboard import KIND_NAMES,KIND_TO_SECTION
+            stages=[{"kind":kind,"section":KIND_TO_SECTION[kind],
+                "start":round(i*3/8,3),"end":round((i+1)*3/8,3)}
+                for i,kind in enumerate(KIND_NAMES)]
+            header=base64.b64encode(json.dumps(stages).encode()).decode()
+            status,body=self.request("POST","/local/layout-preview",movie.read_bytes(),
+                        extra_headers={"X-Swarag-Storyboard":header})
             self.assertEqual(200,status,body[:220])
             self.assertTrue(body.startswith(b"\xff\xd8"))
             from PIL import Image
