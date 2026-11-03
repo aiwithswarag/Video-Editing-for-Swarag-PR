@@ -26,7 +26,7 @@ from visual_review import create as make_review_sheet
 from release_guard import sha256_file, evaluate as release_gate
 from visual_quality_gate import analyze as analyze_visual_opening
 from rag_storyboard import validate as validate_rag_beats
-from rag_visuals import apply as apply_rag_visuals
+from rag_glass_plan import plan as rag_glass_effects, report as rag_glass_report
 
 
 def run(args):
@@ -121,6 +121,10 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
         if not raw.get('transcript_verified'):
             raise ValueError('Explainer graphics require verified script/spoken content')
         validate_rag_beats(storyboard,original['duration'])
+        # The eight semantic cues must be implemented by the ACTUAL 42-effect
+        # registry, not an unmasked post-production Pillow card overlay.
+        plan=validate_plan(plan+rag_glass_effects(storyboard,original['duration']),
+                           original['duration'])
     creative_lint=audit_plan(plan,original['duration'],style)
     if creative_lint['blocking_errors']:
         raise ValueError('Premium edit rejected by creative lint: '+json.dumps(creative_lint['blocking_errors']))
@@ -159,11 +163,13 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
         run(cmd)
         graphic_pass=None
         if storyboard:
-            original_fx_master=outdir/'original_42_effects_intermediate.mp4'
-            master.replace(original_fx_master)
-            # This supplements (never replaces) the real 42-effect render.
-            graphic_pass=apply_rag_visuals(original_fx_master,master,storyboard,crf=crf)
-            (outdir/'rag_graphics_qa.json').write_text(json.dumps(graphic_pass,indent=2,ensure_ascii=False)+'\n',encoding='utf8')
+            # All eight glass-widgets have ALREADY been rendered with the
+            # real MediaPipe depth mask during the canonical fx.py pass.
+            # No opaque post-overlay and no second encoding of the speaker.
+            graphic_pass=rag_glass_report(storyboard,original['duration'],workplan)
+            (outdir/'rag_graphics_qa.json').write_text(
+                json.dumps(graphic_pass,indent=2,ensure_ascii=False)+'\n',
+                encoding='utf8')
         report=check_master(graded,master,expected_width=width)
         if report['technical_status']!='PASS':
             raise RuntimeError('Final QA FAIL: '+', '.join(report['errors']))
