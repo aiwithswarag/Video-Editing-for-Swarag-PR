@@ -107,12 +107,13 @@ const EFFECTS=__ORIGINAL_EFFECT_NAMES__;
 const el=(id)=>document.getElementById(id);
 let duration=0,jobId=null,previewReady=false,motionPreviewReady=false,healthJobId=null;
 function status(v){el("output").style.display="block";el("status").textContent=v;}
-async function call(path,method="GET",body=null,blob=false,extraHeaders={}){
+async function call(path,method="GET",body=null,blob=false,extraHeaders={},includePreviewQC=false){
  const hdr={"Authorization":"Bearer "+TOKEN,...extraHeaders};
  if(body instanceof Blob)hdr["Content-Type"]="application/octet-stream";
  else if(body!==null){hdr["Content-Type"]="application/json";body=JSON.stringify(body);}
  const response=await fetch(path,{method:method,headers:hdr,body:body,cache:"no-store"});
  if(!response.ok){let err=await response.text();try{err=JSON.parse(err).error||err;}catch(e){}throw Error("HTTP "+response.status+" "+err);}
+ if(blob && includePreviewQC)return {data:await response.blob(),faceQC:response.headers.get("X-Swarag-Face-QC")||"UNVERIFIED"};
  return blob?response.blob():response.json();
 }
 el("video").onchange=async()=>{
@@ -347,13 +348,18 @@ el("motionPreview").onclick=async()=>{
    const stages=collectRag();
    if(stages.length!==8)throw Error("All eight RAG stages are required for motion review.");
    const result=await call("/local/layout-motion-preview","POST",el("video").files[0],true,
-     {"X-Swarag-Storyboard":btoa(JSON.stringify(stages))});
+     {"X-Swarag-Storyboard":btoa(JSON.stringify(stages))},true);
    const player=el("motionVideo");
    if(player.src?.startsWith("blob:"))URL.revokeObjectURL(player.src);
-   player.src=URL.createObjectURL(result);player.style.display="block";
+   player.src=URL.createObjectURL(result.data);player.style.display="block";
    motionPreviewReady=true;
    el("layoutApproved").disabled=!previewReady;
-   status("Moving RAG glass samples ready. Watch each segment, check face/hair/hand masking and listen to the original speech before approving.");
+   const faceMessage=result.faceQC==="POSSIBLE_OVERLAY"
+     ?"WARNING: possible glass overlap on your face. Reject the preview and report it for correction."
+     :result.faceQC==="FACE_UNVERIFIED"
+     ?"Face detection was inconclusive in one or more samples. Manual motion review is essential."
+     :"No major face changes found in sampled frames. Still inspect all moving hair, hands and typography.";
+   status("Moving RAG glass samples ready. "+faceMessage+" Listen to the source speech before approving.");
  }catch(err){status("Moving RAG preview failed: "+String(err?.message||err));}
  finally{button.disabled=false;check();}
 };
@@ -496,7 +502,7 @@ class LocalHandler(api.Handler):
                     stages=json.loads(base64.b64decode(header_data,validate=True).decode("utf-8"))
                     if urlsplit(self.path).path=="/local/layout-motion-preview":
                         destination=Path(d)/"rag-motion-preview.mp4"
-                        preview_motion_clip(source,stages,destination)
+                        motion_report=preview_motion_clip(source,stages,destination)
                         content=destination.read_bytes()
                         media_type="video/mp4"
                     else:
@@ -507,6 +513,8 @@ class LocalHandler(api.Handler):
                         media_type="image/jpeg"
                 self.send_response(200)
                 self.send_header("Content-Type",media_type)
+                if media_type=="video/mp4":
+                    self.send_header("X-Swarag-Face-QC",motion_report["face_change_qc_status"])
                 self.send_header("Cache-Control","private, no-store")
                 self.send_header("X-Content-Type-Options","nosniff")
                 self.send_header("Content-Length",str(len(content)))
