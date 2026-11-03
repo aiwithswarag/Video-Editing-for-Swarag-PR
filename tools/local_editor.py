@@ -223,12 +223,16 @@ el("check42").onclick=async()=>{
        output.textContent+="\\n"+state.technical_status+"; original effects passed "+state.technically_passed_effects+"/42."+
           "\\nCreative status: "+state.creative_status;
        el("download42").style.display="inline-block";
-       if(state.status==="REVIEW_REQUIRED"){
+       // Show evidence even when some tests fail: failed/missing slots
+       // are explicitly labeled in the private contact sheet.
+       try{
          const jpg=await call("/local/effect-diagnostic/"+healthJobId+"/contact-sheet","GET",null,true);
          const image=el("check42Sheet");
          if(image.src?.startsWith("blob:"))URL.revokeObjectURL(image.src);
          image.src=URL.createObjectURL(jpg);
          image.style.display="block";
+       }catch(previewError){
+         output.textContent+="\\nReview sheet unavailable: "+String(previewError?.message||previewError);
        }
      }else if(state.error)output.textContent+="\\n"+state.error;
      break;
