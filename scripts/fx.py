@@ -1649,6 +1649,9 @@ def fx_liquid_glass_graph(c, e):
     g = ease_inout((c.lt - 0.25) / max(0.3, e.d * 0.72))
     lab = e.o.get('text', 'RETENTION').upper()
     d.text((pad, pad * 0.9), lab, font=font('mono', gw * 0.04), fill=(255, 255, 255, 190))
+    if e.o.get('hypothetical_example'):
+        d.text((pad, pad * 2.0), 'ILLUSTRATIVE — NOT MEASURED',
+               font=font('uib', gw * 0.025), fill=(255, 218, 162, 245))
     a, _, _ = num_parts(e.o.get('from', '0')); b, suf, dp = num_parts(e.o.get('to', '59%'))
     v = a + (b - a) * g; s = f'{v:.{dp}f}{suf}'
     f = font('uib', gw * 0.12); d.text((gw - pad - f.getlength(s), pad * 0.55), s, font=f, fill=(255, 255, 255, 255))
