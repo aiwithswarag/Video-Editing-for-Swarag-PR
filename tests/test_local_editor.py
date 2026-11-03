@@ -193,6 +193,10 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertIn(b'id="checkEngine"',data)
         self.assertIn(b'id="check42Status"',data)
         self.assertIn(b'id="download42"',data)
+        self.assertIn(b'id="download42Motion"',data)
+        self.assertIn(b'id="check42MotionSheet"',data)
+        self.assertEqual("ORIGINAL-42-MOTION-REVIEW-2026-11-03",
+                         json.loads(version)["motion_review_build_id"])
         self.assertIn(b"Test all 42 effects on my camera footage",data)
         self.assertTrue(json.loads(version)["private_real_camera_42_effect_diagnostic"])
         self.assertEqual("ORIGINAL-42-EFFECT-QA-2026-11-03",
