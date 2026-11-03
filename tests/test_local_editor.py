@@ -194,6 +194,8 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertIn(b'id="check42Status"',data)
         self.assertIn(b'id="download42"',data)
         self.assertIn(b'id="download42Motion"',data)
+        self.assertIn(b'id="motionPreview"',data)
+        self.assertIn(b'id="motionVideo"',data)
         self.assertIn(b'id="check42MotionSheet"',data)
         self.assertEqual("ORIGINAL-42-MOTION-REVIEW-2026-11-03",
                          json.loads(version)["motion_review_build_id"])
@@ -208,11 +210,16 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertIn(b'id="previewImage"',data)
         self.assertIn(b'id="layoutApproved"',data)
         self.assertIn(b"layout-preview",data)
+        self.assertIn(b"layout-motion-preview",data)
+        self.assertEqual("RAG-MOTION-PREVIEW-2026-11-03",
+                         json.loads(version)["rag_motion_preview_build_id"])
         self.assertEqual("RAG-API-START-FIX-2026-11-02",
                          json.loads(version)["rag_api_start_fix_id"])
         self.assertEqual(403,self.request("GET","/",host="evil.example")[0])
         self.assertEqual(403,self.request("POST","/local/draft",{},origin="https://evil.example")[0])
     def test_layout_preview_rejects_unauthenticated_or_fake_media(self):
+        self.assertEqual(401,self.request("POST","/local/layout-motion-preview",
+                                          b"not a video",token=False)[0])
         self.assertEqual(401,self.request("POST","/local/layout-preview",
                                           b"not a video",token=False)[0])
         from rag_storyboard import KIND_NAMES,KIND_TO_SECTION
@@ -224,6 +231,10 @@ class LocalHostHTTPTests(unittest.TestCase):
                     extra_headers={"X-Swarag-Storyboard":header})
         self.assertEqual(422,status)
         self.assertIn(b"MP4",body)
+        motion_status,motion_body=self.request("POST","/local/layout-motion-preview",
+                    b"not a real MP4",extra_headers={"X-Swarag-Storyboard":header})
+        self.assertEqual(422,motion_status)
+        self.assertIn(b"MP4",motion_body)
 
     @unittest.skipUnless(shutil.which("ffmpeg") and
                          (ROOT/"fonts"/"Inter.ttf").is_file(),
