@@ -29,7 +29,7 @@ BUILD_ID="RAG-SIX-SECTION-GUARD-2026-11-02"
 RENDER_BUTTON_FIX_ID="RAG-RENDER-BUTTON-FIX-2026-11-02"
 API_START_FIX_ID="RAG-API-START-FIX-2026-11-02"
 GLASS_LEGIBILITY_FIX_ID="GLASS-MOBILE-LEGIBILITY-2026-11-03"
-EFFECT_QA_BUILD_ID="ORIGINAL-42-EFFECT-QA-2026-11-03"
+EFFECT_QA_BUILD_ID="ORIGINAL-42-MOTION-REVIEW-2026-11-03"
 
 PAGE = r'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -55,13 +55,15 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 <label>Clean original video (.mp4)</label><input type="file" accept=".mp4" id="video">
 <div class="warning" style="margin-top:12px">
 <h3>Check all 42 original effects — before another full render</h3>
-<p>Optional private diagnostic. Tests all 42 effects and five named looks on a short sample of your ACTUAL selected camera video. Reports decode errors, missing audio/frames, and observable single-frame changes. This is not a finished MP4 or artistic certification. No footage goes to GitHub or a hosted service.</p>
+<p>Optional private diagnostic. Tests all 42 effects and five named looks on a short sample of your ACTUAL selected camera video. Reports decode errors, missing audio/frames, observable visual changes, and a 3-frame motion review of each effect. The full 47 short MP4 clips can be played individually. This is not a finished MP4 or artistic certification. No footage goes to GitHub or a hosted service.</p>
 <button id="checkEngine" type="button">Check my local 42-effect engine first (no rendering)</button>
 <pre id="engineHealth" aria-live="polite" style="display:none"></pre>
 <button id="check42" type="button">Test all 42 effects on my camera footage</button>
 <pre id="check42Status" aria-live="polite" style="display:none"></pre>
 <img id="check42Sheet" alt="Private 42-effect preview contact sheet from your actual original camera video" style="width:100%;height:auto;display:none;border:1px solid #587283;border-radius:8px">
 <button id="download42" style="display:none" type="button">Download effect-by-effect diagnostic JSON</button>
+<button id="download42Motion" style="display:none" type="button">Download all 47 playable effect previews (ZIP)</button>
+<img id="check42MotionSheet" alt="Three sequential frames from each actual original-effect motion clip" style="width:100%;height:auto;display:none;border:1px solid #587283;border-radius:8px">
 </div>
 <label>Script (.txt / .md / .docx)</label><input type="file" accept=".txt,.md,.docx" id="script">
 <video id="player" controls playsinline style="display:none"></video>
@@ -228,6 +230,7 @@ el("check42").onclick=async()=>{
  const output=el("check42Status");output.style.display="block";
  output.textContent="Uploading a private camera sample for the original 42-effect diagnostic...";
  el("check42Sheet").style.display="none";el("download42").style.display="none";
+ el("check42MotionSheet").style.display="none";el("download42Motion").style.display="none";
  try{
    const started=await call("/local/effect-diagnostic","POST",file);
    healthJobId=started.id;
@@ -241,6 +244,18 @@ el("check42").onclick=async()=>{
        output.textContent+="\\n"+state.technical_status+"; original effects passed "+state.technically_passed_effects+"/42."+
           "\\nCreative status: "+state.creative_status;
        el("download42").style.display="inline-block";
+       output.textContent+="\nMotion evidence: "+(state.motion_review_status||"not ready")+
+          "; playable clips: "+(state.motion_clips_packaged||0)+"/47.";
+       if(state.motion_review_status==="MOTION_SAMPLES_AVAILABLE"){
+         el("download42Motion").style.display="inline-block";
+         try{
+           const motionSheet=await call("/local/effect-diagnostic/"+healthJobId+"/motion-sheet","GET",null,true);
+           const motionImage=el("check42MotionSheet");
+           if(motionImage.src?.startsWith("blob:"))URL.revokeObjectURL(motionImage.src);
+           motionImage.src=URL.createObjectURL(motionSheet);
+           motionImage.style.display="block";
+         }catch(err){output.textContent+="\nMotion review sheet unavailable: "+String(err?.message||err);}
+       }
        // Show evidence even when some tests fail: failed/missing slots
        // are explicitly labeled in the private contact sheet.
        try{
@@ -267,6 +282,15 @@ el("download42").onclick=async()=>{
  const url=URL.createObjectURL(data),a=document.createElement("a");
  a.href=url;a.download="Swarag_42_Effect_Health_Report.json";a.click();
  setTimeout(()=>URL.revokeObjectURL(url),30000);
+ }catch(err){el("check42Status").textContent=String(err?.message||err);}
+};
+el("download42Motion").onclick=async()=>{
+ if(!healthJobId)return;
+ try{
+   const data=await call("/local/effect-diagnostic/"+healthJobId+"/motion-clips","GET",null,true);
+   const url=URL.createObjectURL(data),a=document.createElement("a");
+   a.href=url;a.download="Swarag_47_Motion_Clips.zip";a.click();
+   setTimeout(()=>URL.revokeObjectURL(url),30000);
  }catch(err){el("check42Status").textContent=String(err?.message||err);}
 };
 el("draft").onclick=async()=>{try{
