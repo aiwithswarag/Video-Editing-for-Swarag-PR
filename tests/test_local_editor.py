@@ -190,6 +190,7 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertIn(b"subject-masked-glass-v5",data)
         self.assertIn(b"GLASS-MOBILE-LEGIBILITY-2026-11-03",data)
         self.assertIn(b'id="check42"',data)
+        self.assertIn(b'id="checkEngine"',data)
         self.assertIn(b'id="check42Status"',data)
         self.assertIn(b'id="download42"',data)
         self.assertIn(b"Test all 42 effects on my camera footage",data)
@@ -243,6 +244,20 @@ class LocalHostHTTPTests(unittest.TestCase):
             from PIL import Image
             im=Image.open(io.BytesIO(body))
             self.assertEqual((1080,640),im.size)
+
+    def test_local_runtime_status_is_private_and_redacted(self):
+        self.assertEqual(401,self.request("GET","/local/diagnostics",token=False)[0])
+        status,blob=self.request("GET","/local/diagnostics")
+        self.assertEqual(200,status)
+        report=json.loads(blob)
+        self.assertEqual(42,report["effect_registry_count"])
+        self.assertIn(report["status"],("READY_FOR_PRIVATE_TEST","NEEDS_ATTENTION"))
+        self.assertIn("ffmpeg",report["runtime_executables"])
+        self.assertIn("selfie_segmenter.tflite",str(report["required_assets_present"]))
+        self.assertEqual(42,len(report["effect_names"]))
+        self.assertNotIn("Bearer ",blob.decode())
+        self.assertNotIn("source.mp4",blob.decode())
+        self.assertNotIn("PRIVATE/local-jobs",blob.decode())
 
     def test_private_diagnostic_refuses_unauthorized_and_malformed_video(self):
         self.assertEqual(401,self.request("POST","/local/effect-diagnostic",
