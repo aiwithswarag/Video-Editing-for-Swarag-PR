@@ -12,6 +12,35 @@ hosting fee, no public network endpoint, and no automatic external upload.
 Free compute is supplied by your own computer. Electricity and any hardware
 costs remain yours. You still need technical/creative review of the output.
 
+## Independently verify all 42 original effects (private, local)
+
+The 42 registered effects and five named looks are available through the
+original Swarag engine. Registered does NOT mean production-certified.
+
+**Automated GitHub effect matrix:** Each original effect and named variant
+renders on short synthetic 360x640/8fps footage. Tests now validate decoded
+preview PNGs, expected image dimensions, full FFmpeg motion/audio decoding,
+frame counts, and single-frame pixel-change evidence. These remain BASIC
+TECHNICAL SMOKE TESTS, not face-masking or cinematic quality signoff.
+
+**Optional one-click real-camera check on Windows:** Open the updated local
+editor and select your clean original MP4. Click the new
+**Test all 42 effects on my camera footage** button. It privately extracts
+a 2.25-second camera sample and independently renders all 42 original
+effects plus five named looks in the real Docker engine. The app displays
+progress, then a contact sheet and a downloadable per-effect JSON report.
+Missing or failed effects are named explicitly, including incomplete
+video/audio decoding. The user media, sample and outputs stay in the
+private local jobs folder; do not commit them to GitHub.
+
+The diagnostic is intentionally NOT a second full Reel export. Passing
+on 2.25 seconds of original footage cannot certify 1080p typography,
+different gestures, accurate captions, stable masking throughout the
+whole video, or brand-level artistic professionalism. Human review of
+the final full MP4 is still mandatory.
+
+---
+
 ## Latest RAG Reel design — ORIGINAL subject-masked glass-widgets (v5)
 
 **The previous opaque policy cards and the subsequent tiny-text dark split
