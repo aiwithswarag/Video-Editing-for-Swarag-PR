@@ -15,7 +15,7 @@ sys.path.insert(0,str(ROOT/"tools"))
 sys.path.insert(0,str(ROOT/"scripts"))
 from local_director import draft
 from rag_storyboard import compose,recognizable,validate,coverage,rag_intent,explain_unrecognized
-from rag_visuals import draw_overlay,geometry,sample_face_crop,LAYOUT_ID
+from rag_glass_plan import plan as glass_cues,report as glass_report,LAYOUT_ID
 from release_guard import evaluate as gate
 from PIL import Image
 
@@ -91,33 +91,41 @@ class StoryboardTests(unittest.TestCase):
         with self.assertRaises(ValueError):validate(corrupted,50.4)
         corrupted=[dict(x) for x in beats];corrupted[2]["kind"]="hook"
         with self.assertRaises(ValueError):validate(corrupted,50.4)
-    @unittest.skipUnless((ROOT/"fonts"/"Inter.ttf").is_file(),"Licensed fonts must be installed to draw graphics")
-    def test_entire_camera_is_pixel_transparent_all_eight_graphics(self):
-        top=geometry(360,640)["camera_bottom"]
-        for item in compose(SAMPLE,50.4):
-            image=draw_overlay(item["kind"],360,640,ROOT/"fonts")
-            self.assertEqual("RGBA",image.mode)
-            self.assertEqual((360,640),image.size)
-            # Strong contract: NO overlays touch any portion of camera tile,
-            # regardless of actor face position or segmentation accuracy.
-            self.assertIsNone(image.crop((0,0,360,top)).getchannel("A").getbbox(),
-                "Graphics have invaded the real-camera region")
-            self.assertEqual(255,image.getpixel((180,600))[3])
-    def test_face_safe_split_layout_metadata(self):
-        geo=geometry(1080,1920)
-        self.assertEqual(1228,geo["camera_bottom"])
-        self.assertEqual(1670,geo["text_bottom"])
-        self.assertEqual("face-safe-editorial-split-v3",LAYOUT_ID)
-    def test_missing_face_detection_always_preserves_original_full_frame(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            absent=Path(tmp)/"no_detector.onnx"
-            # No need for actual face pixels: without verified model we MUST
-            # fit the full original camera, not guess a risky crop.
-            result=sample_face_crop(Path(tmp)/"source.mp4",360,640,
-                                    geometry(360,640)["camera_bottom"],
-                                    model=absent)
-            self.assertEqual("contain-full-source",result["camera_mode"])
-            self.assertIsNone(result["crop_y"])
+    def test_full_original_glass_widgets_storyboard_uses_only_approved_copy(self):
+        stages=compose(SAMPLE,50.4)
+        cues=glass_cues(stages,50.4)
+        self.assertEqual(8,len(cues))
+        self.assertEqual({"glass-widgets"},{x["fx"] for x in cues})
+        self.assertEqual({"rag-evidence"},{x["look"] for x in cues})
+        self.assertEqual([v["kind"] for v in stages],[v["stage"] for v in cues])
+        data=glass_report(stages,50.4,cues)
+        self.assertEqual("subject-masked-glass-v5",data["layout_id"])
+        self.assertEqual("scripts/fx.py" in data["compositing"],False)
+        self.assertTrue(data["full_frame_camera_preserved"])
+        self.assertTrue(data["no_fabricated_demo_widgets"])
+        self.assertTrue(data["subject_depth_mask"])
+    @unittest.skipUnless((ROOT/"fonts"/"Inter.ttf").is_file() and
+                         (ROOT/"models"/"selfie_segmenter.tflite").is_file(),
+                         "Full original fx.py + fonts/models required")
+    def test_original_glass_depth_mask_preserves_person_pixels(self):
+        # Regression: panels can pass behind the actual person, but must not
+        # replace any original speaker pixels in the supplied person mask.
+        import numpy as np
+        import fx
+        from types import SimpleNamespace
+        W,H=360,640
+        original=np.full((H,W,3),0.65,dtype=np.float32)
+        mask=np.zeros((H,W),dtype=np.float32)
+        mask[45:215,100:260]=1.
+        c=SimpleNamespace(W=W,H=H,img=original.copy(),m=mask,
+           fx=W/2,fy=H*.25,fw=95.,lt=.7,t=1.2,fps=8)
+        effect=fx.Fx({"fx":"glass-widgets","start":0.,"end":4.,
+                      "look":"rag-evidence","stage":"policies","grade":"none"},8)
+        fx.fx_glass_widgets(c,effect)
+        self.assertTrue(np.array_equal(c.img[mask==1],original[mask==1]),
+                        "Glass panel erased original person pixels")
+        self.assertGreater(np.max(np.abs(c.img[mask==0]-original[mask==0])),.03,
+                           "No genuine glass art was composited on background")
 
 @unittest.skipUnless(shutil.which("ffmpeg") and (ROOT/"models"/"selfie_segmenter.tflite").is_file(),
                      "Full offline MediaPipe/FFmpeg/fonts are required")
@@ -145,7 +153,11 @@ class FullPipelineTest(unittest.TestCase):
             self.assertTrue(report["rag_graphics_pass"]["face_safe_layout"])
             self.assertFalse(report["rag_graphics_pass"]["graphics_overlap_camera_pixels"])
             self.assertEqual(LAYOUT_ID,report["rag_graphics_pass"]["layout_id"])
-            self.assertEqual("contain-full-source",report["rag_graphics_pass"]["camera"]["camera_mode"])
+            self.assertEqual("glass-widgets",report["rag_graphics_pass"]["effect_name"])
+            self.assertTrue(report["rag_graphics_pass"]["subject_depth_mask"])
+            self.assertTrue(report["rag_graphics_pass"]["full_frame_camera_preserved"])
+            self.assertIn("glass-widgets",report["selected_effects"])
+            self.assertEqual(8,sum(x=="glass-widgets" for x in report["selected_effects"]))
             self.assertEqual(6,len(report["editorial_sections_covered"]))
             self.assertEqual(48,report["qa"]["output_media"]["frames"])
             self.assertTrue(report["qa"]["audio_bitstream_identical"])
