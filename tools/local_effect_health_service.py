@@ -48,12 +48,15 @@ def safe_health_state(job_id):
         returned["technically_failed_or_unverified_effects"]=r.get(
             "technically_failed_or_unverified_effects",[])
         returned["creative_status"]=r.get("creative_status")
+        returned["review_artifact_status"]=r.get("review_artifact_status")
+        returned["review_artifact_error_type"]=r.get("review_artifact_error_type")
+        returned["recovered_without_rerender"]=bool(r.get("recovered_without_rerender"))
         returned["motion_review_status"]=(r.get("motion_review") or {}).get("status")
         returned["motion_clips_packaged"]=(r.get("motion_review") or {}).get("clips_packaged",0)
     return returned
 
 
-def process_diagnostic(job_id):
+def process_diagnostic(job_id, *, recover=False):
     folder=api.jobdir(job_id)
     try:
         dest=folder/"diagnostic"
@@ -62,7 +65,9 @@ def process_diagnostic(job_id):
             sys.executable,str(ROOT/"tools"/"local_effect_diagnostic.py"),
             "--video",str(folder/"source.mp4"),
             "--output-dir",str(dest)]
-        with (folder/"effect-health.log").open("w",encoding="utf8") as log:
+        if recover:
+            command.append("--recover-existing")
+        with (folder/"effect-health.log").open("a" if recover else "w",encoding="utf8") as log:
             # Each clip is strictly short; full suite still requires real CPU.
             # The user can close the browser and later poll this private job.
             proc=subprocess.run(command,cwd=ROOT,stdout=log,
@@ -70,7 +75,7 @@ def process_diagnostic(job_id):
         state=api.metadata(job_id)
         report=dest/"effect-health-report.json"
         if not report.is_file():
-            raise RuntimeError("No effect-by-effect health report was produced; check private diagnostic log")
+            raise RuntimeError("No health report exists. The individual render step may have succeeded; use local recovery if retained results.json exists.")
         data=json.loads(report.read_text(encoding="utf8"))
         state["status"]=(
             "REVIEW_REQUIRED" if proc.returncode==0 and
@@ -79,7 +84,12 @@ def process_diagnostic(job_id):
             else "FAILED"
         )
         if state["status"]=="FAILED":
-            state["error"]="An effect, motion review artifact, or named variant failed short real-camera testing. Review the per-effect report."
+            stage=data.get("review_artifact_status","UNVERIFIED")
+            state["error"]=("Diagnostic finished with incomplete evidence. Technical report is available. "
+                "Review artifact state: "+str(stage)+". "
+                "Failure class: "+str(data.get("review_artifact_error_type","none"))+".")
+        else:
+            state["error"]=None
         state["finished_at"]=time.time()
         api.save(job_id,state)
     except (subprocess.TimeoutExpired,ValueError,KeyError,OSError,RuntimeError,
