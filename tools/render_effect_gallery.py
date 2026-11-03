@@ -32,6 +32,8 @@ def main():
     ap.add_argument("--brand",choices=["none","executive"],default="none")
     ap.add_argument("--include-variants",action="store_true")
     ap.add_argument("--render-motion",action="store_true",help="Also render MP4 clips")
+    ap.add_argument("--only",action="append",default=[],
+       help="LIMITED developer test subset only. Omit this option for 42-effect certification.")
     args=ap.parse_args()
     if args.shards<1 or not 0<=args.shard<args.shards:
         ap.error("Invalid shard or shard count")
@@ -58,6 +60,12 @@ def main():
     names, _, _=read_registry()
     tasks=[(name,name,{}) for name in names]
     if args.include_variants: tasks+=NAMED_VARIANTS
+    if args.only:
+        selected=set(args.only)
+        if not selected<=set(label for label,_,_ in tasks):
+            ap.error("Unknown effect label in --only; cannot claim catalog coverage")
+        tasks=[task for task in tasks if task[0] in selected]
+        print("LIMITED TEST SUBSET ONLY — NOT a 42/42 certification",flush=True)
     assigned=[task for idx,task in enumerate(tasks) if idx % args.shards==args.shard]
     statuses=[]
     for label,fx,options in assigned:
