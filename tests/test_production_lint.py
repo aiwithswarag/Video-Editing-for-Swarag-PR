@@ -24,6 +24,39 @@ class EditorialGuardTests(unittest.TestCase):
     def test_rejects_hard_zoom(self):
         report=audit([{'fx':'slow-push','start':.2,'end':2,'zoom':1.6}],3)
         self.assertEqual('AGGRESSIVE_ZOOM',report['blocking_errors'][0]['code'])
+    def test_premium_rejects_demo_ui_and_unsourced_business_metrics(self):
+        risky=[
+            ({'fx':'glass-widgets','start':0,'end':1.7},'STOCK_GLASS_DEMO'),
+            ({'fx':'glass-widgets','start':0,'end':1.7,'look':'simple'},'STOCK_GLASS_DEMO'),
+            ({'fx':'liquid-glass-graph','start':0,'end':1.7},'UNVERIFIED_CHART_METRIC'),
+            ({'fx':'liquid-glass-graph','start':0,'end':1.7,'look':'bento',
+              'text':'Revenue','from':0,'to':100},'UNVERIFIED_CHART_METRIC'),
+            ({'fx':'profile-wall','start':0,'end':1.7},'FAKE_ENGAGEMENT_COUNT'),
+            ({'fx':'match-cut','start':0,'end':1.7},'DEMO_ARTICLE_COPY'),
+            ({'fx':'checklist','start':0,'end':1.7},'UNVERIFIED_CHECKLIST_COPY'),
+            ({'fx':'todo','start':0,'end':1.7},'UNVERIFIED_CHECKLIST_COPY'),
+        ]
+        for item,expected in risky:
+            with self.subTest(fx=item['fx'],look=item.get('look')):
+                report=audit([item],3,'premium')
+                codes=[p['code'] for p in report['blocking_errors']]
+                self.assertIn(expected,codes)
+                self.assertEqual('BLOCKED',report['technical_status'])
+                showcase=audit([item],3,'showcase')
+                self.assertEqual([],showcase['blocking_errors'])
+    def test_source_backed_rag_glass_is_allowed_but_still_review_required(self):
+        item={'fx':'glass-widgets','look':'rag-evidence','stage':'policies',
+              'start':0,'end':1.7}
+        report=audit([item],3,'premium')
+        self.assertEqual([],report['blocking_errors'])
+        self.assertTrue(report['requires_manual_creative_review'])
+    def test_explicit_sourced_non_bento_chart_is_allowed_with_review(self):
+        item={'fx':'liquid-glass-graph','text':'Hypothetical example',
+              'from':100,'to':150,'start':0,'end':1.7}
+        report=audit([item],3,'premium')
+        self.assertNotIn('UNVERIFIED_CHART_METRIC',
+                         [e['code'] for e in report['blocking_errors']])
+
     def test_42_effect_gallery_is_possible_with_manual_override(self):
         from plan_validation import AVAILABLE_EFFECTS
         plan=[{'fx':fx,'start':i*2,'end':i*2+1,'text':'Reviewed'} for i,fx in enumerate(sorted(AVAILABLE_EFFECTS))]
