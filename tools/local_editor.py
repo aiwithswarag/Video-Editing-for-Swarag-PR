@@ -26,6 +26,7 @@ from rag_glass_preview import preview_contact_sheet,LAYOUT_ID
 BUILD_ID="RAG-SIX-SECTION-GUARD-2026-11-02"
 RENDER_BUTTON_FIX_ID="RAG-RENDER-BUTTON-FIX-2026-11-02"
 API_START_FIX_ID="RAG-API-START-FIX-2026-11-02"
+GLASS_LEGIBILITY_FIX_ID="GLASS-MOBILE-LEGIBILITY-2026-11-03"
 
 PAGE = r'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -45,7 +46,7 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 </style></head><body>
 <header><h1>SWARAG / Free Video Director</h1>
 <p>Private on-device rendering · Original 42 effects · No monthly hosting</p>
-<div class="warning"><b>Editor build:</b> __LOCAL_BUILD_ID__ · <b>UI fix:</b> __RENDER_BUTTON_FIX_ID__ · <b>API fix:</b> __API_START_FIX_ID__ · <b>Creative layout:</b> __FACE_SAFE_LAYOUT_ID__ · Six-section RAG explainer detection and incomplete-plan protection enabled. If you do not see this build marker, stop and update your Windows ZIP/Docker image.</div>
+<div class="warning"><b>Editor build:</b> __LOCAL_BUILD_ID__ · <b>UI fix:</b> __RENDER_BUTTON_FIX_ID__ · <b>API fix:</b> __API_START_FIX_ID__ · <b>Creative layout:</b> __FACE_SAFE_LAYOUT_ID__ · <b>Typography:</b> __GLASS_LEGIBILITY_FIX_ID__ · Six-section RAG explainer detection and incomplete-plan protection enabled. If you do not see this build marker, stop and update your Windows ZIP/Docker image.</div>
 <div class="warning">Uses your actual footage and the same FFmpeg/MediaPipe engine. It does not fake subtitles, voice, or statistics. Script-based timings must be checked before export.</div></header>
 <section><h2>1. Upload and describe</h2>
 <label>Clean original video (.mp4)</label><input type="file" accept=".mp4" id="video">
@@ -311,6 +312,7 @@ class LocalHandler(api.Handler):
                              "rag_api_start_fixed":True,
                              "rag_api_start_fix_id":API_START_FIX_ID,
                              "face_safe_layout_id":LAYOUT_ID,
+                             "glass_legibility_fix_id":GLASS_LEGIBILITY_FIX_ID,
                              "layout_preview_required":True,
                              "original_effect_catalog":len(read_registry()[0])})
             return
@@ -320,6 +322,7 @@ class LocalHandler(api.Handler):
             data=data.replace("__RENDER_BUTTON_FIX_ID__",RENDER_BUTTON_FIX_ID)
             data=data.replace("__API_START_FIX_ID__",API_START_FIX_ID)
             data=data.replace("__FACE_SAFE_LAYOUT_ID__",LAYOUT_ID)
+            data=data.replace("__GLASS_LEGIBILITY_FIX_ID__",GLASS_LEGIBILITY_FIX_ID)
             data=data.replace("__ORIGINAL_EFFECT_NAMES__",json.dumps(sorted(read_registry()[0])))
             blob=data.encode("utf-8")
             self.send_response(200)
