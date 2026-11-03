@@ -16,6 +16,9 @@ on:
       - tests/test_rag_storyboard.py
       - tests/test_effect_media_qc.py
       - tests/test_local_effect_diagnostic.py
+      - tests/test_effect_motion_review.py
+      - tests/test_rag_motion_preview.py
+      - tests/test_face_motion_qc.py
       - tools/local_editor.py
       - tools/local_director.py
       - .github/workflows/renderer-container.yml
@@ -56,6 +59,12 @@ jobs:
             python -m unittest discover -s tests -p 'test_effect_media_qc.py' -v
           docker run --rm --network none --memory 5g swarag-editor:ci \
             python -m unittest discover -s tests -p 'test_local_effect_diagnostic.py' -v
+          docker run --rm --network none --memory 5g swarag-editor:ci \
+            python -m unittest discover -s tests -p 'test_effect_motion_review.py' -v
+          docker run --rm --network none --memory 5g swarag-editor:ci \
+            python -m unittest discover -s tests -p 'test_rag_motion_preview.py' -v
+          docker run --rm --network none --memory 5g swarag-editor:ci \
+            python -m unittest discover -s tests -p 'test_face_motion_qc.py' -v
 
       - name: Test confidential media is absent from image context
         run: |

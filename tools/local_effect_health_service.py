@@ -19,7 +19,7 @@ import render_job_api as api
 from effect_catalog import read_registry
 
 ROOT=Path(__file__).resolve().parents[1]
-ROUTE=re.compile(r"^/local/effect-diagnostic/([0-9a-f]{32})(?:/(report|contact-sheet))?$")
+ROUTE=re.compile(r"^/local/effect-diagnostic/([0-9a-f]{32})(?:/(report|contact-sheet|motion-sheet|motion-clips))?$")
 
 
 def safe_health_state(job_id):
@@ -48,10 +48,15 @@ def safe_health_state(job_id):
         returned["technically_failed_or_unverified_effects"]=r.get(
             "technically_failed_or_unverified_effects",[])
         returned["creative_status"]=r.get("creative_status")
+        returned["review_artifact_status"]=r.get("review_artifact_status")
+        returned["review_artifact_error_type"]=r.get("review_artifact_error_type")
+        returned["recovered_without_rerender"]=bool(r.get("recovered_without_rerender"))
+        returned["motion_review_status"]=(r.get("motion_review") or {}).get("status")
+        returned["motion_clips_packaged"]=(r.get("motion_review") or {}).get("clips_packaged",0)
     return returned
 
 
-def process_diagnostic(job_id):
+def process_diagnostic(job_id, *, recover=False):
     folder=api.jobdir(job_id)
     try:
         dest=folder/"diagnostic"
@@ -60,7 +65,9 @@ def process_diagnostic(job_id):
             sys.executable,str(ROOT/"tools"/"local_effect_diagnostic.py"),
             "--video",str(folder/"source.mp4"),
             "--output-dir",str(dest)]
-        with (folder/"effect-health.log").open("w",encoding="utf8") as log:
+        if recover:
+            command.append("--recover-existing")
+        with (folder/"effect-health.log").open("a" if recover else "w",encoding="utf8") as log:
             # Each clip is strictly short; full suite still requires real CPU.
             # The user can close the browser and later poll this private job.
             proc=subprocess.run(command,cwd=ROOT,stdout=log,
@@ -68,15 +75,21 @@ def process_diagnostic(job_id):
         state=api.metadata(job_id)
         report=dest/"effect-health-report.json"
         if not report.is_file():
-            raise RuntimeError("No effect-by-effect health report was produced; check private diagnostic log")
+            raise RuntimeError("No health report exists. The individual render step may have succeeded; use local recovery if retained results.json exists.")
         data=json.loads(report.read_text(encoding="utf8"))
         state["status"]=(
             "REVIEW_REQUIRED" if proc.returncode==0 and
-            data.get("technical_status")=="ALL_42_SHORT_SAMPLE_DECODE_PASS"
+            data.get("technical_status")=="ALL_42_SHORT_SAMPLE_DECODE_PASS" and
+            (data.get("motion_review") or {}).get("status")=="MOTION_SAMPLES_AVAILABLE"
             else "FAILED"
         )
         if state["status"]=="FAILED":
-            state["error"]="At least one effect or named variant failed short real-camera testing. Review the per-effect report."
+            stage=data.get("review_artifact_status","UNVERIFIED")
+            state["error"]=("Diagnostic finished with incomplete evidence. Technical report is available. "
+                "Review artifact state: "+str(stage)+". "
+                "Failure class: "+str(data.get("review_artifact_error_type","none"))+".")
+        else:
+            state["error"]=None
         state["finished_at"]=time.time()
         api.save(job_id,state)
     except (subprocess.TimeoutExpired,ValueError,KeyError,OSError,RuntimeError,
@@ -137,6 +150,51 @@ def begin(handler):
         handler.answer(422,{"error":"Diagnostic could not start: "+str(exc)[-190:]})
 
 
+
+def recover_latest(handler):
+    """Rebuild latest FAILED diagnostic from retained local clips only.
+
+    User-initiated, authenticated, localhost-only. No upload, no FX rerender
+    and no remote data transfer. The original 47-entry manifest is mandatory.
+    """
+    if not handler.authorized():
+        return
+    with api.LIVE:
+        if api.ACTIVE.get("id") is not None:
+            handler.answer(409,{"error":"A diagnostic or render is already active"})
+            return
+        candidates=[]
+        for folder in api.JOB_DIR.iterdir():
+            if not folder.is_dir() or not api.ID_RE.fullmatch(folder.name):
+                continue
+            try:
+                state=api.metadata(folder.name)
+            except (ValueError,OSError,KeyError,json.JSONDecodeError):
+                continue
+            if (state.get("type")=="effect_diagnostic" and
+                state.get("status")=="FAILED" and
+                (folder/"source.mp4").is_file() and
+                (folder/"diagnostic"/"effect-gallery"/"results.json").is_file()):
+                candidates.append((float(state.get("created_at",0)),folder.name,state))
+        if not candidates:
+            handler.answer(409,{"error":"No retained completed effect gallery was found. Your previous local job may have been cleaned up; no rerender was started."})
+            return
+        _,job_id,state=max(candidates,key=lambda item:(item[0],item[1]))
+        api.ACTIVE["id"]=job_id
+        try:
+            state["status"]="RUNNING"
+            state["error"]=None
+            state["recovery_requested"]=True
+            api.save(job_id,state)
+        except (ValueError,OSError) as exc:
+            api.ACTIVE["id"]=None
+            handler.answer(422,{"error":"Could not start local recovery: "+type(exc).__name__})
+            return
+    threading.Thread(target=process_diagnostic,kwargs={"job_id":job_id,"recover":True},daemon=True).start()
+    handler.answer(202,{"id":job_id,"status":"RUNNING",
+                   "message":"Recovering private 47-effect report and motion review from stored clips; no effect rerender or upload"})
+
+
 def get(handler,path):
     if not handler.authorized():return
     match=ROUTE.fullmatch(path)
@@ -153,14 +211,23 @@ def get(handler,path):
         handler.answer(200,info)
         return
     folder=api.jobdir(job_id)/"diagnostic"
-    target=(folder/"effect-health-report.json" if kind=="report" else
-            folder/"review"/"all-47-effects.jpg")
+    targets={
+        "report":folder/"effect-health-report.json",
+        "contact-sheet":folder/"review"/"all-47-effects.jpg",
+        "motion-sheet":folder/"review"/"all-47-motion-review.jpg",
+        "motion-clips":folder/"review"/"all-47-motion-clips.zip",
+    }
+    target=targets[kind]
     if not target.is_file():
         handler.answer(409,{"error":"Diagnostic artifact not ready; see status and effect-health.log"})
         return
     blob=target.read_bytes()
     handler.send_response(200)
-    handler.send_header("Content-Type",("application/json" if kind=="report" else "image/jpeg"))
+    handler.send_header("Content-Type",
+        "application/json" if kind=="report" else
+        "application/zip" if kind=="motion-clips" else "image/jpeg")
+    if kind=="motion-clips":
+        handler.send_header("Content-Disposition",'attachment; filename="Swarag_47_Motion_Clips.zip"')
     handler.send_header("Cache-Control","private, no-store")
     handler.send_header("X-Content-Type-Options","nosniff")
     handler.send_header("Content-Length",str(len(blob)))

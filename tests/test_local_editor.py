@@ -80,13 +80,18 @@ const ctx=vm.createContext({
   setTimeout:()=>{},
 });
 vm.runInContext(JSON.parse(process.env.BROWSER_JS),ctx);
-vm.runInContext("duration=50.4;previewReady=true;check();",ctx);
+vm.runInContext("duration=50.4;previewReady=true;motionPreviewReady=true;check();",ctx);
 assert.equal(elem("render").disabled,false,elem("renderReason").textContent);
 assert.match(elem("renderReason").textContent,/Ready to render/);
 vm.runInContext("previewReady=false;check();",ctx);
 assert.equal(elem("render").disabled,true);
 assert.match(elem("renderReason").textContent,/glass-widget/);
 vm.runInContext("previewReady=true;check();",ctx);
+assert.equal(elem("render").disabled,false);
+vm.runInContext("motionPreviewReady=false;check();",ctx);
+assert.equal(elem("render").disabled,true);
+assert.match(elem("renderReason").textContent,/moving RAG samples/);
+vm.runInContext("motionPreviewReady=true;check();",ctx);
 assert.equal(elem("render").disabled,false);
 elem("verified").checked=false;
 vm.runInContext("check();",ctx);
@@ -193,6 +198,14 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertIn(b'id="checkEngine"',data)
         self.assertIn(b'id="check42Status"',data)
         self.assertIn(b'id="download42"',data)
+        self.assertIn(b'id="download42Motion"',data)
+        self.assertIn(b'id="recover42"',data)
+        self.assertIn(b"recover-latest",data)
+        self.assertIn(b'id="motionPreview"',data)
+        self.assertIn(b'id="motionVideo"',data)
+        self.assertIn(b'id="check42MotionSheet"',data)
+        self.assertEqual("ORIGINAL-42-MOTION-REVIEW-2026-11-03",
+                         json.loads(version)["motion_review_build_id"])
         self.assertIn(b"Test all 42 effects on my camera footage",data)
         self.assertTrue(json.loads(version)["private_real_camera_42_effect_diagnostic"])
         self.assertEqual("ORIGINAL-42-EFFECT-QA-2026-11-03",
@@ -204,11 +217,16 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertIn(b'id="previewImage"',data)
         self.assertIn(b'id="layoutApproved"',data)
         self.assertIn(b"layout-preview",data)
+        self.assertIn(b"layout-motion-preview",data)
+        self.assertEqual("RAG-MOTION-PREVIEW-2026-11-03",
+                         json.loads(version)["rag_motion_preview_build_id"])
         self.assertEqual("RAG-API-START-FIX-2026-11-02",
                          json.loads(version)["rag_api_start_fix_id"])
         self.assertEqual(403,self.request("GET","/",host="evil.example")[0])
         self.assertEqual(403,self.request("POST","/local/draft",{},origin="https://evil.example")[0])
     def test_layout_preview_rejects_unauthenticated_or_fake_media(self):
+        self.assertEqual(401,self.request("POST","/local/layout-motion-preview",
+                                          b"not a video",token=False)[0])
         self.assertEqual(401,self.request("POST","/local/layout-preview",
                                           b"not a video",token=False)[0])
         from rag_storyboard import KIND_NAMES,KIND_TO_SECTION
@@ -220,6 +238,10 @@ class LocalHostHTTPTests(unittest.TestCase):
                     extra_headers={"X-Swarag-Storyboard":header})
         self.assertEqual(422,status)
         self.assertIn(b"MP4",body)
+        motion_status,motion_body=self.request("POST","/local/layout-motion-preview",
+                    b"not a real MP4",extra_headers={"X-Swarag-Storyboard":header})
+        self.assertEqual(422,motion_status)
+        self.assertIn(b"MP4",motion_body)
 
     @unittest.skipUnless(shutil.which("ffmpeg") and
                          (ROOT/"fonts"/"Inter.ttf").is_file(),
@@ -259,6 +281,13 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertNotIn("source.mp4",blob.decode())
         self.assertNotIn("PRIVATE/local-jobs",blob.decode())
 
+    def test_recover_previous_diagnostic_requires_auth_and_retained_results(self):
+        code,_=self.request("POST","/local/effect-diagnostic/recover-latest",
+                            token=False)
+        self.assertEqual(401,code)
+        code,body=self.request("POST","/local/effect-diagnostic/recover-latest")
+        self.assertEqual(409,code)
+        self.assertIn(b"No retained completed effect gallery",body)
     def test_private_diagnostic_refuses_unauthorized_and_malformed_video(self):
         self.assertEqual(401,self.request("POST","/local/effect-diagnostic",
                                           b"not a video",token=False)[0])

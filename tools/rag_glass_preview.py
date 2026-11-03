@@ -15,6 +15,8 @@ from PIL import Image
 
 from rag_glass_plan import LAYOUT_ID,cue
 from rag_storyboard import validate
+from effect_media_qc import motion_evidence
+from face_motion_qc import inspect_face_change
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -87,4 +89,107 @@ def preview_contact_sheet(source,storyboard,thumb_width=360):
         "source_fidelity":"real original-camera footage with original MediaPipe person-depth protection",
         "full_motion_status":"NOT REVIEWED — three true-effect stills only",
         "creative_status":"PREVIEW ONLY — approval and full MP4 review required",
+    }
+
+
+def preview_motion_clip(source, storyboard, output, *, width=540, fps=15):
+    """Three short REAL moving RAG glass samples, with original spoken audio.
+
+    This is a motion/subject-mask approval aid, not the 50-second film, and
+    540-pixel / 15fps previews never certify native 1080p detail or final FPS.
+    All extracts and rendered media remain under the caller's private folder.
+    """
+    source, output = Path(source), Path(output)
+    if not source.is_file():
+        raise FileNotFoundError(source)
+    if not 360 <= width <= 720 or width % 2:
+        raise ValueError("Motion preview width must be even, 360..720")
+    if not 8 <= fps <= 30:
+        raise ValueError("Motion preview FPS must be 8..30")
+    if source.resolve() == output.resolve():
+        raise ValueError("Refusing to overwrite original footage")
+    info = _probe(source)
+    if info["width"] * 16 != info["height"] * 9:
+        raise ValueError("Motion preview source must be portrait 9:16")
+    stages = validate(storyboard, info["duration"])
+    selected = [next(beat for beat in stages if beat["kind"] == kind)
+                for kind in ("policies", "rag-flow", "check-3")]
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="swarag_private_rag_motion_") as tmp:
+        work = Path(tmp)
+        rendered = []
+        face_checks = []
+        for index, beat in enumerate(selected):
+            span = beat["end"] - beat["start"]
+            if span < 0.80:
+                raise ValueError("RAG stage too short for a meaningful moving preview")
+            length = min(1.50, span - 0.02)
+            begin = round(beat["start"] + (span - length) / 2, 3)
+            source_clip = work / ("camera_%d.mp4" % index)
+            output_clip = work / ("glass_%d.mp4" % index)
+            plan_file = work / ("plan_%d.json" % index)
+            effect = cue(beat)
+            effect["start"], effect["end"] = 0.0, length
+            plan_file.write_text(json.dumps({"effects": [effect]}), encoding="utf8")
+            subprocess.run([
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin",
+                "-y", "-ss", str(begin), "-i", str(source), "-t", str(length),
+                "-map", "0:v:0", "-map", "0:a:0",
+                "-vf", f"fps={fps},scale={width}:{round(width * 16 / 9)}:flags=lanczos,format=yuv420p",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
+                "-c:a", "aac", "-b:a", "128k", str(source_clip),
+            ], check=True, timeout=180)
+            subprocess.run([
+                sys.executable, str(ROOT / "scripts" / "video_director.py"),
+                "render", str(source_clip), str(plan_file), str(output_clip),
+                "--width", str(width), "--brand", "none",
+            ], cwd=ROOT, check=True, timeout=240)
+            if not output_clip.is_file() or output_clip.stat().st_size < 4096:
+                raise RuntimeError("Original RAG glass renderer produced no motion clip")
+            # Face QC is supplemental and may be inconclusive on footage
+            # with motion blur, occlusion or no reliably detected face. A
+            # detector failure must not break the local preview socket;
+            # surface a conspicuous UNVERIFIED status instead.
+            try:
+                face_report = inspect_face_change(source_clip, output_clip)
+            except Exception as exc:
+                face_report = {
+                    "status": "UNVERIFIED_FACE_QC_ERROR",
+                    "sampled_frames": 0,
+                    "face_detections": 0,
+                    "possible_overlays": 0,
+                    "error_type": type(exc).__name__,
+                }
+            face_checks.append({"stage": beat["kind"], **face_report})
+            rendered.append(output_clip)
+        concatenation = work / "preview-list.txt"
+        concatenation.write_text(
+            "".join("file '" + clip.name + "'\n" for clip in rendered),
+            encoding="utf8",
+        )
+        subprocess.run([
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin",
+            "-y", "-f", "concat", "-safe", "0", "-i", str(concatenation),
+            "-c", "copy", "-movflags", "+faststart", str(output),
+        ], cwd=work, check=True, timeout=120)
+    if not output.is_file() or output.stat().st_size < 4096:
+        raise RuntimeError("No playable RAG motion preview was produced")
+    technical = motion_evidence(output, width, round(width * 16 / 9), min_frames=10)
+    face_warnings=[item["stage"] for item in face_checks if item["possible_overlays"]]
+    face_unknown=[item["stage"] for item in face_checks if item["face_detections"]==0]
+    return {
+        "face_change_qc_status": "POSSIBLE_OVERLAY" if face_warnings else "FACE_UNVERIFIED" if face_unknown else "NO_MAJOR_FACE_CHANGE_SAMPLED",
+        "possible_face_overlay_stages": face_warnings,
+        "face_not_detected_stages": face_unknown,
+        "face_change_samples": face_checks,
+        "preview_engine": "original scripts/fx.py via scripts/video_director.py",
+        "original_effect": "glass-widgets",
+        "look": "rag-evidence",
+        "stage_kinds": [stage["kind"] for stage in selected],
+        "preview_resolution": f"{width}x{round(width * 16 / 9)}",
+        "preview_fps": fps,
+        "original_speech_audio": True,
+        "verified_motion_frames": technical["decoded_frames"],
+        "full_video_audio_decode": technical["full_video_and_audio_decode"],
+        "creative_status": "REVIEW REQUIRED — this is three short moving samples, not final motion approval",
     }
