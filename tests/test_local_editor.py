@@ -199,6 +199,8 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertIn(b'id="check42Status"',data)
         self.assertIn(b'id="download42"',data)
         self.assertIn(b'id="download42Motion"',data)
+        self.assertIn(b'id="recover42"',data)
+        self.assertIn(b"recover-latest",data)
         self.assertIn(b'id="motionPreview"',data)
         self.assertIn(b'id="motionVideo"',data)
         self.assertIn(b'id="check42MotionSheet"',data)
@@ -279,6 +281,13 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertNotIn("source.mp4",blob.decode())
         self.assertNotIn("PRIVATE/local-jobs",blob.decode())
 
+    def test_recover_previous_diagnostic_requires_auth_and_retained_results(self):
+        code,_=self.request("POST","/local/effect-diagnostic/recover-latest",
+                            token=False)
+        self.assertEqual(401,code)
+        code,body=self.request("POST","/local/effect-diagnostic/recover-latest")
+        self.assertEqual(409,code)
+        self.assertIn(b"No retained completed effect gallery",body)
     def test_private_diagnostic_refuses_unauthorized_and_malformed_video(self):
         self.assertEqual(401,self.request("POST","/local/effect-diagnostic",
                                           b"not a video",token=False)[0])
