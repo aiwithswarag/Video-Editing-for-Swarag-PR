@@ -73,10 +73,10 @@ class DiagnosticReporting(unittest.TestCase):
             output=folder/"diagnostic"
             self._complete_manifest(output)
             with mock.patch("local_effect_diagnostic.probe",
-                            return_value=(50.4,{"width":1080,"height":1920})), \\
+                            return_value=(50.4,{"width":1080,"height":1920})), \
                  mock.patch("local_effect_diagnostic.subprocess.run",
-                            return_value=SimpleNamespace(returncode=0)), \\
-                 mock.patch("local_effect_diagnostic.make_review_sheet") as sheet, \\
+                            return_value=SimpleNamespace(returncode=0)), \
+                 mock.patch("local_effect_diagnostic.make_review_sheet") as sheet, \
                  mock.patch("local_effect_diagnostic.create_motion_review",
                             return_value={"status":"MOTION_SAMPLES_AVAILABLE",
                                           "clips_packaged":47}):
@@ -95,9 +95,9 @@ class DiagnosticReporting(unittest.TestCase):
             output=folder/"diagnostic"
             self._complete_manifest(output)
             with mock.patch("local_effect_diagnostic.probe",
-                            return_value=(50.4,{"width":1080,"height":1920})), \\
+                            return_value=(50.4,{"width":1080,"height":1920})), \
                  mock.patch("local_effect_diagnostic.subprocess.run",
-                            return_value=SimpleNamespace(returncode=0)), \\
+                            return_value=SimpleNamespace(returncode=0)), \
                  mock.patch("local_effect_diagnostic.make_review_sheet",
                             side_effect=RuntimeError("mock art failure")):
                 report=run(source,output)
@@ -115,9 +115,9 @@ class DiagnosticReporting(unittest.TestCase):
             output=folder/"diagnostic"
             self._complete_manifest(output)
             with mock.patch("local_effect_diagnostic.probe",
-                            return_value=(50.4,{"width":1080,"height":1920})), \\
-                 mock.patch("local_effect_diagnostic.subprocess.run") as render, \\
-                 mock.patch("local_effect_diagnostic.make_review_sheet"), \\
+                            return_value=(50.4,{"width":1080,"height":1920})), \
+                 mock.patch("local_effect_diagnostic.subprocess.run") as render, \
+                 mock.patch("local_effect_diagnostic.make_review_sheet"), \
                  mock.patch("local_effect_diagnostic.create_motion_review",
                             return_value={"status":"MOTION_SAMPLES_AVAILABLE",
                                           "clips_packaged":47}):
