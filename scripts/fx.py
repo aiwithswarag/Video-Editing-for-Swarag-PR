@@ -1412,7 +1412,7 @@ def rag_evidence_glass_widgets(c, e):
         panel=glass(c,width,height,min(width,height)*0.105,
                     W/2,card_top+height/2,
                     amt=0.10,tint=(18,27,38),blur=max(5,int(W/90)),
-                    alpha=245,dark=0.58)
+                    alpha=246,dark=0.70)
         d=ImageDraw.Draw(panel)
         d.rounded_rectangle((14*u,15*u,width-14*u,24*u),
                             radius=4*u,fill=accent)
@@ -1431,9 +1431,9 @@ def rag_evidence_glass_widgets(c, e):
                 ('2026','CURRENT POLICY','$150',teal))
         for i,(year,meta,amount,accent) in enumerate(labels):
             panel,d=pane(w,h,accent)
-            tx(d,(34*u,43*u),'FICTIONAL / PER NIGHT',pt=28,color=subdued,maxw=w-55*u)
+            tx(d,(34*u,43*u),'FICTIONAL / PER NIGHT',pt=36,color=subdued,maxw=w-55*u)
             tx(d,(34*u,103*u),year,pt=47,color=white)
-            tx(d,(218*u,109*u),meta,pt=25,color=accent,maxw=w-234*u)
+            tx(d,(218*u,109*u),meta,pt=34,color=accent,maxw=w-234*u)
             tx(d,(34*u,163*u),amount,'serif',106,white)
             cx=W*(0.267 if i==0 else 0.733)
             position(panel,cx,card_top,i)
@@ -1442,14 +1442,27 @@ def rag_evidence_glass_widgets(c, e):
         w=304*u;h=221*u
         for i,term in enumerate(terms):
             panel,d=pane(w,h,gold if i==1 else teal)
-            tx(d,(29*u,43*u),f'STEP {i+1:02d}',pt=29,color=subdued)
-            tx(d,(29*u,92*u),term,'uim',49,white,maxw=w-48*u)
+            tx(d,(29*u,43*u),f'STEP {i+1:02d}',pt=36,color=subdued)
+            tx(d,(29*u,92*u),term,'uim',52,white,maxw=w-48*u)
             tx(d,(29*u,157*u),('DOCUMENTS','RELEVANT TEXT','ANSWER')[i],
-               'uim',25,subdued,maxw=w-48*u)
+               'uim',34,subdued,maxw=w-48*u)
             position(panel,W*(.18+.32*i),card_top,i)
-        lab=fit_text('RELEVANT DOES NOT ALWAYS MEAN CURRENT',
-                     W*.83,'uim',start=42*u,fill=gold[:3])
-        place(c,lab,W/2,H*.284,alpha=alpha,behind=True)
+        # The old freestanding gold sentence was illegible over the
+        # real bookshelf at phone scale. Put the exact source-backed
+        # takeaway inside its own dark frosted glass ribbon.
+        rw,rh=916*u,132*u
+        ry=H*.296
+        ribbon=glass(c,rw,rh,37*u,W/2,ry,
+                     amt=.08,tint=(18,27,38),blur=max(5,int(W/90)),
+                     alpha=248,dark=.78)
+        dr=ImageDraw.Draw(ribbon)
+        reminder='RELEVANT DOES NOT ALWAYS MEAN CURRENT'
+        fs=54*u
+        while font('uib',fs).getlength(reminder)>rw-72*u:
+            fs*=.96
+        dr.text((rw/2,rh/2),reminder,font=font('uib',fs),
+                fill=(242,239,233,255),anchor='mm')
+        position(ribbon,W/2,ry-rh/2,3)
     elif kind in ('check-1','check-2','check-3'):
         idx=int(kind[-1])
         statement=('RIGHT VERSION?','ANSWER MATCHES SOURCE?','AUTHORIZED ACCESS?')[idx-1]
