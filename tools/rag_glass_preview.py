@@ -15,6 +15,7 @@ from PIL import Image
 
 from rag_glass_plan import LAYOUT_ID,cue
 from rag_storyboard import validate
+from effect_media_qc import motion_evidence
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -156,6 +157,7 @@ def preview_motion_clip(source, storyboard, output, *, width=540, fps=15):
         ], cwd=work, check=True, timeout=120)
     if not output.is_file() or output.stat().st_size < 4096:
         raise RuntimeError("No playable RAG motion preview was produced")
+    technical = motion_evidence(output, width, round(width * 16 / 9), min_frames=10)
     return {
         "preview_engine": "original scripts/fx.py via scripts/video_director.py",
         "original_effect": "glass-widgets",
@@ -164,5 +166,7 @@ def preview_motion_clip(source, storyboard, output, *, width=540, fps=15):
         "preview_resolution": f"{width}x{round(width * 16 / 9)}",
         "preview_fps": fps,
         "original_speech_audio": True,
+        "verified_motion_frames": technical["decoded_frames"],
+        "full_video_audio_decode": technical["full_video_and_audio_decode"],
         "creative_status": "REVIEW REQUIRED — this is three short moving samples, not final motion approval",
     }
