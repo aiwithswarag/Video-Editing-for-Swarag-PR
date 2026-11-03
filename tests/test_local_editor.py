@@ -80,13 +80,18 @@ const ctx=vm.createContext({
   setTimeout:()=>{},
 });
 vm.runInContext(JSON.parse(process.env.BROWSER_JS),ctx);
-vm.runInContext("duration=50.4;previewReady=true;check();",ctx);
+vm.runInContext("duration=50.4;previewReady=true;motionPreviewReady=true;check();",ctx);
 assert.equal(elem("render").disabled,false,elem("renderReason").textContent);
 assert.match(elem("renderReason").textContent,/Ready to render/);
 vm.runInContext("previewReady=false;check();",ctx);
 assert.equal(elem("render").disabled,true);
 assert.match(elem("renderReason").textContent,/glass-widget/);
 vm.runInContext("previewReady=true;check();",ctx);
+assert.equal(elem("render").disabled,false);
+vm.runInContext("motionPreviewReady=false;check();",ctx);
+assert.equal(elem("render").disabled,true);
+assert.match(elem("renderReason").textContent,/moving RAG samples/);
+vm.runInContext("motionPreviewReady=true;check();",ctx);
 assert.equal(elem("render").disabled,false);
 elem("verified").checked=false;
 vm.runInContext("check();",ctx);
