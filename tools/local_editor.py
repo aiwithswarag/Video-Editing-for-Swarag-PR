@@ -455,6 +455,19 @@ def main():
     api.TOKEN=secrets.token_urlsafe(48)
     api.JOB_DIR=Path(os.getenv("SWARAG_JOB_DIR",str(ROOT/"PRIVATE"/"local-jobs"))).resolve()
     api.JOB_DIR.mkdir(parents=True,exist_ok=True)
+    # Docker restarts must not leave private jobs permanently RUNNING:
+    # that would also prevent the 24-hour local cleanup policy.
+    import time
+    for folder in api.JOB_DIR.iterdir():
+        if not folder.is_dir() or not api.ID_RE.fullmatch(folder.name):continue
+        try:
+            state=api.metadata(folder.name)
+            if state.get("status")=="RUNNING":
+                state["status"]="INTERRUPTED"
+                state["finished_at"]=time.time()
+                state["error"]="The previous local Docker session stopped during rendering or diagnostics; no output was certified."
+                api.save(folder.name,state)
+        except (OSError,ValueError,KeyError):continue
     api.erase_old_jobs()
     import threading
     import time
