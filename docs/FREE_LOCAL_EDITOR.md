@@ -12,6 +12,54 @@ hosting fee, no public network endpoint, and no automatic external upload.
 Free compute is supplied by your own computer. Electricity and any hardware
 costs remain yours. You still need technical/creative review of the output.
 
+## Latest RAG Reel design — ORIGINAL subject-masked glass-widgets (v5)
+
+**The previous opaque policy cards and the subsequent tiny-text dark split
+panel were rejected in the user's real-video review.** Do not render with
+the legacy `face-safe-editorial-split-v3` compositor. It is intentionally
+not in the current production chain.
+
+**Current design:** `subject-masked-glass-v5`, using the *actual*
+`glass-widgets` effect registered in `scripts/fx.py`, plus its original
+glass blur, gentle pop motion and MediaPipe person-depth compositing.
+The full authentic 9:16 video stays visible throughout, with frosted
+glass floating in the background while the speaker's silhouette stays in
+front. Script-verified cards present ONLY the two fictional 2024/$100 and
+2026/$150 policies, outdated cited answer, RAG search/retrieve/generate
+flow, one verification question at a time, and the closing thought.
+No generic views charts, fake render progress, cloned face avatars,
+made-up social UI or irrelevant widgets.
+
+**Do not approve a full render based on a simulated image.** The browser's
+three-frame preview now runs the actual `scripts/fx.py --still` engine
+on short private excerpts from the uploaded source at the reviewed policy,
+RAG and final-check timestamps. This uses real person segmentation.
+Only accept the preview if those panels genuinely look professional,
+are readable at phone size and do not cover hair, eyes or expressions.
+Technical smoke tests are not artistic signoff.
+
+1. Stop the existing Docker Desktop `swarag-local-editor` container.
+2. Download latest `feat/executive-editorial-v2` ZIP and extract into a new
+   folder; keep old PRIVATE media out of the repository.
+3. Double-click `START_FREE_EDITOR_WINDOWS.bat`. In
+   http://127.0.0.1:8765/local/version verify:
+   `"face_safe_layout_id": "subject-masked-glass-v5"`.
+4. Select clean MP4 + full RAG script; create the eight-stage draft.
+5. Click **Render 3 genuine glass-widget preview frames**. The source
+   video is processed locally only; the result is a preview JPEG.
+6. Inspect it; **STOP without full render if design is still basic or
+   the original face is obstructed**. When approved, verify spoken-word
+   timing, check the relevant confirmations, and then render.
+7. Final QA must report eight original `glass-widgets` instances,
+   `rag_graphics_pass.layout_id=subject-masked-glass-v5`,
+   `subject_depth_mask=true`, and full source frame/audio preservation.
+   Human review of the full MP4 remains mandatory.
+
+**Note:** This visual style is an original evidence-specific variant
+inside the 42-effect `glass-widgets` catalog entry, not a 43rd effect.
+
+---
+
 ## One-time setup (no terminal commands per video)
 
 1. Install Docker Desktop once (or Docker Engine on Linux).
@@ -114,7 +162,7 @@ After a successful export, confirm that the JSON technical QA contains
 regardless of technical PASS. Send both the real MP4 and the QA here for
 full-motion and audio review; technical checks do not certify visual quality.
 
-## Face-safe Executive Editorial V2 (corrected RAG video layout)
+## Superseded layout v3 — historical notes only, DO NOT USE
 
 The older dedicated RAG graphics compositor used fixed opaque cards across
 approximately 60–85% of the image, obscuring the actual speaker's beard,
