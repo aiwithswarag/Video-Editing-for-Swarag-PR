@@ -146,7 +146,7 @@ def preview_motion_clip(source, storyboard, output, *, width=540, fps=15):
             rendered.append(output_clip)
         concatenation = work / "preview-list.txt"
         concatenation.write_text(
-            "".join("file '" + clip.name + "'\\n" for clip in rendered),
+            "".join("file '" + clip.name + "'\n" for clip in rendered),
             encoding="utf8",
         )
         subprocess.run([
