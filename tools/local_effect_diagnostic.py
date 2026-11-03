@@ -217,7 +217,7 @@ def recover_existing(source, output):
     report["review_artifact_status"]="PENDING"
     target=output/"effect-health-report.json"
     output.mkdir(parents=True,exist_ok=True)
-    target.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\\n",encoding="utf8")
+    target.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\n",encoding="utf8")
     try:
         review=output/"review"
         make_review_sheet(gallery,review/"all-47-effects.jpg")
@@ -233,7 +233,7 @@ def recover_existing(source, output):
         report["review_artifact_error_type"]=type(exc).__name__
         report["motion_review"]={"status":"UNAVAILABLE","clips_packaged":0,
                                  "creative_status":"REVIEW REQUIRED"}
-    target.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\\n",encoding="utf8")
+    target.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\n",encoding="utf8")
     return report
 
 
