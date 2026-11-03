@@ -121,6 +121,8 @@ def release(video,plan_path,outdir,look='clean-studio',width=None,brand='executi
         if not raw.get('transcript_verified'):
             raise ValueError('Explainer graphics require verified script/spoken content')
         validate_rag_beats(storyboard,original['duration'])
+        if any(x["fx"]=="glass-widgets" for x in plan):
+            raise ValueError("RAG mode already renders eight verified glass-widgets; remove the generic demo widget from the user effect list")
         # The eight semantic cues must be implemented by the ACTUAL 42-effect
         # registry, not an unmasked post-production Pillow card overlay.
         plan=validate_plan(plan+rag_glass_effects(storyboard,original['duration']),
