@@ -48,7 +48,7 @@ def audit(plan,duration,style='premium'):
         if name=='broll-split' and not str(item.get('text','')).strip():
             flag('error','UNVERIFIED_BROLL_TAG',
                  f'{label} cannot publish the demo time-savings sticker; provide an intentional sourced short label')
-        if name=='broll-split' and re.search(r'\\d',str(item.get('text',''))) and not str(item.get('metric_source','')).strip():
+        if name=='broll-split' and re.search(r'\d',str(item.get('text',''))) and not str(item.get('metric_source','')).strip():
             flag('error','UNVERIFIED_BROLL_METRIC',
                  f'{label} shows numeric claims without metric_source evidence')
         if name in ('cover-star','red-collage'):
