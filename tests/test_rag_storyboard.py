@@ -135,7 +135,7 @@ class StoryboardTests(unittest.TestCase):
         fx.fx_glass_widgets(face,hook)
         self.assertTrue(np.array_equal(face.img[115,180],original[115,180]),
                         "Detector-centred face guard failed without segmentation")
-        self.assertGreater(np.max(np.abs(face.img[55,35]-original[55,35])),.01,
+        self.assertGreater(np.max(np.abs(face.img[85,45]-original[85,45])),.01,
                            "No glass panel art appeared in safe background")
 
 @unittest.skipUnless(shutil.which("ffmpeg") and (ROOT/"models"/"selfie_segmenter.tflite").is_file(),
