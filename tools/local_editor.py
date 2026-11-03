@@ -20,7 +20,7 @@ sys.path.insert(0,str(ROOT/"tools"))
 import render_job_api as api
 from effect_catalog import read_registry
 from local_director import document_text,draft
-from rag_visuals import preview_contact_sheet,LAYOUT_ID
+from rag_glass_preview import preview_contact_sheet,LAYOUT_ID
 
 BUILD_ID="RAG-SIX-SECTION-GUARD-2026-11-02"
 RENDER_BUTTON_FIX_ID="RAG-RENDER-BUTTON-FIX-2026-11-02"
@@ -60,15 +60,15 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 <pre id="warnings"></pre><div id="effects"></div><button id="add">Add another effect</button>
 <div id="ragPanel" style="display:none">
 <h3>Six-section script-aware explainer · fictional policy example</h3>
-<p>These graphics are separate from the original 42 effects. Check actual word timing against the uploaded video and adjust every start/end point. The three checks are revealed sequentially.</p>
+<p>Eight stages use the ORIGINAL glass-widgets effect with per-frame MediaPipe subject-depth masking, not a flat overlay. Check timings against real speech; each verification question appears separately.</p>
 <div id="ragStages"></div>
 </div>
 <div id="layoutReview" style="display:none">
-<h3>Face-safe preview before full render</h3>
-<p>This uses three frames from your real source footage, with the final policy/RAG/check layout. It is NOT a completed video or a motion/skin-quality approval.</p>
-<button id="preview" type="button">Generate 3-frame face-safe preview</button>
-<img id="previewImage" alt="Three private video frames with face-safe RAG editorial graphics" style="display:none;width:100%;height:auto;border:1px solid #587283;border-radius:8px">
-<label><input type="checkbox" id="layoutApproved" disabled> I inspected the three actual layout frames and the graphics do NOT cover the speaker.</label>
+<h3>Original glass-widgets effect — real video preview</h3>
+<p>Three frames are rendered by the REAL fx.py/MediaPipe engine: policy evidence, RAG retrieval and access check. Glass floats BEHIND your silhouette on full-frame source footage. This is not a completed video or creative approval.</p>
+<button id="preview" type="button">Render 3 genuine glass-widget preview frames</button>
+<img id="previewImage" alt="Three actual depth-masked glass-widget RAG frames" style="display:none;width:100%;height:auto;border:1px solid #587283;border-radius:8px">
+<label><input type="checkbox" id="layoutApproved" disabled> I inspected the genuine glass-widget frames; the design is professional and does NOT obscure my face.</label>
 </div>
 <label><input type="checkbox" id="clean"> I confirm this is unedited camera footage, with no burned-in graphics.</label>
 <label><input type="checkbox" id="verified"> I checked effect timestamps/text and script words against the actual video audio.</label>
@@ -85,8 +85,8 @@ const EFFECTS=__ORIGINAL_EFFECT_NAMES__;
 const el=(id)=>document.getElementById(id);
 let duration=0,jobId=null,previewReady=false;
 function status(v){el("output").style.display="block";el("status").textContent=v;}
-async function call(path,method="GET",body=null,blob=false){
- const hdr={"Authorization":"Bearer "+TOKEN};
+async function call(path,method="GET",body=null,blob=false,extraHeaders={}){
+ const hdr={"Authorization":"Bearer "+TOKEN,...extraHeaders};
  if(body instanceof Blob)hdr["Content-Type"]="application/octet-stream";
  else if(body!==null){hdr["Content-Type"]="application/json";body=JSON.stringify(body);}
  const response=await fetch(path,{method:method,headers:hdr,body:body,cache:"no-store"});
@@ -157,15 +157,22 @@ function createStage(item){
  const note=document.createElement("label");note.textContent="Graphic content is derived from matching script text";
  [label,start[0],end[0],note].forEach(x=>block.append(x));
  block.stage={kind:item.kind,section:item.section,start:start[1],end:end[1]};
- start[1].addEventListener("input",check);end[1].addEventListener("input",check);
+ start[1].addEventListener("input",()=>{invalidatePreview();check();});
+ end[1].addEventListener("input",()=>{invalidatePreview();check();});
  el("ragStages").append(block);
+}
+function invalidatePreview(){
+ previewReady=false;
+ el("layoutApproved").checked=false;
+ el("layoutApproved").disabled=true;
+ el("previewImage").style.display="none";
 }
 function check(){
  let reason="";
  if(!el("clean").checked)reason="Confirm that your video is clean, original camera footage.";
  else if(!el("verified").checked)reason="Check the script/timestamps against the spoken audio, then confirm.";
  else if(el("editMode").value==="rag"&&(!previewReady||!el("layoutApproved").checked))
-   reason="Generate and inspect the three real-video layout previews before the full render.";
+   reason="Render and inspect the three authentic glass-widget frames before full video production.";
  try{
    effects();
    const stages=collectRag();
@@ -175,7 +182,9 @@ function check(){
  el("render").disabled=Boolean(reason);
  el("renderReason").textContent=reason||"Ready to render. Original 42-effect pass and six-section graphics are selected.";
 }
-["clean","verified","editMode","layoutApproved"].forEach(x=>el(x).onchange=check);
+["clean","verified","layoutApproved"].forEach(x=>el(x).onchange=check);
+el("editMode").onchange=()=>{invalidatePreview();check();};
+el("script").addEventListener("change",()=>{invalidatePreview();check();});
 el("video").addEventListener("change",()=>{
  previewReady=false;
  el("layoutApproved").checked=false;
@@ -211,14 +220,17 @@ el("preview").onclick=async()=>{
  el("layoutApproved").disabled=true;check();
  status("Generating three local real-footage composition previews (no full render)...");
  try{
-  const picture=await call("/local/layout-preview","POST",el("video").files[0],true);
+  const stages=collectRag();
+  if(stages.length!==8)throw Error("All eight script-backed RAG stages are required for original glass preview.");
+  const picture=await call("/local/layout-preview","POST",el("video").files[0],true,
+    {"X-Swarag-Storyboard":btoa(JSON.stringify(stages))});
   const image=el("previewImage");
   if(image.src&&image.src.startsWith("blob:"))URL.revokeObjectURL(image.src);
   image.src=URL.createObjectURL(picture);
   image.style.display="block";
   previewReady=true;
   el("layoutApproved").disabled=false;
-  status("Layout preview ready. Inspect whether your head, beard and hands are unobstructed. Reject it if the design feels wrong.");
+  status("Real Swarag glass-widgets preview ready. Inspect readability, subtle motion direction and whether the original person remains in front. Reject if the design feels wrong.");
  }catch(e){status("Layout preview failed: "+String(e?.message||e));}
  finally{button.disabled=false;check();}
 };
@@ -336,7 +348,11 @@ class LocalHandler(api.Handler):
                     with source.open("rb") as file:header=file.read(12)
                     if len(header)<12 or header[4:8]!=b"ftyp":
                         raise ValueError("Preview requires original MP4 bytes")
-                    image,report=preview_contact_sheet(source)
+                    header_data=self.headers.get("X-Swarag-Storyboard","")
+                    if not (40<len(header_data)<8000):
+                        raise ValueError("Eight edited RAG stages must be supplied for true-effect preview")
+                    stages=json.loads(base64.b64decode(header_data,validate=True).decode("utf-8"))
+                    image,report=preview_contact_sheet(source,stages)
                     data=io.BytesIO()
                     image.save(data,format="JPEG",quality=86)
                     content=data.getvalue()
