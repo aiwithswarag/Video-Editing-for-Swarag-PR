@@ -63,6 +63,22 @@
     "orbit": {
       "brand_cards": true,
       "labels": "STRATEGY|EXECUTION|GOVERNANCE|AI ADOPTION|OUTCOMES|DELIVERY"
+    },
+    "noise": {
+      "brand_cards": true,
+      "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY"
+    },
+    "carousel-spin": {
+      "brand_cards": true,
+      "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY"
+    },
+    "phone-fan": {
+      "brand_cards": true,
+      "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY"
+    },
+    "check-pills": {
+      "brand_cards": true,
+      "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY"
     }
   }
 }
