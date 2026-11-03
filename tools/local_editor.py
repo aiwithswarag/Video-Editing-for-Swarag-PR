@@ -61,6 +61,7 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 <button id="checkEngine" type="button">Check my local 42-effect engine first (no rendering)</button>
 <pre id="engineHealth" aria-live="polite" style="display:none"></pre>
 <button id="check42" type="button">Test all 42 effects on my camera footage</button>
+<button id="recover42" type="button">Recover previous completed 47-effect test (no rerender)</button>
 <pre id="check42Status" aria-live="polite" style="display:none"></pre>
 <img id="check42Sheet" alt="Private 42-effect preview contact sheet from your actual original camera video" style="width:100%;height:auto;display:none;border:1px solid #587283;border-radius:8px">
 <button id="download42" style="display:none" type="button">Download effect-by-effect diagnostic JSON</button>
@@ -282,6 +283,51 @@ el("check42").onclick=async()=>{
      "\\nIf Docker stopped, inspect Docker Desktop > Containers > swarag-local-editor > Logs. No 42/42 result was certified.";
  }finally{button.disabled=false;}
 };
+el("recover42").onclick=async()=>{
+ const button=el("recover42"),output=el("check42Status");
+ button.disabled=true;output.style.display="block";
+ output.textContent="Checking previously saved private effect results. No camera footage will be uploaded or rerendered...";
+ el("check42Sheet").style.display="none";el("check42MotionSheet").style.display="none";
+ el("download42").style.display="none";el("download42Motion").style.display="none";
+ try{
+   const started=await call("/local/effect-diagnostic/recover-latest","POST");
+   healthJobId=started.id;
+   while(true){
+     await new Promise(done=>setTimeout(done,1500));
+     const state=await call("/local/effect-diagnostic/"+healthJobId);
+     output.textContent="Recovered real-camera effect report: "+state.status+
+       "\\nPreviously rendered: "+state.effect_checks_completed+"/47; no effects rerendered."; 
+     if(state.status==="RUNNING")continue;
+     if(state.technical_status){
+       output.textContent+="\\n"+state.technical_status+"; original effects passed "+state.technically_passed_effects+"/42."; 
+       output.textContent+="\\nMotion review: "+(state.motion_review_status||"unavailable") +
+         "; saved clips: "+(state.motion_clips_packaged||0)+"/47."; 
+       if(state.review_artifact_status)output.textContent+="\\nReview artifact status: "+state.review_artifact_status;
+       if(state.review_artifact_error_type)output.textContent+=" ("+state.review_artifact_error_type+")";
+       el("download42").style.display="inline-block";
+       if(state.motion_review_status==="MOTION_SAMPLES_AVAILABLE"){
+         el("download42Motion").style.display="inline-block";
+         try{
+           const jpg=await call("/local/effect-diagnostic/"+healthJobId+"/motion-sheet","GET",null,true);
+           const image=el("check42MotionSheet");
+           if(image.src?.startsWith("blob:"))URL.revokeObjectURL(image.src);
+           image.src=URL.createObjectURL(jpg);image.style.display="block";
+         }catch(err){output.textContent+="\\nMotion sheet not available: "+String(err?.message||err);}
+       }
+       try{
+         const jpg=await call("/local/effect-diagnostic/"+healthJobId+"/contact-sheet","GET",null,true);
+         const image=el("check42Sheet");
+         if(image.src?.startsWith("blob:"))URL.revokeObjectURL(image.src);
+         image.src=URL.createObjectURL(jpg);image.style.display="block";
+       }catch(err){output.textContent+="\\nOriginal review sheet not available: "+String(err?.message||err);}
+     }
+     if(state.error)output.textContent+="\\n"+state.error;
+     break;
+   }
+ }catch(err){output.textContent="Recovery unavailable: "+String(err?.message||err)+
+      "\\nYour original footage remains untouched. You can run a new diagnostic only if previous files have expired."; }
+ finally{button.disabled=false;}
+};
 el("download42").onclick=async()=>{
  if(!healthJobId)return;
  try{
@@ -476,6 +522,9 @@ class LocalHandler(api.Handler):
         super().do_GET()
     def do_POST(self):
         if not self.local_request():return
+        if urlsplit(self.path).path=="/local/effect-diagnostic/recover-latest":
+            effect_health.recover_latest(self)
+            return
         if urlsplit(self.path).path=="/local/effect-diagnostic":
             effect_health.begin(self)
             return
