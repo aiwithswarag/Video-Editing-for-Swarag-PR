@@ -15,6 +15,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from PIL import Image,ImageDraw
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"tools"))
@@ -92,6 +93,38 @@ def report_from_gallery(folder,source_duration,source_start,original_dims):
     }
 
 
+def make_review_sheet(gallery,destination):
+    """Private original-camera contact sheet, including failed/missing effect slots."""
+    names,_,_=read_registry()
+    labels=names+[name for name,_,_ in NAMED_VARIANTS]
+    gallery=Path(gallery)
+    destination=Path(destination)
+    destination.parent.mkdir(parents=True,exist_ok=True)
+    columns=6
+    cell_width=205
+    cell_height=391
+    rows=(len(labels)+columns-1)//columns
+    canvas=Image.new("RGB",(columns*cell_width,rows*cell_height),(20,32,44))
+    dr=ImageDraw.Draw(canvas)
+    for i,name in enumerate(labels):
+        x=(i%columns)*cell_width
+        y=(i//columns)*cell_height
+        image_path=gallery/(name+".png")
+        if image_path.is_file():
+            try:
+                with Image.open(image_path) as file:
+                    image=file.convert("RGB")
+                image.thumbnail((cell_width-12,cell_height-40))
+                canvas.paste(image,(x+(cell_width-image.width)//2,y+30))
+            except (OSError,ValueError):
+                dr.text((x+6,y+45),"FAILED TO DECODE",fill=(227,151,126))
+        else:
+            dr.text((x+6,y+45),"MISSING PREVIEW",fill=(227,151,126))
+        dr.text((x+6,y+7),name[:27],fill=(242,239,233))
+    canvas.save(destination,quality=88)
+    return destination
+
+
 def run(source,output,*,only=None):
     source=Path(source)
     if not source.is_file():raise FileNotFoundError(source)
@@ -119,6 +152,10 @@ def run(source,output,*,only=None):
         for name in only:command+=["--only",name]
     proc=subprocess.run(command,check=False,cwd=ROOT)
     report=report_from_gallery(gallery,duration,start,stream)
+    if not only:
+        # Even if one original effect crashes, show a genuine partial review
+        # sheet with explicit missing/failed slots. Don't hide failed visuals.
+        make_review_sheet(gallery,review/"all-47-effects.jpg")
     if only:
         report["purpose"]="LIMITED INTERNAL SUBSET TEST — NOT ALL 42 EFFECTS"
         report["technical_status"]="INCOMPLETE_SUBSET" if proc.returncode==0 else "FAIL_OR_INCOMPLETE"
