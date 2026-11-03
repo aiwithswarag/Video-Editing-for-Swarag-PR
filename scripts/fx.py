@@ -123,12 +123,18 @@ def comp(c, layer, x, y, alpha=1.0, behind=False, guard=False):
     if x1 <= x0 or y1 <= y0 or alpha <= 0: return
     L = L[y0 - y:y1 - y, x0 - x:x1 - x]
     a = L[..., 3:4] * alpha
-    m = c.m[y0:y1, x0:x1, None]
-    if behind: a = a * (1 - m)
-    elif guard:
+    m = np.clip(c.m[y0:y1, x0:x1, None], 0, 1)
+    if behind or guard:
+        # Face geometry is an independent failsafe when MediaPipe misses
+        # hair/eyes for a frame. Do not rely on the person mask alone.
         yy, xx = np.ogrid[y0:y1, x0:x1]
-        e = ((xx - c.fx) / (c.fw * 0.95)) ** 2 + ((yy - c.fy) / (c.fw * 1.35)) ** 2
-        a = a * (1 - np.clip((1.2 - e) / 0.3, 0, 1)[..., None] * m)
+        fw = max(float(c.fw), float(c.W) * 0.045, 1.0)
+        e = ((xx - c.fx) / (fw * 1.07)) ** 2 + ((yy - c.fy) / (fw * 1.43)) ** 2
+        face_protect = np.clip((1.25 - e) / 0.3, 0, 1)[..., None]
+        if behind:
+            a = a * (1 - np.maximum(m, face_protect))
+        else:
+            a = a * (1 - face_protect)
     dst = c.img[y0:y1, x0:x1]
     dst[:] = dst * (1 - a) + L[..., :3] * a
 
@@ -335,12 +341,15 @@ def fx_spotlight(c, e):
 
 @effect('the-bill', 'prints every instruction like a ticket, into the wall above your head')
 def fx_bill(c, e):
-    lines = e.o.get('text', 'ORDER #1021|1x orbit|1x spotlight|1x lean-in|cut the dead air|TOTAL: 1 prompt').split('|')
+    lines = e.o.get('text', 'DEMO EDIT NOTES|STRATEGY|EXECUTION|EXAMPLE ONLY').split('|')
     def build():
-        pw = int(c.W * 0.5); lh = int(pw * 0.085); pad = int(pw * 0.08)
+        pw = int(c.W * 0.72); lh = max(10,int(pw * 0.105)); pad = int(pw * 0.055)
         h = pad * 2 + lh * (len(lines) + 1)
         im = Image.new('RGBA', (pw, h), CREAM + (255,)); d = ImageDraw.Draw(im)
-        f = font('mono', lh * 0.62)
+        fontsize = lh * 0.69
+        while fontsize > 11 and max(font('mono',fontsize).getlength(ln) for ln in lines) > pw - pad*2:
+            fontsize *= 0.94
+        f = font('mono', fontsize)
         for i, ln in enumerate(lines):
             y = pad + lh * i + (lh if i == len(lines) - 1 else 0)
             if i == len(lines) - 1:
@@ -348,7 +357,7 @@ def fx_bill(c, e):
             d.text((pad, y), ln, font=f, fill=INK + (255,))
         return im
     rec = cached(e, 'r', build)
-    slot_y, sw = c.H * 0.075, c.W * 0.62
+    slot_y, sw = c.H * 0.028, c.W * 0.77
     max_h = max(80, c.fy - c.fw * 1.3 - slot_y)
     s = min(1.0, max_h / rec.height)
     pr = ease_inout(c.lt / (e.d * 0.75)); L = int(rec.height * pr)
@@ -1013,10 +1022,13 @@ def fx_profile_wall(c, e):
     place(c, wl, W / 2, H * 0.04 + wl.height / 2, 0.94 + 0.06 * ease_out(c.lt / 0.35), 0, al * clamp(c.lt / 0.15), behind=True)
     cw, chh = W * 0.76, W * 0.25; cy = min(H * 0.86, c.fy + c.fw * 2.6)
     g = glass(c, cw, chh, chh * 0.18, W / 2, cy, amt=0.5, tint=(12, 12, 14)); d = ImageDraw.Draw(g)
-    target = int(e.o.get('count', 197000)); n = int(target * ease_out((c.lt - 0.2) / 0.8))
+    # The gallery uses deliberately neutral copy until a verified count is
+    # supplied. Never make a demo look like a real engagement metric.
+    target = int(e.o['count']) if e.o.get('count') is not None else None
+    n = int(target * ease_out((c.lt - 0.2) / 0.8)) if target is not None else None
     swap = clamp((c.lt - 1.15) / 0.2)
-    if swap < 1: d.text((cw / 2, chh * 0.33), f'{n:,}', font=font('uib', chh * 0.3), fill=(255, 255, 255, int(255 * (1 - swap))), anchor='mm')
-    if swap > 0: d.text((cw / 2, chh * 0.33), e.o.get('label', 'views'), font=font('uib', chh * 0.3), fill=(255, 255, 255, int(255 * swap)), anchor='mm')
+    if swap < 1: d.text((cw / 2, chh * 0.33), f'{n:,}' if n is not None else 'DEMO', font=font('uib', chh * 0.3), fill=(255, 255, 255, int(255 * (1 - swap))), anchor='mm')
+    if swap > 0: d.text((cw / 2, chh * 0.33), e.o.get('label', 'example only' if n is None else 'views'), font=font('uib', chh * 0.3), fill=(255, 255, 255, int(255 * swap)), anchor='mm')
     av = face_chip(c, e, chh * 0.3); g.alpha_composite(av, (int(chh * 0.14), int(chh * 0.58)))
     d.text((chh * 0.52, chh * 0.68), e.o.get('name', 'aiwithswarag'), font=font('uib', chh * 0.09), fill=(255, 255, 255, 255), anchor='lm')
     d.text((chh * 0.52, chh * 0.8), e.o.get('sub', 'top reel'), font=font('uim', chh * 0.075), fill=(170, 170, 176, 255), anchor='lm')
@@ -1072,13 +1084,22 @@ def fx_broll_split(c, e):
         top = np.asarray(im, np.float32) / 255
         c.img[:sh] = top[int(H * 0.5) - sh:]; c.m[:sh] = 0
         c.img[max(0, sh - 3):sh + 3] = 1.0
-    tag = cached(e, 'tag', lambda: text_img(e.o.get('text', '4 hrs  →  4 min'), W * 0.06, 'uib', (16, 16, 18)))
+    tag = cached(e, 'tag', lambda: fit_text(e.o.get('text', 'EXAMPLE ONLY'), W * 0.76, 'uib', W * 0.06, fill=(16,16,18)))
     tw, th = int(tag.width + W * 0.11), int(tag.height * 1.25)
     st = Image.new('RGBA', (tw, th), (0, 0, 0, 0)); d = ImageDraw.Draw(st); n = th * 0.5
     d.polygon([(0, th / 2), (n, 0), (tw, 0), (tw, th), (n, th)], fill=(255, 255, 255, 255))
     d.ellipse([n * 0.55, th / 2 - n * 0.16, n * 0.87, th / 2 + n * 0.16], fill=(200, 200, 205, 255))
     st.alpha_composite(tag, (int(n * 1.05), (th - tag.height) // 2))
-    place(c, shadowed(st, 12, 6, 110), W * 0.66, H * 0.39 * k + H * 0.0, 0.5 + 0.5 * pop(c, 0.3), 8, al * clamp((c.lt - 0.3) / 0.08))
+    # The sticker belongs to the upper B-roll pane, NEVER to the speaker's
+    # face. Previous 0.39*H placement cut across the eyes in the camera test.
+    scale = 0.74 + 0.26 * pop(c, 0.3)
+    card_height = shadowed(st, 12, 6, 110).height * scale
+    safe_bottom = sh - H * 0.045
+    if safe_bottom > card_height * 1.12:
+        cy = min(H * 0.24, safe_bottom - card_height * 0.57)
+        cy = max(card_height * 0.6, cy)
+        place(c, shadowed(st, 12, 6, 110), W * 0.55, cy,
+              scale, 2, al * clamp((c.lt - 0.3) / 0.08), guard=True)
 
 
 @effect('phone-fan', 'your reels fan out like a hand of phones in front of you, under a two-line headline')
@@ -1628,6 +1649,9 @@ def fx_liquid_glass_graph(c, e):
     g = ease_inout((c.lt - 0.25) / max(0.3, e.d * 0.72))
     lab = e.o.get('text', 'RETENTION').upper()
     d.text((pad, pad * 0.9), lab, font=font('mono', gw * 0.04), fill=(255, 255, 255, 190))
+    if e.o.get('hypothetical_example'):
+        d.text((pad, pad * 2.0), 'ILLUSTRATIVE — NOT MEASURED',
+               font=font('uib', gw * 0.025), fill=(255, 218, 162, 245))
     a, _, _ = num_parts(e.o.get('from', '0')); b, suf, dp = num_parts(e.o.get('to', '59%'))
     v = a + (b - a) * g; s = f'{v:.{dp}f}{suf}'
     f = font('uib', gw * 0.12); d.text((gw - pad - f.getlength(s), pad * 0.55), s, font=f, fill=(255, 255, 255, 255))
@@ -1694,9 +1718,16 @@ def match_page(c, e, j, wx, wy):
     im = Image.new('RGB', (W, H), paper); d = ImageDraw.Draw(im); ink = (40, 38, 36)
     base = f.getbbox('Ag'); asc = -base[1]
     ww = f.getlength(word); bx0 = wx - ww / 2
+    # Real business edits may supply their own verified words. Never publish
+    # an apparently cited article assembled from hard-coded synthetic claims.
+    supplied = str(e.o.get('article_text') or '').strip().split()
+    vocabulary = supplied if supplied else MATCH_TXT
+    counter = j * 23
     def run(x, y, direction):
+        nonlocal counter
         while (x < W + size if direction > 0 else x > -size * 6):
-            w_ = rnd.choice(MATCH_TXT) + ' '
+            w_ = vocabulary[counter % len(vocabulary)] + ' '
+            counter += 1
             if direction < 0: x -= f.getlength(w_)
             d.text((x, y), w_, font=f, fill=ink)
             if direction > 0: x += f.getlength(w_)
@@ -1721,6 +1752,11 @@ def match_page(c, e, j, wx, wy):
     box = rrect(ww + 2 * padx, (bb[3] - bb[1]) + 2 * pady + size * 0.08, size * 0.08, red + (255,))
     ImageDraw.Draw(box).text((padx, pady - bb[1]), word, font=bf, fill=(255, 255, 255, 255))
     pg.alpha_composite(box, (int(bx0 - padx), int(wy - asc + bb[1] - pady)))
+    if not supplied:
+        # The matrix is a technical demo, not a real article or endorsement.
+        stamp = ImageDraw.Draw(pg)
+        stamp.text((W * 0.07, H * 0.94), 'SAMPLE TEXT / DEMO',
+                   font=font('uib', W * 0.037), fill=(120, 46, 46, 255))
     return np.asarray(pg.convert('RGB'), np.uint8)
 
 
@@ -1913,13 +1949,13 @@ def cover_editorial(c, e):
         kind, sz, col = styles[min(j, 2)]
         im = cached(e, ('l', j), lambda: (tracked(ln, int(W * sz), kind, col, W * 0.006) if kind == 'ui' else text_img(ln, W * sz, kind, col, glow=(cream, W * 0.012))))
         kj = ease_out((c.lt - 0.2 - 0.1 * j) / 0.35)
-        comp(c, im, W * 0.05 - (1 - kj) * W * 0.03, y, al * kj); y += im.height * (0.82 if kind != 'ui' else 1.6)
+        comp(c, im, W * 0.05 - (1 - kj) * W * 0.03, y, al * kj, behind=True); y += im.height * (0.82 if kind != 'ui' else 1.6)
     right = [text for text in e.o.get('right', '').split('|') if text.strip()]
     y = H * float(e.o.get('right_y', 0.715))
     for j, ln in enumerate(right):
         im = cached(e, ('r', j), lambda: text_img(ln, W * 0.058, 'didonei', ink, glow=(cream, W * 0.01)))
         kj = ease_out((c.lt - 0.45 - 0.1 * j) / 0.35)
-        comp(c, im, W * 0.95 - im.width + (1 - kj) * W * 0.03, y, al * kj); y += im.height * 0.78
+        comp(c, im, W * 0.95 - im.width + (1 - kj) * W * 0.03, y, al * kj, behind=True); y += im.height * 0.78
 
 
 def donut(size, pct, col, label, value):
@@ -2102,15 +2138,23 @@ def executive_cards(labels=None):
 
 
 def load_cards(folder, thumbs):
+    """No silent substitution of real user-approved assets with duplicate selfies."""
     out = []
-    if folder and os.path.isdir(folder):
+    if folder:
+        if not os.path.isdir(folder):
+            raise ValueError("Approved card media directory does not exist")
         for n in sorted(os.listdir(folder)):
             p = os.path.join(folder, n); ext = n.lower().rsplit('.', 1)[-1]
-            if ext in ('jpg', 'jpeg', 'png', 'webp'): out.append(Image.open(p).convert('RGB'))
+            if ext in ('jpg', 'jpeg', 'png', 'webp'):
+                with Image.open(p) as source: out.append(source.convert('RGB'))
             elif ext in ('mp4', 'mov', 'm4v', 'webm'):
                 cap = cv2.VideoCapture(p); cap.set(cv2.CAP_PROP_POS_MSEC, 1000); ok, fr = cap.read(); cap.release()
                 if ok: out.append(Image.fromarray(cv2.cvtColor(fr, cv2.COLOR_BGR2RGB)))
-    return out or thumbs
+            if len(out) >= 40: break
+        if not out:
+            raise ValueError("Approved card media directory contains no decodable images or videos")
+        return out
+    return thumbs
 
 
 def main():
@@ -2161,7 +2205,12 @@ def main():
     if sm is None: sm = np.tile([aw / 2, ah * 0.33, aw * 0.15], (len(faces), 1))
     for f in fxs:
         if f.name in CARD_FX:
-            f.cards = executive_cards(f.o.get('labels')) if f.name == 'orbit' and f.o.get('brand_cards') and not f.o.get('images') else load_cards(f.o.get('images'), thumbs)
+            # Explicit original Swarag editorial cards are a credible choice
+            # for abstract concepts. In their absence, raw source thumbnails
+            # remain SHOWCASE fixtures only; premium lint blocks their use.
+            f.cards = (executive_cards(f.o.get('labels'))
+                if f.o.get('brand_cards') and not f.o.get('images')
+                else load_cards(f.o.get('images'), thumbs))
     stills = sorted({int(round(float(s) * fps)) for s in a.still.split(',')}) if a.still else None
     enc = None
     if not stills:

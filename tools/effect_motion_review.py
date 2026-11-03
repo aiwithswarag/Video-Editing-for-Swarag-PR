@@ -12,6 +12,11 @@ from pathlib import Path
 from zipfile import ZIP_STORED, ZipFile
 
 from PIL import Image, ImageDraw
+try:
+    from .effect_creative_review import review_focus
+except ImportError:
+    # The localhost worker executes scripts from tools/ directly.
+    from effect_creative_review import review_focus
 
 SAMPLE_RATIOS = (0.15, 0.50, 0.85)
 
@@ -60,7 +65,8 @@ def create_motion_review(gallery, destination, labels):
             draw.text((x + 7, y + 7), label[:40], fill=(242, 239, 233))
             clip = gallery / (label + ".mp4")
             if not clip.is_file() or clip.stat().st_size < 2000:
-                results.append({"effect": label, "status": "MISSING_MOTION_CLIP"})
+                results.append({"effect": label, "status": "MISSING_MOTION_CLIP",
+                                "human_creative_review_focus":review_focus(label)})
                 draw.text((x + 7, y + 44), "MISSING MOTION CLIP", fill=(227, 151, 126))
                 continue
             try:
@@ -71,10 +77,12 @@ def create_motion_review(gallery, destination, labels):
                     offset = x + 7 + 124 * j
                     sheet.paste(frame, (offset + (116 - frame.width) // 2, y + 32))
                 results.append({"effect": label, "status": "FRAMES_SAMPLED",
-                                "frame_samples": len(frames)})
+                                "frame_samples": len(frames),
+                                "human_creative_review_focus":review_focus(label)})
             except (OSError, ValueError) as exc:
                 results.append({"effect": label, "status": "UNREADABLE_MOTION_CLIP",
-                                "error_type": type(exc).__name__})
+                                "error_type": type(exc).__name__,
+                                "human_creative_review_focus":review_focus(label)})
                 draw.text((x + 7, y + 44), "UNREADABLE MOTION", fill=(227, 151, 126))
         manifest = {
             "purpose": "PRIVATE MOTION REVIEW — NOT CREATIVE APPROVAL",
