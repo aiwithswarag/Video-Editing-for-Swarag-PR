@@ -188,7 +188,7 @@ class LocalHostHTTPTests(unittest.TestCase):
                          json.loads(version)["face_safe_layout_id"])
         self.assertTrue(json.loads(version)["layout_preview_required"])
         self.assertIn(b"subject-masked-glass-v5",data)
-        self.assertIn(b"original glass-widgets",data)
+        self.assertIn(b"Original glass-widgets",data)
         self.assertIn(b'id="previewImage"',data)
         self.assertIn(b'id="layoutApproved"',data)
         self.assertIn(b"layout-preview",data)
