@@ -146,7 +146,20 @@ def preview_motion_clip(source, storyboard, output, *, width=540, fps=15):
             ], cwd=ROOT, check=True, timeout=240)
             if not output_clip.is_file() or output_clip.stat().st_size < 4096:
                 raise RuntimeError("Original RAG glass renderer produced no motion clip")
-            face_report = inspect_face_change(source_clip, output_clip)
+            # Face QC is supplemental and may be inconclusive on footage
+            # with motion blur, occlusion or no reliably detected face. A
+            # detector failure must not break the local preview socket;
+            # surface a conspicuous UNVERIFIED status instead.
+            try:
+                face_report = inspect_face_change(source_clip, output_clip)
+            except Exception as exc:
+                face_report = {
+                    "status": "UNVERIFIED_FACE_QC_ERROR",
+                    "sampled_frames": 0,
+                    "face_detections": 0,
+                    "possible_overlays": 0,
+                    "error_type": type(exc).__name__,
+                }
             face_checks.append({"stage": beat["kind"], **face_report})
             rendered.append(output_clip)
         concatenation = work / "preview-list.txt"
