@@ -254,6 +254,9 @@ el("check42").onclick=async()=>{
        el("download42").style.display="inline-block";
        output.textContent+="\nMotion evidence: "+(state.motion_review_status||"not ready")+
           "; playable clips: "+(state.motion_clips_packaged||0)+"/47.";
+       if(state.review_artifact_status)output.textContent+="\nMotion artifact assembly: "+state.review_artifact_status;
+       if(state.review_artifact_error_type)output.textContent+=" ("+state.review_artifact_error_type+")";
+       if(state.error)output.textContent+="\n"+state.error;
        if(state.motion_review_status==="MOTION_SAMPLES_AVAILABLE"){
          el("download42Motion").style.display="inline-block";
          try{
