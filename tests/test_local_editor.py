@@ -194,6 +194,9 @@ class LocalHostHTTPTests(unittest.TestCase):
         self.assertIn(b'id="download42"',data)
         self.assertIn(b"Test all 42 effects on my camera footage",data)
         self.assertTrue(json.loads(version)["private_real_camera_42_effect_diagnostic"])
+        self.assertEqual("ORIGINAL-42-EFFECT-QA-2026-11-03",
+                         json.loads(version)["effect_qa_build_id"])
+        self.assertIn(b"ORIGINAL-42-EFFECT-QA-2026-11-03",data)
         self.assertEqual("GLASS-MOBILE-LEGIBILITY-2026-11-03",
                          json.loads(version)["glass_legibility_fix_id"])
         self.assertIn(b"Original glass-widgets",data)
