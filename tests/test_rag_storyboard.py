@@ -126,6 +126,17 @@ class StoryboardTests(unittest.TestCase):
                         "Glass panel erased original person pixels")
         self.assertGreater(np.max(np.abs(c.img[mask==0]-original[mask==0])),.03,
                            "No genuine glass art was composited on background")
+        # Face-aware safety must remain effective when segmentation misses.
+        missing=np.zeros((H,W),dtype=np.float32)
+        face=SimpleNamespace(W=W,H=H,img=original.copy(),m=missing,
+             fx=W/2,fy=H*.18,fw=100.,lt=.8,t=1.2,fps=8)
+        hook=fx.Fx({"fx":"glass-widgets","start":0.,"end":4.,
+                    "look":"rag-evidence","stage":"hook","grade":"none"},8)
+        fx.fx_glass_widgets(face,hook)
+        self.assertTrue(np.array_equal(face.img[115,180],original[115,180]),
+                        "Detector-centred face guard failed without segmentation")
+        self.assertGreater(np.max(np.abs(face.img[55,35]-original[55,35])),.01,
+                           "No glass panel art appeared in safe background")
 
 @unittest.skipUnless(shutil.which("ffmpeg") and (ROOT/"models"/"selfie_segmenter.tflite").is_file(),
                      "Full offline MediaPipe/FFmpeg/fonts are required")
@@ -151,7 +162,7 @@ class FullPipelineTest(unittest.TestCase):
             self.assertEqual("CREATIVE_REVIEW_REQUIRED",report["release_gate_status"])
             self.assertEqual(8,report["rag_graphics_pass"]["graphic_stages"])
             self.assertTrue(report["rag_graphics_pass"]["face_safe_layout"])
-            self.assertFalse(report["rag_graphics_pass"]["graphics_overlap_camera_pixels"])
+            self.assertIn("NOT MEASURED",report["rag_graphics_pass"]["graphics_overlap_camera_pixels"])
             self.assertEqual(LAYOUT_ID,report["rag_graphics_pass"]["layout_id"])
             self.assertEqual("glass-widgets",report["rag_graphics_pass"]["effect_name"])
             self.assertTrue(report["rag_graphics_pass"]["subject_depth_mask"])
