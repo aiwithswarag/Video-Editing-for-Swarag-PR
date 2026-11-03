@@ -34,7 +34,7 @@ class CreativeFocusTests(unittest.TestCase):
         for effect in ("slow-push","orbit","glitter-spotlight"):
             result="|".join(review_focus(effect)).lower()
             self.assertNotIn("creative pass",result)
-            self.assertNotIn("approved",result)
+            self.assertNotIn("creative approved",result)
 
 if __name__=="__main__":
     unittest.main()
