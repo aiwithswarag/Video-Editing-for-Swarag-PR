@@ -5,6 +5,7 @@ accuracy or whether any motion looks 'AI generated'; human review remains requir
 """
 from __future__ import annotations
 import math
+import re
 
 COPY_REQUIRED=frozenset({'headline-box','backdrop-word','led-sign','reject-stamp',
                          'split-headline','headline-wall','pastel-word','the-bill'})
@@ -47,6 +48,9 @@ def audit(plan,duration,style='premium'):
         if name=='broll-split' and not str(item.get('text','')).strip():
             flag('error','UNVERIFIED_BROLL_TAG',
                  f'{label} cannot publish the demo time-savings sticker; provide an intentional sourced short label')
+        if name=='broll-split' and re.search(r'\\d',str(item.get('text',''))) and not str(item.get('metric_source','')).strip():
+            flag('error','UNVERIFIED_BROLL_METRIC',
+                 f'{label} shows numeric claims without metric_source evidence')
         if name in ('cover-star','red-collage'):
             if not str(item.get('text','')).strip() or not str(item.get('lines','')).strip():
                 flag('error','EDITORIAL_DEMO_COPY',
@@ -71,6 +75,12 @@ def audit(plan,duration,style='premium'):
                 any(k not in item or str(item[k]).strip()=='' for k in ('text','from','to'))):
             flag('error','UNVERIFIED_CHART_METRIC',
                  f'{label} needs sourced label/from/to values; its bento demo has built-in examples')
+        if name=='liquid-glass-graph' and item.get('look')!='bento' and (
+                all(str(item.get(k,'')).strip() for k in ('text','from','to')) and
+                not item.get('hypothetical_example') and
+                not str(item.get('metric_source','')).strip()):
+            flag('error','UNVERIFIED_CHART_PROVENANCE',
+                 f'{label} needs metric_source or explicit hypothetical_example=true')
         if name=='profile-wall' and (
                 'count' not in item or not str(item.get('metric_source','')).strip()):
             flag('error','FAKE_ENGAGEMENT_COUNT',
