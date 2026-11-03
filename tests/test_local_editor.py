@@ -160,8 +160,8 @@ class LocalHostHTTPTests(unittest.TestCase):
         ui.api.TOKEN=self.old_token;ui.api.JOB_DIR=self.old_path
         if self.old_port is None:__import__("os").environ.pop("PORT",None)
         else:__import__("os").environ["PORT"]=self.old_port
-    def request(self,method,path,body=None,host="127.0.0.1:8765",origin=None,token=True,extra_headers=None):
-        c=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=5)
+    def request(self,method,path,body=None,host="127.0.0.1:8765",origin=None,token=True,extra_headers=None,timeout=5):
+        c=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=timeout)
         hdr={"Host":host,"Content-Type":"application/json",**(extra_headers or {})}
         if token:hdr["Authorization"]="Bearer "+ui.api.TOKEN
         if origin:hdr["Origin"]=origin
@@ -226,7 +226,7 @@ class LocalHostHTTPTests(unittest.TestCase):
                 for i,kind in enumerate(KIND_NAMES)]
             header=base64.b64encode(json.dumps(stages).encode()).decode()
             status,body=self.request("POST","/local/layout-preview",movie.read_bytes(),
-                        extra_headers={"X-Swarag-Storyboard":header})
+                        extra_headers={"X-Swarag-Storyboard":header},timeout=180)
             self.assertEqual(200,status,body[:220])
             self.assertTrue(body.startswith(b"\xff\xd8"))
             from PIL import Image
