@@ -123,12 +123,18 @@ def comp(c, layer, x, y, alpha=1.0, behind=False, guard=False):
     if x1 <= x0 or y1 <= y0 or alpha <= 0: return
     L = L[y0 - y:y1 - y, x0 - x:x1 - x]
     a = L[..., 3:4] * alpha
-    m = c.m[y0:y1, x0:x1, None]
-    if behind: a = a * (1 - m)
-    elif guard:
+    m = np.clip(c.m[y0:y1, x0:x1, None], 0, 1)
+    if behind or guard:
+        # Face geometry is an independent failsafe when MediaPipe misses
+        # hair/eyes for a frame. Do not rely on the person mask alone.
         yy, xx = np.ogrid[y0:y1, x0:x1]
-        e = ((xx - c.fx) / (c.fw * 0.95)) ** 2 + ((yy - c.fy) / (c.fw * 1.35)) ** 2
-        a = a * (1 - np.clip((1.2 - e) / 0.3, 0, 1)[..., None] * m)
+        fw = max(float(c.fw), float(c.W) * 0.045, 1.0)
+        e = ((xx - c.fx) / (fw * 1.07)) ** 2 + ((yy - c.fy) / (fw * 1.43)) ** 2
+        face_protect = np.clip((1.25 - e) / 0.3, 0, 1)[..., None]
+        if behind:
+            a = a * (1 - np.maximum(m, face_protect))
+        else:
+            a = a * (1 - face_protect)
     dst = c.img[y0:y1, x0:x1]
     dst[:] = dst * (1 - a) + L[..., :3] * a
 
@@ -1013,10 +1019,13 @@ def fx_profile_wall(c, e):
     place(c, wl, W / 2, H * 0.04 + wl.height / 2, 0.94 + 0.06 * ease_out(c.lt / 0.35), 0, al * clamp(c.lt / 0.15), behind=True)
     cw, chh = W * 0.76, W * 0.25; cy = min(H * 0.86, c.fy + c.fw * 2.6)
     g = glass(c, cw, chh, chh * 0.18, W / 2, cy, amt=0.5, tint=(12, 12, 14)); d = ImageDraw.Draw(g)
-    target = int(e.o.get('count', 197000)); n = int(target * ease_out((c.lt - 0.2) / 0.8))
+    # The gallery uses deliberately neutral copy until a verified count is
+    # supplied. Never make a demo look like a real engagement metric.
+    target = int(e.o['count']) if e.o.get('count') is not None else None
+    n = int(target * ease_out((c.lt - 0.2) / 0.8)) if target is not None else None
     swap = clamp((c.lt - 1.15) / 0.2)
-    if swap < 1: d.text((cw / 2, chh * 0.33), f'{n:,}', font=font('uib', chh * 0.3), fill=(255, 255, 255, int(255 * (1 - swap))), anchor='mm')
-    if swap > 0: d.text((cw / 2, chh * 0.33), e.o.get('label', 'views'), font=font('uib', chh * 0.3), fill=(255, 255, 255, int(255 * swap)), anchor='mm')
+    if swap < 1: d.text((cw / 2, chh * 0.33), f'{n:,}' if n is not None else 'DEMO', font=font('uib', chh * 0.3), fill=(255, 255, 255, int(255 * (1 - swap))), anchor='mm')
+    if swap > 0: d.text((cw / 2, chh * 0.33), e.o.get('label', 'example only' if n is None else 'views'), font=font('uib', chh * 0.3), fill=(255, 255, 255, int(255 * swap)), anchor='mm')
     av = face_chip(c, e, chh * 0.3); g.alpha_composite(av, (int(chh * 0.14), int(chh * 0.58)))
     d.text((chh * 0.52, chh * 0.68), e.o.get('name', 'aiwithswarag'), font=font('uib', chh * 0.09), fill=(255, 255, 255, 255), anchor='lm')
     d.text((chh * 0.52, chh * 0.8), e.o.get('sub', 'top reel'), font=font('uim', chh * 0.075), fill=(170, 170, 176, 255), anchor='lm')
@@ -1072,13 +1081,22 @@ def fx_broll_split(c, e):
         top = np.asarray(im, np.float32) / 255
         c.img[:sh] = top[int(H * 0.5) - sh:]; c.m[:sh] = 0
         c.img[max(0, sh - 3):sh + 3] = 1.0
-    tag = cached(e, 'tag', lambda: text_img(e.o.get('text', '4 hrs  →  4 min'), W * 0.06, 'uib', (16, 16, 18)))
+    tag = cached(e, 'tag', lambda: fit_text(e.o.get('text', 'EXAMPLE ONLY'), W * 0.76, 'uib', W * 0.06, fill=(16,16,18)))
     tw, th = int(tag.width + W * 0.11), int(tag.height * 1.25)
     st = Image.new('RGBA', (tw, th), (0, 0, 0, 0)); d = ImageDraw.Draw(st); n = th * 0.5
     d.polygon([(0, th / 2), (n, 0), (tw, 0), (tw, th), (n, th)], fill=(255, 255, 255, 255))
     d.ellipse([n * 0.55, th / 2 - n * 0.16, n * 0.87, th / 2 + n * 0.16], fill=(200, 200, 205, 255))
     st.alpha_composite(tag, (int(n * 1.05), (th - tag.height) // 2))
-    place(c, shadowed(st, 12, 6, 110), W * 0.66, H * 0.39 * k + H * 0.0, 0.5 + 0.5 * pop(c, 0.3), 8, al * clamp((c.lt - 0.3) / 0.08))
+    # The sticker belongs to the upper B-roll pane, NEVER to the speaker's
+    # face. Previous 0.39*H placement cut across the eyes in the camera test.
+    scale = 0.74 + 0.26 * pop(c, 0.3)
+    card_height = shadowed(st, 12, 6, 110).height * scale
+    safe_bottom = sh - H * 0.045
+    if safe_bottom > card_height * 1.12:
+        cy = min(H * 0.24, safe_bottom - card_height * 0.57)
+        cy = max(card_height * 0.6, cy)
+        place(c, shadowed(st, 12, 6, 110), W * 0.55, cy,
+              scale, 2, al * clamp((c.lt - 0.3) / 0.08), guard=True)
 
 
 @effect('phone-fan', 'your reels fan out like a hand of phones in front of you, under a two-line headline')
@@ -1913,13 +1931,13 @@ def cover_editorial(c, e):
         kind, sz, col = styles[min(j, 2)]
         im = cached(e, ('l', j), lambda: (tracked(ln, int(W * sz), kind, col, W * 0.006) if kind == 'ui' else text_img(ln, W * sz, kind, col, glow=(cream, W * 0.012))))
         kj = ease_out((c.lt - 0.2 - 0.1 * j) / 0.35)
-        comp(c, im, W * 0.05 - (1 - kj) * W * 0.03, y, al * kj); y += im.height * (0.82 if kind != 'ui' else 1.6)
+        comp(c, im, W * 0.05 - (1 - kj) * W * 0.03, y, al * kj, behind=True); y += im.height * (0.82 if kind != 'ui' else 1.6)
     right = [text for text in e.o.get('right', '').split('|') if text.strip()]
     y = H * float(e.o.get('right_y', 0.715))
     for j, ln in enumerate(right):
         im = cached(e, ('r', j), lambda: text_img(ln, W * 0.058, 'didonei', ink, glow=(cream, W * 0.01)))
         kj = ease_out((c.lt - 0.45 - 0.1 * j) / 0.35)
-        comp(c, im, W * 0.95 - im.width + (1 - kj) * W * 0.03, y, al * kj); y += im.height * 0.78
+        comp(c, im, W * 0.95 - im.width + (1 - kj) * W * 0.03, y, al * kj, behind=True); y += im.height * 0.78
 
 
 def donut(size, pct, col, label, value):
