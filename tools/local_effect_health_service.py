@@ -17,9 +17,16 @@ from pathlib import Path
 
 import render_job_api as api
 from effect_catalog import read_registry
+from render_effect_gallery import NAMED_VARIANTS
 
 ROOT=Path(__file__).resolve().parents[1]
 ROUTE=re.compile(r"^/local/effect-diagnostic/([0-9a-f]{32})(?:/(report|contact-sheet|motion-sheet|motion-clips))?$")
+CLIP_ROUTE=re.compile(r"^/local/effect-diagnostic/([0-9a-f]{32})/clip/([a-z0-9-]{1,60})$")
+# A clip is selectable only if the exact label is in the original registry.
+# Never turn user input into an arbitrary file path.
+def safe_clip_labels():
+    names,_,_=read_registry()
+    return [*names,*[label for label,_,_ in NAMED_VARIANTS]]
 
 
 def safe_health_state(job_id):
@@ -40,6 +47,7 @@ def safe_health_state(job_id):
               ("id","status","error","finished_at","created_at")}
     returned["effect_checks_completed"]=min(47,completed)
     returned["expected_effect_checks"]=47
+    returned["effect_labels"]=safe_clip_labels()
     report=folder/"diagnostic"/"effect-health-report.json"
     if report.is_file():
         r=json.loads(report.read_text(encoding="utf8"))
@@ -197,6 +205,32 @@ def recover_latest(handler):
 
 def get(handler,path):
     if not handler.authorized():return
+    selected=CLIP_ROUTE.fullmatch(path)
+    if selected:
+        job_id,label=selected.groups()
+        if label not in safe_clip_labels():
+            handler.answer(404,{"error":"Unknown original effect label"})
+            return
+        try:
+            safe_health_state(job_id)
+        except (FileNotFoundError,ValueError,KeyError,OSError):
+            handler.answer(404,{"error":"Unknown local diagnostic"})
+            return
+        clip=api.jobdir(job_id)/"diagnostic"/"effect-gallery"/(label+".mp4")
+        if not clip.is_file() or clip.stat().st_size<2000:
+            handler.answer(409,{"error":"This effect's motion clip is unavailable; inspect the diagnostic report"})
+            return
+        # Downloading one short PRIVATE MP4 on demand is less cumbersome than
+        # transferring the full 47-clip ZIP for every individual playback.
+        blob=clip.read_bytes()
+        handler.send_response(200)
+        handler.send_header("Content-Type","video/mp4")
+        handler.send_header("Cache-Control","private, no-store")
+        handler.send_header("X-Content-Type-Options","nosniff")
+        handler.send_header("Content-Length",str(len(blob)))
+        handler.end_headers()
+        handler.wfile.write(blob)
+        return
     match=ROUTE.fullmatch(path)
     if not match:
         handler.answer(404,{"error":"Unknown local diagnostic"})
