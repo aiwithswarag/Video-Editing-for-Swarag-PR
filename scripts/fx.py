@@ -341,12 +341,15 @@ def fx_spotlight(c, e):
 
 @effect('the-bill', 'prints every instruction like a ticket, into the wall above your head')
 def fx_bill(c, e):
-    lines = e.o.get('text', 'ORDER #1021|1x orbit|1x spotlight|1x lean-in|cut the dead air|TOTAL: 1 prompt').split('|')
+    lines = e.o.get('text', 'DEMO EDIT NOTES|STRATEGY|EXECUTION|EXAMPLE ONLY').split('|')
     def build():
-        pw = int(c.W * 0.5); lh = int(pw * 0.085); pad = int(pw * 0.08)
+        pw = int(c.W * 0.72); lh = max(10,int(pw * 0.105)); pad = int(pw * 0.055)
         h = pad * 2 + lh * (len(lines) + 1)
         im = Image.new('RGBA', (pw, h), CREAM + (255,)); d = ImageDraw.Draw(im)
-        f = font('mono', lh * 0.62)
+        fontsize = lh * 0.69
+        while fontsize > 11 and max(font('mono',fontsize).getlength(ln) for ln in lines) > pw - pad*2:
+            fontsize *= 0.94
+        f = font('mono', fontsize)
         for i, ln in enumerate(lines):
             y = pad + lh * i + (lh if i == len(lines) - 1 else 0)
             if i == len(lines) - 1:
@@ -354,7 +357,7 @@ def fx_bill(c, e):
             d.text((pad, y), ln, font=f, fill=INK + (255,))
         return im
     rec = cached(e, 'r', build)
-    slot_y, sw = c.H * 0.075, c.W * 0.62
+    slot_y, sw = c.H * 0.028, c.W * 0.77
     max_h = max(80, c.fy - c.fw * 1.3 - slot_y)
     s = min(1.0, max_h / rec.height)
     pr = ease_inout(c.lt / (e.d * 0.75)); L = int(rec.height * pr)
