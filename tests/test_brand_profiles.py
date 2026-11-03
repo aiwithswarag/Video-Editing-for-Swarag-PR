@@ -26,7 +26,9 @@ class TestExecutiveBrand(unittest.TestCase):
         self.assertNotIn("brand_cards",apply_brand(plan,"none")[0])
     def test_orbit_user_images_take_priority(self):
         script=(ROOT/"scripts/fx.py").read_text(encoding="utf8")
-        self.assertIn("not f.o.get('images') else load_cards",script)
+        self.assertIn("if f.o.get('brand_cards') and not f.o.get('images')",script)
+        self.assertIn("else load_cards(f.o.get('images'), thumbs)",script)
+        self.assertIn("Approved card media directory does not exist",script)
     def test_no_inherited_creator_defaults(self):
         s=(ROOT/"scripts/fx.py").read_text(encoding="utf8")
         for forbidden in ["'CLAUDE'","'VIBE'","@vibha.in.progress","22 effects","the art of the|effortless edit"]:
