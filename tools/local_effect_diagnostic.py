@@ -162,7 +162,7 @@ def run(source,output,*,only=None):
     report_path=output/"effect-health-report.json"
     report["review_artifact_status"]="PENDING"
     # A gallery, ZIP or thumbnail failure must not erase 42-effect evidence.
-    report_path.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\\n",encoding="utf8")
+    report_path.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\n",encoding="utf8")
     if not only:
         # Even if one original effect crashes, show a genuine partial review
         # sheet with explicit missing/failed slots. Don't hide failed visuals.
