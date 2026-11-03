@@ -163,7 +163,8 @@ def run(source,output,*,only=None):
         # Even if one original effect crashes, show a genuine partial review
         # sheet with explicit missing/failed slots. Don't hide failed visuals.
         make_review_sheet(gallery,review/"all-47-effects.jpg")
-        labels=names+[name for name,_,_ in NAMED_VARIANTS]
+        effect_names,_,_=read_registry()
+        labels=effect_names+[name for name,_,_ in NAMED_VARIANTS]
         report["motion_review"]=create_motion_review(gallery,review,labels)
         if report["motion_review"]["status"]!="MOTION_SAMPLES_AVAILABLE":
             report["technical_status"]="FAIL_OR_INCOMPLETE — MOTION REVIEW ARTIFACTS MISSING"
