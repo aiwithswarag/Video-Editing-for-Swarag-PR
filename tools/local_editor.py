@@ -6,6 +6,7 @@ One-time Docker build prepares FFmpeg/MediaPipe/fonts/models; no external hosted
 service or media uploads. Script and effect timing remain human-verified.
 """
 import base64
+import binascii
 import html
 import json
 import os
@@ -362,8 +363,9 @@ class LocalHandler(api.Handler):
                 self.send_header("X-Content-Type-Options","nosniff")
                 self.send_header("Content-Length",str(len(content)))
                 self.end_headers();self.wfile.write(content)
-            except (ValueError,OSError,RuntimeError,ImportError,subprocess.SubprocessError) as exc:
-                self.answer(422,{"error":"Local composition preview failed: "+str(exc)[:180]})
+            except (ValueError,OSError,RuntimeError,ImportError,binascii.Error,
+                    subprocess.SubprocessError) as exc:
+                self.answer(422,{"error":"Local glass-widget preview failed: "+str(exc)[:180]})
             return
         if urlsplit(self.path).path=="/local/draft":
             if not self.authorized():return
