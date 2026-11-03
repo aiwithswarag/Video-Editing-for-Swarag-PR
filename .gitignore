@@ -9,3 +9,12 @@ models/
 *.webm
 *.words.json
 .DS_Store
+
+# Private local clips, edit plans, transcripts, QA and finished deliverables
+PRIVATE/
+private/
+outputs/
+exports/
+renders/
+*.cue.txt
+*.words.json

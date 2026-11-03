@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "description": "Synthetic example only. These times are NOT from any user's private video.",
+  "reframes": [
+    {
+      "start": 0.3,
+      "end": 1.7,
+      "zoom": 1.075
+    }
+  ]
+}

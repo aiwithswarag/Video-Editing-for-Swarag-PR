@@ -1,0 +1,52 @@
+name: Build private offline ASR runtime
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/offline-asr-runtime.yml'
+jobs:
+  portable-transcriber:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install compiler and tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake build-essential ffmpeg curl ca-certificates
+      - name: Fetch pinned upstream whisper.cpp source
+        run: |
+          git clone -q --filter=blob:none https://github.com/ggml-org/whisper.cpp.git upstream-whisper
+          git -C upstream-whisper checkout -q 284029c07012d2000941a08d38a31ffb71f4734e
+          git -C upstream-whisper rev-parse HEAD
+      - name: Build portable CPU-only whisper-cli
+        run: |
+          cmake -S upstream-whisper -B upstream-whisper/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DWHISPER_BUILD_TESTS=OFF
+          cmake --build upstream-whisper/build --config Release --target whisper-cli --parallel 2
+          ldd upstream-whisper/build/bin/whisper-cli
+      - name: Download English base transcription model (no user data)
+        run: |
+          mkdir -p offline-asr/models offline-asr/licenses
+          curl -fL --retry 3 --retry-delay 3 --connect-timeout 30 --max-time 500 \
+            'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin' \
+            -o offline-asr/models/ggml-base.en.bin
+          test "$(stat -c%s offline-asr/models/ggml-base.en.bin)" -gt 120000000
+          sha256sum offline-asr/models/ggml-base.en.bin | tee offline-asr/model-sha256.txt
+      - name: Package CPU executable and attribution
+        run: |
+          cp upstream-whisper/build/bin/whisper-cli offline-asr/
+          cp upstream-whisper/LICENSE offline-asr/licenses/whisper-cpp-LICENSE
+          cp upstream-whisper/models/README.md offline-asr/licenses/models-README.md
+          printf '%s\n' 'whisper.cpp commit 284029c07012d2000941a08d38a31ffb71f4734e' \
+             'Model: ggml-base.en.bin, English-only. Source: ggerganov/whisper.cpp on Hugging Face.' \
+             'Model/binary only: no customer or personal video/audio files are uploaded or used by this job.' \
+             'Experimental word timestamps require review against original dialogue.' > offline-asr/README.txt
+          ./offline-asr/whisper-cli --help >/dev/null 2>&1 || true
+          ls -lh offline-asr/ offline-asr/models/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whisper-cpp-base-en-cpu
+          path: offline-asr/
+          retention-days: 2
+          compression-level: 0
+          if-no-files-found: error

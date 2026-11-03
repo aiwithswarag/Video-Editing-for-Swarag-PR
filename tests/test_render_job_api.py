@@ -1,0 +1,306 @@
+"""Authenticated Render API transport tests; no private footage or server deployment."""
+import http.client
+import importlib.util
+import json
+import shutil
+import subprocess
+import time
+import sys
+import tempfile
+import threading
+import unittest
+from unittest.mock import patch
+from pathlib import Path
+
+ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT/"tools"))
+spec=importlib.util.spec_from_file_location("render_job_api",ROOT/"tools"/"render_job_api.py")
+mod=importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+
+class RenderAPITransportTests(unittest.TestCase):
+    def setUp(self):
+        self.dir=tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.old_path=mod.JOB_DIR
+        self.old_token=mod.TOKEN
+        mod.JOB_DIR=Path(self.dir.name)
+        mod.TOKEN="x"*48
+        self.server=mod.ThreadingHTTPServer(("127.0.0.1",0),mod.Handler)
+        self.thread=threading.Thread(target=self.server.serve_forever,daemon=True)
+        self.thread.start()
+        self.addCleanup(self._close)
+    def _close(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(5)
+        mod.JOB_DIR=self.old_path
+        mod.TOKEN=self.old_token
+    def request(self,method,path,body=None,auth=True):
+        con=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=6)
+        headers={"Content-Type":"application/json" if isinstance(body,dict) else "application/octet-stream"}
+        if auth:headers["Authorization"]="Bearer "+mod.TOKEN
+        if isinstance(body,dict):
+            body=json.dumps(body).encode()
+        con.request(method,path,body=body,headers=headers)
+        res=con.getresponse()
+        raw=res.read()
+        code=res.status
+        con.close()
+        return code,json.loads(raw.decode())
+    def job(self,verified=False):
+        code,response=self.request("POST","/v1/jobs",{
+            "effects":[{"fx":"backdrop-word","start":5.2,"end":7.3,
+                        "text":"WORLD MODELS"}],
+            "requires_transcript":True,
+            "transcript_verified":verified,
+            "source_clean_confirmed":True})
+        self.assertEqual(201,code,response)
+        return response["id"]
+    def test_authentication_hides_job_and_media(self):
+        self.assertEqual(401,self.request("POST","/v1/jobs",{},auth=False)[0])
+        self.assertEqual(401,self.request("GET","/v1/jobs/"+"0"*32,auth=False)[0])
+        self.assertEqual(404,self.request("GET","/v1/jobs/"+"0"*32)[0])
+    def test_script_cannot_start_without_verified_spoken_words(self):
+        id=self.job(False)
+        movie=b"\x00\x00\x00\x18ftypisom"+b"\x00"*45
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{id}/video",movie)[0])
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{id}/script",b'Actual script')[0])
+        code,payload=self.request("POST",f"/v1/jobs/{id}/start",{})
+        self.assertEqual(409,code)
+        self.assertIn("Verified",payload["error"])
+        self.assertEqual("AWAITING_INPUT",self.request("GET",f"/v1/jobs/{id}")[1]["status"])
+        self.assertEqual(409,self.request("GET",f"/v1/jobs/{id}/master")[0])
+        self.assertEqual(200,self.request("DELETE",f"/v1/jobs/{id}")[0])
+        self.assertEqual(404,self.request("GET",f"/v1/jobs/{id}")[0])
+    def test_full_citation_rag_script_cannot_render_only_slow_push(self):
+        code,info=self.request("POST","/v1/jobs",{
+            "effects":[{"fx":"slow-push","start":0,"end":1,"zoom":1.05}],
+            "requires_transcript":True,"transcript_verified":True,
+            "source_clean_confirmed":True})
+        self.assertEqual(201,code,info)
+        job=info["id"]
+        source=b"\x00\x00\x00\x18ftypisom"+b"\x00"*64
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/video",source)[0])
+        words=b"AI cited a citation. Fictional policies $100 and $150. RAG retrieval documents and the answer may not be current."
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/script",words)[0])
+        code,out=self.request("POST",f"/v1/jobs/{job}/start",{})
+        self.assertEqual(409,code,out)
+        self.assertIn("Incomplete RAG explainer",out["error"])
+        self.assertEqual("AWAITING_INPUT",self.request("GET",f"/v1/jobs/{job}")[1]["status"])
+
+    def test_explicit_rag_mode_cannot_fall_back_to_slow_push(self):
+        status,data=self.request("POST","/v1/jobs",{
+            "video_mode":"rag",
+            "effects":[{"fx":"slow-push","start":0.5,"end":2.0,"zoom":1.04}],
+            "requires_transcript":True,"transcript_verified":True,
+            "source_clean_confirmed":True,
+            "requires_six_section_explainer":False,
+            "rag_storyboard":[]})
+        self.assertEqual(422,status,data)
+        self.assertIn("Six-section explainer required",data["error"])
+
+    def test_six_section_rag_start_imports_cinematic_probe_and_returns_http(self):
+        """Regression: missing scripts/ path crashed request handler ("Failed to fetch")."""
+        from rag_storyboard import compose
+        import cinematic_finish
+        source_script=(
+            "# 0-3 sec | hook\nYour AI cited a source. Can a citation be wrong?\n"
+            "# 3-12 sec | fictional policies\nThese fictional policies: 2024 $100 per night versus 2026 $150 per night.\n"
+            "# 12-20 sec | outdated answer\nAI answers $100, with an outdated 2024 citation.\n"
+            "# 20-33 sec | rag flow\nRAG retrieval searches a document and generates an answer.\n"
+            "# 33-49 sec | verification checks\nCheck version, answer matches source, and authorized access.\n"
+            "# 49-55 sec | closing\nA citation is where verification starts, not ends.\n"
+        )
+        code,info=self.request("POST","/v1/jobs",{
+            "effects":[{"fx":"slow-push","start":0.25,"end":3.45,"zoom":1.055}],
+            "requires_transcript":True,"transcript_verified":True,
+            "source_clean_confirmed":True,"video_mode":"rag",
+            "source_duration":50.4,"script_filename":"rag.txt",
+            "rag_storyboard":compose(source_script,50.4)})
+        self.assertEqual(201,code,info)
+        job=info["id"]
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/video",
+                                    b"\x00\x00\x00\x18ftypisom"+b"\x00"*64)[0])
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/script",
+                                    source_script.encode("utf8"))[0])
+        ran=threading.Event()
+        def fake_producer(id):
+            try:
+                state=mod.metadata(id)
+                state["status"]="REVIEW_REQUIRED"
+                mod.save(id,state)
+            finally:
+                with mod.LIVE:
+                    mod.ACTIVE["id"]=None
+                ran.set()
+        with patch.object(cinematic_finish,"probe",return_value={"duration":50.4}),\
+                patch.object(mod,"run_production",fake_producer):
+            status,response=self.request("POST",f"/v1/jobs/{job}/start",{})
+            self.assertEqual(202,status,response)
+            self.assertTrue(ran.wait(5),"Render thread was not launched")
+        self.assertEqual("REVIEW_REQUIRED",
+                         self.request("GET",f"/v1/jobs/{job}")[1]["status"])
+
+    def test_probe_dependency_errors_return_json_instead_of_dropped_socket(self):
+        """Unexpected RAG video-probe imports must be converted into HTTP errors."""
+        from rag_storyboard import compose
+        script=(
+            "# 0-3 sec | hook\nYour AI cited a source.\n"
+            "# 3-12 sec | fictional policies\nTwo fictional policies, 2024 $100 versus 2026 $150.\n"
+            "# 12-20 sec | outdated citation\nAI answered $100 citing outdated 2024 source.\n"
+            "# 20-33 sec | RAG process\nRAG retrieval searches a document then generates an answer.\n"
+            "# 33-49 sec | three checks\nVersion, answer matches source, authorized access.\n"
+            "# 49-55 sec | closing\nA citation is where verification starts.\n"
+        )
+        code,item=self.request("POST","/v1/jobs",{
+            "video_mode":"rag","source_duration":50.4,"script_filename":"rag.txt",
+            "requires_transcript":True,"transcript_verified":True,
+            "source_clean_confirmed":True,
+            "effects":[{"fx":"slow-push","start":0.2,"end":2.2,"zoom":1.03}],
+            "rag_storyboard":compose(script,50.4)})
+        self.assertEqual(201,code,item)
+        job=item["id"]
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/video",
+                                    b"\x00\x00\x00\x18ftypisom"+b"\x00"*64)[0])
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/script",script.encode())[0])
+        with patch.dict(sys.modules,{"cinematic_finish":None}):
+            status,response=self.request("POST",f"/v1/jobs/{job}/start",{})
+        self.assertEqual(409,status,response)
+        self.assertIn("script-verified explainer",response["error"])
+        self.assertEqual("AWAITING_INPUT",
+                         self.request("GET",f"/v1/jobs/{job}")[1]["status"])
+
+    def test_invalid_mp4_is_rejected_before_processing(self):
+        id=self.job()
+        code,_=self.request("PUT",f"/v1/jobs/{id}/video",b"NOT AN MP4")
+        self.assertEqual(422,code)
+        self.assertFalse((mod.jobdir(id)/"source.mp4").exists())
+    def test_no_absolute_external_effect_asset_paths(self):
+        code,payload=self.request("POST","/v1/jobs",{"effects":[{
+            "fx":"orbit","start":0,"end":1,"images":"/etc/private"
+        }]})
+        self.assertEqual(422,code,payload)
+    def test_old_jobs_are_purged_not_running_jobs(self):
+        id=self.job()
+        state=mod.metadata(id)
+        state["created_at"]=2
+        mod.save(id,state)
+        mod.erase_old_jobs(now=100_000,max_age=100)
+        self.assertFalse(mod.jobdir(id).exists())
+        id2=self.job()
+        state=mod.metadata(id2)
+        state["created_at"]=2
+        state["status"]="RUNNING"
+        mod.save(id2,state)
+        mod.erase_old_jobs(now=100_000,max_age=100)
+        self.assertTrue(mod.jobdir(id2).exists())
+    @unittest.skipUnless(shutil.which("ffmpeg") and (ROOT/"models"/"selfie_segmenter.tflite").is_file(),
+                         "Full FFmpeg/MediaPipe model assets required")
+    def test_private_api_can_render_real_synthetic_mp4(self):
+        source=Path(self.dir.name)/"synthetic.mp4"
+        subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-nostdin","-y",
+            "-f","lavfi","-i","testsrc2=size=360x640:rate=8:duration=2",
+            "-f","lavfi","-i","sine=frequency=400:sample_rate=48000:duration=2",
+            "-c:v","libx264","-preset","ultrafast","-pix_fmt","yuv420p",
+            "-c:a","aac","-shortest",str(source)],check=True)
+        code,info=self.request("POST","/v1/jobs",{
+            "effects":[{"fx":"slow-push","start":0.2,"end":1.5,"zoom":1.05}],
+            "source_clean_confirmed":True,
+            "transcript_verified":True,
+            "requires_transcript":True})
+        self.assertEqual(201,code,info)
+        job=info["id"]
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/video",source.read_bytes())[0])
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/script",b"Verified spoken dialogue")[0])
+        self.assertEqual(202,self.request("POST",f"/v1/jobs/{job}/start",{})[0])
+        deadline=time.monotonic()+180
+        status=None
+        while time.monotonic()<deadline:
+            code,status=self.request("GET",f"/v1/jobs/{job}")
+            if status["status"]!="RUNNING":break
+            time.sleep(.5)
+        self.assertIsNotNone(status)
+        self.assertEqual("REVIEW_REQUIRED",status["status"],status)
+        code,body=self.request("GET",f"/v1/jobs/{job}/qa")
+        self.assertEqual(200,code,body)
+        self.assertEqual("PASS",body["technical_status"])
+        code,release=self.request("GET",f"/v1/jobs/{job}/release")
+        self.assertEqual(200,code)
+        self.assertEqual("CREATIVE_REVIEW_REQUIRED",release["release_status"])
+        # Test token-protected MP4 bytes can be returned to an agent.
+        con=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=60)
+        con.request("GET",f"/v1/jobs/{job}/master",headers={"Authorization":"Bearer "+mod.TOKEN})
+        res=con.getresponse();payload=res.read();con.close()
+        self.assertEqual(200,res.status)
+        self.assertEqual(b"ftyp",payload[4:8])
+        self.assertGreater(len(payload),8000)
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and (ROOT/"models"/"selfie_segmenter.tflite").is_file(),
+                         "Real FFmpeg/MediaPipe/font model assets required")
+    def test_complete_six_section_rag_http_upload_render_and_download(self):
+        """End-to-end browser API contract: authentic engine, six sections, original audio."""
+        from rag_storyboard import compose
+        source_script=(
+            "# 0-3 sec | hook\nYour AI cited a source. Can it still be wrong? Yes.\n"
+            "# 3-12 sec | fictional policy comparison\nTwo fictional policies: 2024 $100 per night; 2026 $150 per night.\n"
+            "# 12-20 sec | outdated AI citation\nAI answers $100 with an outdated 2024 citation.\n"
+            "# 20-33 sec | RAG documents\nRAG retrieval searches a document and generates an answer.\n"
+            "# 33-49 sec | three verification checks\nCheck the version, that the answer matches the source, and authorized access.\n"
+            "# 49-55 sec | final takeaway\nA citation is where verification starts, not where it ends.\n"
+        )
+        original=Path(self.dir.name)/"rag_synthetic.mp4"
+        subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y",
+            "-f","lavfi","-i","testsrc2=size=360x640:rate=8:duration=6",
+            "-f","lavfi","-i","sine=frequency=400:sample_rate=48000:duration=6",
+            "-c:v","libx264","-preset","ultrafast","-pix_fmt","yuv420p",
+            "-c:a","aac","-shortest",str(original)],check=True)
+        status,result=self.request("POST","/v1/jobs",{
+            "video_mode":"rag","source_duration":6,"script_filename":"script.txt",
+            "effects":[{"fx":"slow-push","start":0.2,"end":0.9,"zoom":1.04}],
+            "source_clean_confirmed":True,"requires_transcript":True,
+            "transcript_verified":True,"requires_six_section_explainer":True,
+            "rag_storyboard":compose(source_script,6)})
+        self.assertEqual(201,status,result)
+        job=result["id"]
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/video",original.read_bytes())[0])
+        self.assertEqual(201,self.request("PUT",f"/v1/jobs/{job}/script",source_script.encode())[0])
+        status,response=self.request("POST",f"/v1/jobs/{job}/start",{})
+        self.assertEqual(202,status,response)
+        deadline=time.monotonic()+180
+        state=None
+        while time.monotonic()<deadline:
+            _,state=self.request("GET",f"/v1/jobs/{job}")
+            if state["status"]!="RUNNING":break
+            time.sleep(.5)
+        self.assertIsNotNone(state)
+        self.assertEqual("REVIEW_REQUIRED",state["status"],state)
+        status,qa=self.request("GET",f"/v1/jobs/{job}/qa")
+        self.assertEqual(200,status)
+        self.assertEqual("PASS",qa["technical_status"])
+        self.assertTrue(qa["requires_six_section_explainer"])
+        self.assertEqual(8,qa["rag_graphics_pass"]["graphic_stages"])
+        self.assertEqual(6,len(qa["editorial_sections_covered"]))
+        self.assertEqual(48,qa["qa"]["output_media"]["frames"])
+        self.assertTrue(qa["qa"]["audio_bitstream_identical"])
+        self.assertEqual("rag",qa["video_mode"])
+        self.assertEqual(200,self.request("GET",f"/v1/jobs/{job}/release")[0])
+        con=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=60)
+        con.request("GET",f"/v1/jobs/{job}/master",
+                    headers={"Authorization":"Bearer "+mod.TOKEN})
+        mp4=con.getresponse()
+        header=mp4.read(12)
+        con.close()
+        self.assertEqual(b"ftyp",header[4:8])
+
+    def test_no_script_or_video_leak_in_status(self):
+        id=self.job()
+        code,body=self.request("GET",f"/v1/jobs/{id}")
+        self.assertEqual(200,code)
+        self.assertEqual({"id","status","created_at","finished_at","error",
+                          "master_sha256","effect_names"},set(body))
+        self.assertNotIn("transcript_verified",json.dumps(body))
+
+if __name__=="__main__":
+    unittest.main()

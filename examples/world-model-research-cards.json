@@ -1,0 +1,31 @@
+{
+  "cards": [
+    {
+      "kind": "benchmark",
+      "title": "More history. Better simulated result.",
+      "scope": "RoboCasa GR-1 / task success",
+      "citation": "Long-WAM · arXiv:2610.10528",
+      "source_url": "https://arxiv.org/abs/2610.10528",
+      "caveat": "Benchmark-specific; not real-world proof.",
+      "before": {
+        "label": "0.0 s visual history",
+        "value": 63.3
+      },
+      "after": {
+        "label": "19.2 s visual history",
+        "value": 78.7
+      }
+    },
+    {
+      "kind": "coverage",
+      "title": "A gap in comparison.",
+      "scope": "World-model benchmark survey",
+      "citation": "Jena et al. · arXiv:2609.29669",
+      "source_url": "https://arxiv.org/abs/2609.29669",
+      "caveat": "A measurement gap. Not a verdict.",
+      "contrast": "Explicit world-model vs VLA comparisons",
+      "matched": 11,
+      "total": 160
+    }
+  ]
+}
