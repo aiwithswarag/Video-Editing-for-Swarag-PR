@@ -2120,15 +2120,23 @@ def executive_cards(labels=None):
 
 
 def load_cards(folder, thumbs):
+    """No silent substitution of real user-approved assets with duplicate selfies."""
     out = []
-    if folder and os.path.isdir(folder):
+    if folder:
+        if not os.path.isdir(folder):
+            raise ValueError("Approved card media directory does not exist")
         for n in sorted(os.listdir(folder)):
             p = os.path.join(folder, n); ext = n.lower().rsplit('.', 1)[-1]
-            if ext in ('jpg', 'jpeg', 'png', 'webp'): out.append(Image.open(p).convert('RGB'))
+            if ext in ('jpg', 'jpeg', 'png', 'webp'):
+                with Image.open(p) as source: out.append(source.convert('RGB'))
             elif ext in ('mp4', 'mov', 'm4v', 'webm'):
                 cap = cv2.VideoCapture(p); cap.set(cv2.CAP_PROP_POS_MSEC, 1000); ok, fr = cap.read(); cap.release()
                 if ok: out.append(Image.fromarray(cv2.cvtColor(fr, cv2.COLOR_BGR2RGB)))
-    return out or thumbs
+            if len(out) >= 40: break
+        if not out:
+            raise ValueError("Approved card media directory contains no decodable images or videos")
+        return out
+    return thumbs
 
 
 def main():
@@ -2179,7 +2187,12 @@ def main():
     if sm is None: sm = np.tile([aw / 2, ah * 0.33, aw * 0.15], (len(faces), 1))
     for f in fxs:
         if f.name in CARD_FX:
-            f.cards = executive_cards(f.o.get('labels')) if f.name == 'orbit' and f.o.get('brand_cards') and not f.o.get('images') else load_cards(f.o.get('images'), thumbs)
+            # Explicit original Swarag editorial cards are a credible choice
+            # for abstract concepts. In their absence, raw source thumbnails
+            # remain SHOWCASE fixtures only; premium lint blocks their use.
+            f.cards = (executive_cards(f.o.get('labels'))
+                if f.o.get('brand_cards') and not f.o.get('images')
+                else load_cards(f.o.get('images'), thumbs))
     stills = sorted({int(round(float(s) * fps)) for s in a.still.split(',')}) if a.still else None
     enc = None
     if not stills:
