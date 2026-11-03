@@ -51,6 +51,9 @@ class NativeGlassMotionTest(unittest.TestCase):
             self.assertEqual(["policies","rag-flow","check-3"],report["stage_kinds"])
             self.assertEqual("glass-widgets",report["original_effect"])
             self.assertIn("REVIEW REQUIRED",report["creative_status"])
+            self.assertIn(report["face_change_qc_status"],
+                          ("FACE_UNVERIFIED","NO_MAJOR_FACE_CHANGE_SAMPLED","POSSIBLE_OVERLAY"))
+            self.assertEqual(3,len(report["face_change_samples"]))
             probe=subprocess.run([
                 "ffprobe","-v","error","-show_entries",
                 "stream=codec_type,width,height:format=duration",
