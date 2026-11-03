@@ -159,23 +159,41 @@ def run(source,output,*,only=None):
         for name in only:command+=["--only",name]
     proc=subprocess.run(command,check=False,cwd=ROOT)
     report=report_from_gallery(gallery,duration,start,stream)
+    report_path=output/"effect-health-report.json"
+    report["review_artifact_status"]="PENDING"
+    # A gallery, ZIP or thumbnail failure must not erase 42-effect evidence.
+    report_path.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\\n",encoding="utf8")
     if not only:
         # Even if one original effect crashes, show a genuine partial review
         # sheet with explicit missing/failed slots. Don't hide failed visuals.
-        make_review_sheet(gallery,review/"all-47-effects.jpg")
-        effect_names,_,_=read_registry()
-        labels=effect_names+[name for name,_,_ in NAMED_VARIANTS]
-        report["motion_review"]=create_motion_review(gallery,review,labels)
-        if report["motion_review"]["status"]!="MOTION_SAMPLES_AVAILABLE":
-            report["technical_status"]="FAIL_OR_INCOMPLETE — MOTION REVIEW ARTIFACTS MISSING"
+        try:
+            make_review_sheet(gallery,review/"all-47-effects.jpg")
+            effect_names,_,_=read_registry()
+            labels=effect_names+[name for name,_,_ in NAMED_VARIANTS]
+            report["motion_review"]=create_motion_review(gallery,review,labels)
+            report["review_artifact_status"]=("READY" if
+                report["motion_review"]["status"]=="MOTION_SAMPLES_AVAILABLE" else "INCOMPLETE")
+        except Exception as exc:
+            # Do not leak private file paths, user audio or traces via the UI.
+            report["review_artifact_status"]="FAILED"
+            report["review_artifact_error_type"]=type(exc).__name__
+            report["motion_review"]={"status":"UNAVAILABLE","clips_packaged":0,
+                                    "creative_status":"REVIEW REQUIRED"}
     if only:
+        report["review_artifact_status"]="NOT_REQUESTED_SUBSET"
         report["purpose"]="LIMITED INTERNAL SUBSET TEST — NOT ALL 42 EFFECTS"
         report["technical_status"]="INCOMPLETE_SUBSET" if proc.returncode==0 else "FAIL_OR_INCOMPLETE"
-    (output/"effect-health-report.json").write_text(
+    report_path.write_text(
         json.dumps(report,indent=2,ensure_ascii=False)+"\n",encoding="utf8")
     if not only and proc.returncode==0:
-        subprocess.run([sys.executable,str(ROOT/"tools"/"summarize_gallery.py"),
-                        str(gallery),str(review)],check=True,timeout=80)
+        try:
+            subprocess.run([sys.executable,str(ROOT/"tools"/"summarize_gallery.py"),
+                            str(gallery),str(review)],check=True,timeout=80)
+        except (subprocess.CalledProcessError,subprocess.TimeoutExpired,OSError) as exc:
+            report["supplementary_gallery_status"]="FAILED"
+            report["supplementary_gallery_error_type"]=type(exc).__name__
+            report_path.write_text(
+                json.dumps(report,indent=2,ensure_ascii=False)+"\n",encoding="utf8")
     return report
 
 
