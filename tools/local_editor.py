@@ -423,7 +423,8 @@ class LocalHandler(api.Handler):
                              "layout_preview_required":True,
                              "original_effect_catalog":len(read_registry()[0]),
                              "private_real_camera_42_effect_diagnostic":True,
-                             "effect_qa_build_id":EFFECT_QA_BUILD_ID})
+                             "effect_qa_build_id":EFFECT_QA_BUILD_ID,
+                             "motion_review_build_id":MOTION_REVIEW_BUILD_ID})
             return
         if urlsplit(self.path).path=="/":
             data=PAGE.replace("__LOCAL_BEARER_TOKEN__",html.escape(api.TOKEN,quote=True))
@@ -433,7 +434,7 @@ class LocalHandler(api.Handler):
             data=data.replace("__FACE_SAFE_LAYOUT_ID__",LAYOUT_ID)
             data=data.replace("__GLASS_LEGIBILITY_FIX_ID__",GLASS_LEGIBILITY_FIX_ID)
             data=data.replace("__EFFECT_QA_BUILD_ID__",EFFECT_QA_BUILD_ID)
-        data=data.replace("__MOTION_REVIEW_BUILD_ID__",MOTION_REVIEW_BUILD_ID)
+            data=data.replace("__MOTION_REVIEW_BUILD_ID__",MOTION_REVIEW_BUILD_ID)
             data=data.replace("__ORIGINAL_EFFECT_NAMES__",json.dumps(sorted(read_registry()[0])))
             blob=data.encode("utf-8")
             self.send_response(200)
