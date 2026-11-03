@@ -4,6 +4,7 @@ import argparse
 import json
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -52,7 +53,8 @@ def main():
     # A real decoded source-frame baseline allows us to distinguish "the
     # renderer returned a PNG" from "there was any observable change".
     # Low differences are evidence for manual review, never fabricated PASS.
-    baseline=out/"_unedited_source_baseline.png"
+    baseline_tmp=tempfile.TemporaryDirectory(prefix="swarag_effect_baseline_")
+    baseline=Path(baseline_tmp.name)/"unedited_source_baseline.png"
     subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-nostdin",
            "-y","-ss",str(args.at),"-i",args.video,
            "-vf",f"scale={args.width}:{expected_preview_h}",
@@ -107,6 +109,7 @@ def main():
         print(f"{'PASS' if ok else 'FAIL'} {label} ({statuses[-1]['elapsed_seconds']}s)",flush=True)
     (out/"results.json").write_text(json.dumps(statuses,indent=2),encoding="utf8")
     failed=[s for s in statuses if not s["ok"]]
+    baseline_tmp.cleanup()
     print(f"Results: {len(statuses)-len(failed)}/{len(statuses)} passed")
     if failed:
         for f in failed: print("ERROR",f["effect"],f["log"][-1200:],file=sys.stderr)
