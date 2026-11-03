@@ -67,6 +67,16 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 <button id="download42" style="display:none" type="button">Download effect-by-effect diagnostic JSON</button>
 <button id="download42Motion" style="display:none" type="button">Download all 47 playable effect previews (ZIP)</button>
 <img id="check42MotionSheet" alt="Three sequential frames from each actual original-effect motion clip" style="width:100%;height:auto;display:none;border:1px solid #587283;border-radius:8px">
+<div id="effectClipReview" style="display:none;margin-top:12px;padding:12px;border:1px solid #587283;border-radius:8px">
+<h4>Review each effect in motion (phone-sized playback)</h4>
+<p>The overview sheet is only a directory. Select and play each MP4; inspect eyes, hair, hands, motion and text size. No effect is creatively certified by a technical pass.</p>
+<select id="effectClipPick" aria-label="Select effect for private moving video review"></select>
+<button id="previousClip" type="button">Previous effect</button>
+<button id="playClip" type="button">Play selected effect</button>
+<button id="nextClip" type="button">Next effect</button>
+<video id="effectClipPlayer" controls playsinline preload="none" style="display:none;width:min(100%,360px);max-height:640px;margin-top:10px"></video>
+<pre id="effectClipNotes" aria-live="polite" style="white-space:pre-wrap"></pre>
+</div>
 </div>
 <label>Script (.txt / .md / .docx)</label><input type="file" accept=".txt,.md,.docx" id="script">
 <video id="player" controls playsinline style="display:none"></video>
@@ -239,6 +249,7 @@ el("check42").onclick=async()=>{
  output.textContent="Uploading a private camera sample for the original 42-effect diagnostic...";
  el("check42Sheet").style.display="none";el("download42").style.display="none";
  el("check42MotionSheet").style.display="none";el("download42Motion").style.display="none";
+ el("effectClipReview").style.display="none";
  try{
    const started=await call("/local/effect-diagnostic","POST",file);
    healthJobId=started.id;
@@ -258,6 +269,7 @@ el("check42").onclick=async()=>{
        if(state.review_artifact_error_type)output.textContent+=" ("+state.review_artifact_error_type+")";
        if(state.error)output.textContent+="\n"+state.error;
        if(state.motion_review_status==="MOTION_SAMPLES_AVAILABLE"){
+         enableEffectClipReview(state);
          el("download42Motion").style.display="inline-block";
          try{
            const motionSheet=await call("/local/effect-diagnostic/"+healthJobId+"/motion-sheet","GET",null,true);
@@ -292,6 +304,7 @@ el("recover42").onclick=async()=>{
  output.textContent="Checking previously saved private effect results. No camera footage will be uploaded or rerendered...";
  el("check42Sheet").style.display="none";el("check42MotionSheet").style.display="none";
  el("download42").style.display="none";el("download42Motion").style.display="none";
+ el("effectClipReview").style.display="none";
  try{
    const started=await call("/local/effect-diagnostic/recover-latest","POST");
    healthJobId=started.id;
@@ -309,6 +322,7 @@ el("recover42").onclick=async()=>{
        if(state.review_artifact_error_type)output.textContent+=" ("+state.review_artifact_error_type+")";
        el("download42").style.display="inline-block";
        if(state.motion_review_status==="MOTION_SAMPLES_AVAILABLE"){
+         enableEffectClipReview(state);
          el("download42Motion").style.display="inline-block";
          try{
            const jpg=await call("/local/effect-diagnostic/"+healthJobId+"/motion-sheet","GET",null,true);
@@ -331,6 +345,53 @@ el("recover42").onclick=async()=>{
       "\\nYour original footage remains untouched. You can run a new diagnostic only if previous files have expired."; }
  finally{button.disabled=false;}
 };
+let clipReviewReport=null;
+function enableEffectClipReview(state){
+ if(!healthJobId)return;
+ const select=el("effectClipPick"), old=select.value;
+ select.replaceChildren();
+ (state.effect_labels||[]).forEach(name=>{
+   const option=document.createElement("option");option.value=name;option.textContent=name;
+   select.appendChild(option);
+ });
+ if(old && [...select.options].some(option=>option.value===old))select.value=old;
+ el("effectClipReview").style.display="block";
+ el("effectClipNotes").textContent="Select an effect, then play the original moving MP4. Check eyes and hands over the entire clip. This is a small diagnostic excerpt.";
+ clipReviewReport=null;
+}
+async function playEffectClip(){
+ if(!healthJobId)return;
+ const name=el("effectClipPick").value;
+ if(!/^[a-z0-9-]{1,60}$/.test(name))throw Error("Unrecognized effect label");
+ const player=el("effectClipPlayer");
+ try{
+   const clip=await call("/local/effect-diagnostic/"+healthJobId+"/clip/"+name,"GET",null,true);
+   if(player.src?.startsWith("blob:"))URL.revokeObjectURL(player.src);
+   player.src=URL.createObjectURL(clip);player.style.display="block";player.load();
+   el("effectClipNotes").textContent="Loading individual camera motion: "+name+"...";
+   if(!clipReviewReport){
+     clipReviewReport=await call("/local/effect-diagnostic/"+healthJobId+"/report");
+   }
+   const focus=(clipReviewReport.human_creative_review_focus||{})[name]||[];
+   const fail=[...(clipReviewReport.technically_failed_or_unverified_effects||[]),
+               ...(clipReviewReport.named_looks_failed_or_unverified||[])].includes(name);
+   el("effectClipNotes").textContent=name+" | technical sample: "+(fail?"FAILED/UNVERIFIED":"decoded, not creatively approved")+
+       "\nReview: "+(focus.length?focus.join("\n"):"Check face, hands, typography and movement")+
+       "\nThis 240px excerpt cannot certify your 1080p production render.";
+   try{await player.play();}catch(_err){/* user can press native video Play */}
+ }catch(err){
+   el("effectClipNotes").textContent="Individual video unavailable: "+String(err?.message||err);
+ }
+}
+el("playClip").onclick=playEffectClip;
+for(const [id,step] of [["previousClip",-1],["nextClip",1]]){
+ el(id).onclick=()=>{
+   const select=el("effectClipPick");
+   if(!select.options.length)return;
+   select.selectedIndex=(select.selectedIndex+step+select.options.length)%select.options.length;
+   playEffectClip();
+ };
+}
 el("download42").onclick=async()=>{
  if(!healthJobId)return;
  try{
