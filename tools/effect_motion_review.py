@@ -12,7 +12,11 @@ from pathlib import Path
 from zipfile import ZIP_STORED, ZipFile
 
 from PIL import Image, ImageDraw
-from effect_creative_review import review_focus
+try:
+    from .effect_creative_review import review_focus
+except ImportError:
+    # The localhost worker executes scripts from tools/ directly.
+    from effect_creative_review import review_focus
 
 SAMPLE_RATIOS = (0.15, 0.50, 0.85)
 
