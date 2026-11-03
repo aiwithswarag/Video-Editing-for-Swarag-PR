@@ -16,6 +16,7 @@ from PIL import Image
 from rag_glass_plan import LAYOUT_ID,cue
 from rag_storyboard import validate
 from effect_media_qc import motion_evidence
+from face_motion_qc import inspect_face_change
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -117,6 +118,7 @@ def preview_motion_clip(source, storyboard, output, *, width=540, fps=15):
     with tempfile.TemporaryDirectory(prefix="swarag_private_rag_motion_") as tmp:
         work = Path(tmp)
         rendered = []
+        face_checks = []
         for index, beat in enumerate(selected):
             span = beat["end"] - beat["start"]
             if span < 0.80:
@@ -144,6 +146,8 @@ def preview_motion_clip(source, storyboard, output, *, width=540, fps=15):
             ], cwd=ROOT, check=True, timeout=240)
             if not output_clip.is_file() or output_clip.stat().st_size < 4096:
                 raise RuntimeError("Original RAG glass renderer produced no motion clip")
+            face_report = inspect_face_change(source_clip, output_clip)
+            face_checks.append({"stage": beat["kind"], **face_report})
             rendered.append(output_clip)
         concatenation = work / "preview-list.txt"
         concatenation.write_text(
@@ -158,7 +162,13 @@ def preview_motion_clip(source, storyboard, output, *, width=540, fps=15):
     if not output.is_file() or output.stat().st_size < 4096:
         raise RuntimeError("No playable RAG motion preview was produced")
     technical = motion_evidence(output, width, round(width * 16 / 9), min_frames=10)
+    face_warnings=[item["stage"] for item in face_checks if item["possible_overlays"]]
+    face_unknown=[item["stage"] for item in face_checks if item["face_detections"]==0]
     return {
+        "face_change_qc_status": "POSSIBLE_OVERLAY" if face_warnings else "FACE_UNVERIFIED" if face_unknown else "NO_MAJOR_FACE_CHANGE_SAMPLED",
+        "possible_face_overlay_stages": face_warnings,
+        "face_not_detected_stages": face_unknown,
+        "face_change_samples": face_checks,
         "preview_engine": "original scripts/fx.py via scripts/video_director.py",
         "original_effect": "glass-widgets",
         "look": "rag-evidence",
