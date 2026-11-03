@@ -197,13 +197,56 @@ def run(source,output,*,only=None):
     return report
 
 
+
+def recover_existing(source, output):
+    """Rebuild private review artifacts from a previous completed result manifest.
+
+    Does not extract camera footage or execute any of the 47 effect renders.
+    Fails closed when the manifest is absent; no fabricated PASS results.
+    """
+    source, output = Path(source), Path(output)
+    if not source.is_file():
+        raise FileNotFoundError("Original locally stored video unavailable")
+    gallery=output/"effect-gallery"
+    if not (gallery/"results.json").is_file():
+        raise ValueError("No prior completed 47-effect results manifest exists")
+    duration,stream=probe(source)
+    start,_=sample_window(duration)
+    report=report_from_gallery(gallery,duration,start,stream)
+    report["recovered_without_rerender"]=True
+    report["review_artifact_status"]="PENDING"
+    target=output/"effect-health-report.json"
+    output.mkdir(parents=True,exist_ok=True)
+    target.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\\n",encoding="utf8")
+    try:
+        review=output/"review"
+        make_review_sheet(gallery,review/"all-47-effects.jpg")
+        effect_names,_,_=read_registry()
+        labels=effect_names+[label for label,_,_ in NAMED_VARIANTS]
+        report["motion_review"]=create_motion_review(gallery,review,labels)
+        report["review_artifact_status"]=(
+            "READY" if report["motion_review"]["status"]=="MOTION_SAMPLES_AVAILABLE"
+            else "INCOMPLETE"
+        )
+    except Exception as exc:
+        report["review_artifact_status"]="FAILED"
+        report["review_artifact_error_type"]=type(exc).__name__
+        report["motion_review"]={"status":"UNAVAILABLE","clips_packaged":0,
+                                 "creative_status":"REVIEW REQUIRED"}
+    target.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\\n",encoding="utf8")
+    return report
+
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--video",required=True)
     ap.add_argument("--output-dir",required=True)
     ap.add_argument("--only",action="append",default=[])
+    ap.add_argument("--recover-existing",action="store_true",
+                    help="Reassemble only local saved effect results (no effect rendering)")
     args=ap.parse_args()
-    report=run(args.video,args.output_dir,only=args.only)
+    report=(recover_existing(args.video,args.output_dir) if args.recover_existing
+            else run(args.video,args.output_dir,only=args.only))
     print(json.dumps({
         "technical_status":report["technical_status"],
         "effects_passed":report["technically_passed_effects"],
