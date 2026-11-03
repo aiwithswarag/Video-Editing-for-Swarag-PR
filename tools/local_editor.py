@@ -575,7 +575,7 @@ class LocalHandler(api.Handler):
             data=data.replace("__GLASS_LEGIBILITY_FIX_ID__",GLASS_LEGIBILITY_FIX_ID)
             data=data.replace("__EFFECT_QA_BUILD_ID__",EFFECT_QA_BUILD_ID)
             data=data.replace("__MOTION_REVIEW_BUILD_ID__",MOTION_REVIEW_BUILD_ID)
-        data=data.replace("__EXECUTIVE_CAMERA_QA_BUILD_ID__",EXECUTIVE_CAMERA_QA_BUILD_ID)
+            data=data.replace("__EXECUTIVE_CAMERA_QA_BUILD_ID__",EXECUTIVE_CAMERA_QA_BUILD_ID)
             data=data.replace("__RAG_MOTION_PREVIEW_BUILD_ID__",RAG_MOTION_PREVIEW_BUILD_ID)
             data=data.replace("__ORIGINAL_EFFECT_NAMES__",json.dumps(sorted(read_registry()[0])))
             blob=data.encode("utf-8")
