@@ -96,6 +96,13 @@ def draft(direction,script,duration):
         raise ValueError("Script is too long")
     windows,script_total=beats(script,duration)
     found=requested_names(direction)
+    from rag_storyboard import compose as compose_rag_storyboard
+    semantic_beats=compose_rag_storyboard(script,duration)
+    if semantic_beats and "glass-widgets" in found:
+        # Never invoke the stock 42-effect demo widgets (fake charts, views,
+        # profile badges) for a sourced citation explainer. The producer
+        # creates eight authentic "rag-evidence" glass-widgets automatically.
+        found=[x for x in found if x!="glass-widgets"]
     if not found:
         found=["slow-push"]
     warnings=[
@@ -139,8 +146,6 @@ def draft(direction,script,duration):
     validated=validate_plan(entries,duration)
     # Specialized source-grounded graphic direction complements the original
     # catalog. Other scripts stay on the conservative original-effect path.
-    from rag_storyboard import compose as compose_rag_storyboard
-    semantic_beats=compose_rag_storyboard(script,duration)
     from rag_storyboard import explain_unrecognized,rag_intent
     if rag_intent(script+"\n"+direction) and not semantic_beats:
         # Crucial: never "succeed" with just slow-push when a complete
@@ -148,6 +153,7 @@ def draft(direction,script,duration):
         raise ValueError(explain_unrecognized(script) or
                          "RAG explainer requested but source-backed visual stages are missing")
     if semantic_beats:
+        warnings.append("The actual original fx.py glass-widgets effect (rag-evidence look) is automatically applied across eight storyboard stages, with person-depth masking. No generic stock/demo widgets are added.")
         warnings.append("Recognized all six RAG/citation story sections and prepared eight reviewable graphic stages (the three checks enter sequentially).")
         warnings.append("The fictional 2024/$100 and 2026/$150 figures are copied from YOUR script, not asserted to be real policies.")
         warnings.append("Script-time scaling is provisional. Check each panel against the actual spoken video BEFORE approving the render.")
