@@ -45,7 +45,7 @@ def report(stages,duration,rendered_effects):
         "face_safe_layout":True,
         "subject_depth_mask":True,
         "face_masking_approval":"REVIEW REQUIRED — full real motion and mask QA",
-        "graphics_overlap_camera_pixels":False,
+        "graphics_overlap_camera_pixels":"NOT MEASURED — MediaPipe mask + detector face guard require full-motion review",
         "full_frame_camera_preserved":True,
         "no_fabricated_demo_widgets":True,
         **coverage(valid,duration),
