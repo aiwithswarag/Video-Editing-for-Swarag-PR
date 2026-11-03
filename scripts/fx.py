@@ -1712,9 +1712,16 @@ def match_page(c, e, j, wx, wy):
     im = Image.new('RGB', (W, H), paper); d = ImageDraw.Draw(im); ink = (40, 38, 36)
     base = f.getbbox('Ag'); asc = -base[1]
     ww = f.getlength(word); bx0 = wx - ww / 2
+    # Real business edits may supply their own verified words. Never publish
+    # an apparently cited article assembled from hard-coded synthetic claims.
+    supplied = str(e.o.get('article_text') or '').strip().split()
+    vocabulary = supplied if supplied else MATCH_TXT
+    counter = j * 23
     def run(x, y, direction):
+        nonlocal counter
         while (x < W + size if direction > 0 else x > -size * 6):
-            w_ = rnd.choice(MATCH_TXT) + ' '
+            w_ = vocabulary[counter % len(vocabulary)] + ' '
+            counter += 1
             if direction < 0: x -= f.getlength(w_)
             d.text((x, y), w_, font=f, fill=ink)
             if direction > 0: x += f.getlength(w_)
@@ -1739,6 +1746,11 @@ def match_page(c, e, j, wx, wy):
     box = rrect(ww + 2 * padx, (bb[3] - bb[1]) + 2 * pady + size * 0.08, size * 0.08, red + (255,))
     ImageDraw.Draw(box).text((padx, pady - bb[1]), word, font=bf, fill=(255, 255, 255, 255))
     pg.alpha_composite(box, (int(bx0 - padx), int(wy - asc + bb[1] - pady)))
+    if not supplied:
+        # The matrix is a technical demo, not a real article or endorsement.
+        stamp = ImageDraw.Draw(pg)
+        stamp.text((W * 0.07, H * 0.94), 'SAMPLE TEXT / DEMO',
+                   font=font('uib', W * 0.037), fill=(120, 46, 46, 255))
     return np.asarray(pg.convert('RGB'), np.uint8)
 
 
