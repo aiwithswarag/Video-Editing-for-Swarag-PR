@@ -52,7 +52,7 @@ class EditorialGuardTests(unittest.TestCase):
         self.assertTrue(report['requires_manual_creative_review'])
     def test_explicit_sourced_non_bento_chart_is_allowed_with_review(self):
         item={'fx':'liquid-glass-graph','text':'Hypothetical example',
-              'from':100,'to':150,'start':0,'end':1.7}
+              'from':100,'to':150,'start':0,'end':1.7,'metric_source':'Verified fictional example in supplied script'}
         report=audit([item],3,'premium')
         self.assertNotIn('UNVERIFIED_CHART_METRIC',
                          [e['code'] for e in report['blocking_errors']])
@@ -89,6 +89,24 @@ class EditorialGuardTests(unittest.TestCase):
                            'labels':'EXAMPLE'}],3)
         self.assertIn('UNAPPROVED_REPEATED_MEDIA',
                       [x['code'] for x in fake_cards['blocking_errors']])
+
+    def test_numeric_claims_require_provenance(self):
+        item={'fx':'broll-split','start':0,'end':1.7,
+              'images':'private-approved','text':'4 hours to 4 minutes'}
+        report=audit([item],3)
+        self.assertIn('UNVERIFIED_BROLL_METRIC',
+                      [x['code'] for x in report['blocking_errors']])
+        sourced=audit([{**item,'metric_source':'Original timing study'}],3)
+        self.assertNotIn('UNVERIFIED_BROLL_METRIC',
+                         [x['code'] for x in sourced['blocking_errors']])
+        chart={'fx':'liquid-glass-graph','start':0,'end':1.7,
+               'text':'Retention','from':0,'to':59}
+        report=audit([chart],3)
+        self.assertIn('UNVERIFIED_CHART_PROVENANCE',
+                      [x['code'] for x in report['blocking_errors']])
+        explicitly_hypothetical=audit([{**chart,'hypothetical_example':True}],3)
+        self.assertNotIn('UNVERIFIED_CHART_PROVENANCE',
+                         [x['code'] for x in explicitly_hypothetical['blocking_errors']])
 
     def test_ticket_mobile_copy_and_cover_headlines_are_checked(self):
         ticket={'fx':'the-bill','start':0,'end':1.7,'text':'ONE|TWO|THREE'}
