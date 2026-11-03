@@ -1,5 +1,8 @@
 """The private 47-clip motion review must remain evidence, never approval."""
+import importlib.util
 import json
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -55,6 +58,29 @@ class MotionReviewTests(unittest.TestCase):
             with ZipFile(root / "review" / "all-47-motion-clips.zip") as archive:
                 self.assertNotIn("clips/slow-push.mp4", archive.namelist())
                 self.assertNotIn("clips/orbit.mp4", archive.namelist())
+
+
+@unittest.skipUnless(shutil.which("ffmpeg") and
+                     importlib.util.find_spec("cv2") is not None,
+                     "Real FFmpeg/OpenCV decode runtime required")
+class ActualMotionDecodeTests(unittest.TestCase):
+    def test_ffmpeg_mp4_is_sampled_at_three_distinct_times(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            gallery = root / "gallery"
+            gallery.mkdir()
+            clip = gallery / "slow-push.mp4"
+            subprocess.run([
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin",
+                "-y", "-f", "lavfi",
+                "-i", "testsrc2=size=240x426:rate=8:duration=2",
+                "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                str(clip),
+            ], check=True, timeout=30)
+            result = create_motion_review(gallery, root / "review", ["slow-push"])
+            self.assertEqual("MOTION_SAMPLES_AVAILABLE", result["status"])
+            with Image.open(root / "review" / "all-47-motion-review.jpg") as img:
+                self.assertGreater(img.width, 300)
 
 
 if __name__ == "__main__":
