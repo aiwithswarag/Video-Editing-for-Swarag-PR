@@ -1415,7 +1415,7 @@ def rag_evidence_glass_widgets(c, e):
             panel,d=pane(w,h,accent)
             tx(d,(34*u,43*u),'FICTIONAL / PER NIGHT',pt=28,color=subdued,maxw=w-55*u)
             tx(d,(34*u,103*u),year,pt=47,color=white)
-            tx(d,(w-35*u,105*u),meta,pt=25,color=accent)
+            tx(d,(218*u,109*u),meta,pt=25,color=accent,maxw=w-234*u)
             tx(d,(34*u,163*u),amount,'serif',106,white)
             cx=W*(0.267 if i==0 else 0.733)
             position(panel,cx,card_top,i)
