@@ -22,6 +22,7 @@ import render_job_api as api
 from effect_catalog import read_registry
 from local_director import document_text,draft
 from rag_glass_preview import preview_contact_sheet,LAYOUT_ID
+import local_effect_health_service as effect_health
 
 BUILD_ID="RAG-SIX-SECTION-GUARD-2026-11-02"
 RENDER_BUTTON_FIX_ID="RAG-RENDER-BUTTON-FIX-2026-11-02"
@@ -50,6 +51,14 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 <div class="warning">Uses your actual footage and the same FFmpeg/MediaPipe engine. It does not fake subtitles, voice, or statistics. Script-based timings must be checked before export.</div></header>
 <section><h2>1. Upload and describe</h2>
 <label>Clean original video (.mp4)</label><input type="file" accept=".mp4" id="video">
+<div class="warning" style="margin-top:12px">
+<h3>Check all 42 original effects — before another full render</h3>
+<p>Optional private diagnostic. Tests all 42 effects and five named looks on a short sample of your ACTUAL selected camera video. Reports decode errors, missing audio/frames, and observable single-frame changes. This is not a finished MP4 or artistic certification. No footage goes to GitHub or a hosted service.</p>
+<button id="check42" type="button">Test all 42 effects on my camera footage</button>
+<pre id="check42Status" aria-live="polite" style="display:none"></pre>
+<img id="check42Sheet" alt="Private 42-effect preview contact sheet from your actual original camera video" style="width:100%;height:auto;display:none;border:1px solid #587283;border-radius:8px">
+<button id="download42" style="display:none" type="button">Download effect-by-effect diagnostic JSON</button>
+</div>
 <label>Script (.txt / .md / .docx)</label><input type="file" accept=".txt,.md,.docx" id="script">
 <video id="player" controls playsinline style="display:none"></video>
 <label>Editing mode (required)</label>
@@ -85,7 +94,7 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 const TOKEN="__LOCAL_BEARER_TOKEN__";
 const EFFECTS=__ORIGINAL_EFFECT_NAMES__;
 const el=(id)=>document.getElementById(id);
-let duration=0,jobId=null,previewReady=false;
+let duration=0,jobId=null,previewReady=false,healthJobId=null;
 function status(v){el("output").style.display="block";el("status").textContent=v;}
 async function call(path,method="GET",body=null,blob=false,extraHeaders={}){
  const hdr={"Authorization":"Bearer "+TOKEN,...extraHeaders};
@@ -194,6 +203,50 @@ el("video").addEventListener("change",()=>{
  el("previewImage").style.display="none";
  check();
 });
+el("check42").onclick=async()=>{
+ const button=el("check42"),file=el("video").files[0];
+ if(!file){el("check42Status").style.display="block";el("check42Status").textContent="Select your clean original MP4 above first.";return;}
+ button.disabled=true;
+ const output=el("check42Status");output.style.display="block";
+ output.textContent="Uploading a private camera sample for the original 42-effect diagnostic...";
+ el("check42Sheet").style.display="none";el("download42").style.display="none";
+ try{
+   const started=await call("/local/effect-diagnostic","POST",file);
+   healthJobId=started.id;
+   while(true){
+     await new Promise(done=>setTimeout(done,3500));
+     const state=await call("/local/effect-diagnostic/"+healthJobId);
+     output.textContent="Real-camera effect checks: "+state.effect_checks_completed+"/47 (42 original + 5 named looks). Status: "+state.status+"\\n"+
+        "Tech PASS does not prove professional look or mask safety.";
+     if(state.status==="RUNNING")continue;
+     if(state.technical_status){
+       output.textContent+="\\n"+state.technical_status+"; original effects passed "+state.technically_passed_effects+"/42."+
+          "\\nCreative status: "+state.creative_status;
+       el("download42").style.display="inline-block";
+       if(state.status==="REVIEW_REQUIRED"){
+         const jpg=await call("/local/effect-diagnostic/"+healthJobId+"/contact-sheet","GET",null,true);
+         const image=el("check42Sheet");
+         if(image.src?.startsWith("blob:"))URL.revokeObjectURL(image.src);
+         image.src=URL.createObjectURL(jpg);
+         image.style.display="block";
+       }
+     }else if(state.error)output.textContent+="\\n"+state.error;
+     break;
+   }
+ }catch(err){
+   output.textContent="Diagnostic could not be verified: "+String(err?.message||err)+
+     "\\nIf Docker stopped, inspect Docker Desktop > Containers > swarag-local-editor > Logs. No 42/42 result was certified.";
+ }finally{button.disabled=false;}
+};
+el("download42").onclick=async()=>{
+ if(!healthJobId)return;
+ try{
+ const data=await call("/local/effect-diagnostic/"+healthJobId+"/report","GET",null,true);
+ const url=URL.createObjectURL(data),a=document.createElement("a");
+ a.href=url;a.download="Swarag_42_Effect_Health_Report.json";a.click();
+ setTimeout(()=>URL.revokeObjectURL(url),30000);
+ }catch(err){el("check42Status").textContent=String(err?.message||err);}
+};
 el("draft").onclick=async()=>{try{
  if(!duration||!el("video").files[0]||!el("script").files[0])throw Error("Select an MP4 and matching script first");
  let sc=el("script").files[0];
@@ -304,6 +357,9 @@ class LocalHandler(api.Handler):
         return True
     def do_GET(self):
         if not self.local_request():return
+        if urlsplit(self.path).path.startswith("/local/effect-diagnostic/"):
+            effect_health.get(self,urlsplit(self.path).path)
+            return
         if urlsplit(self.path).path=="/local/version":
             self.answer(200,{"build_id":BUILD_ID,
                              "rag_six_section_guard":True,
@@ -314,7 +370,8 @@ class LocalHandler(api.Handler):
                              "face_safe_layout_id":LAYOUT_ID,
                              "glass_legibility_fix_id":GLASS_LEGIBILITY_FIX_ID,
                              "layout_preview_required":True,
-                             "original_effect_catalog":len(read_registry()[0])})
+                             "original_effect_catalog":len(read_registry()[0]),
+                             "private_real_camera_42_effect_diagnostic":True})
             return
         if urlsplit(self.path).path=="/":
             data=PAGE.replace("__LOCAL_BEARER_TOKEN__",html.escape(api.TOKEN,quote=True))
@@ -335,6 +392,9 @@ class LocalHandler(api.Handler):
         super().do_GET()
     def do_POST(self):
         if not self.local_request():return
+        if urlsplit(self.path).path=="/local/effect-diagnostic":
+            effect_health.begin(self)
+            return
         if urlsplit(self.path).path=="/local/layout-preview":
             if not self.authorized():return
             import io
