@@ -57,6 +57,70 @@ class EditorialGuardTests(unittest.TestCase):
         self.assertNotIn('UNVERIFIED_CHART_METRIC',
                          [e['code'] for e in report['blocking_errors']])
 
+    def test_unsafe_card_recycling_blocks_premium_not_gallery(self):
+        for name in ('noise','orbit','carousel-spin','check-pills',
+                     'profile-wall','phone-fan','broll-split'):
+            with self.subTest(effect=name):
+                item={'fx':name,'start':0,'end':1.7}
+                result=audit([item],3,'premium')
+                self.assertIn('UNAPPROVED_REPEATED_MEDIA',
+                              [x['code'] for x in result['blocking_errors']])
+                showcase=audit([item],3,'showcase')
+                self.assertFalse(showcase['blocking_errors'])
+
+    def test_branded_source_cards_allowed_for_supported_effects(self):
+        for name in ('noise','orbit','carousel-spin','check-pills','phone-fan'):
+            with self.subTest(effect=name):
+                item={'fx':name,'start':0,'end':1.7,'brand_cards':True,
+                      'labels':'STRATEGY|DELIVERY'}
+                report=audit([item],3,'premium')
+                self.assertNotIn('UNAPPROVED_REPEATED_MEDIA',
+                                 [x['code'] for x in report['blocking_errors']])
+
+    def test_broll_needs_real_media_and_sourced_label(self):
+        sample={'fx':'broll-split','start':0,'end':1.7,'images':'private-approved',
+                'text':'CONFIRMED PROCESS'}
+        report=audit([sample],3,'premium')
+        self.assertEqual([],report['blocking_errors'])
+        no_copy=audit([{k:v for k,v in sample.items() if k!='text'}],3)
+        self.assertIn('UNVERIFIED_BROLL_TAG',
+                      [x['code'] for x in no_copy['blocking_errors']])
+        fake_cards=audit([{**sample,'images':'','brand_cards':True,
+                           'labels':'EXAMPLE'}],3)
+        self.assertIn('UNAPPROVED_REPEATED_MEDIA',
+                      [x['code'] for x in fake_cards['blocking_errors']])
+
+    def test_ticket_mobile_copy_and_cover_headlines_are_checked(self):
+        ticket={'fx':'the-bill','start':0,'end':1.7,'text':'ONE|TWO|THREE'}
+        self.assertEqual([],audit([ticket],3,'premium')['blocking_errors'])
+        overflow=audit([{**ticket,'text':'ONE|TWO|THREE|FOUR|FIVE'}],3)
+        self.assertIn('MOBILE_TICKET_OVERFLOW',
+                      [x['code'] for x in overflow['blocking_errors']])
+        for name in ('cover-star','red-collage'):
+            self.assertIn('EDITORIAL_DEMO_COPY',
+                          [x['code'] for x in audit([
+                          {'fx':name,'start':0,'end':1.7,'text':'STRATEGY'}
+                          ],3)['blocking_errors']])
+            approved=audit([{'fx':name,'start':0,'end':1.7,
+                             'text':'STRATEGY','lines':'Delivery|Outcomes'}],3)
+            self.assertNotIn('EDITORIAL_DEMO_COPY',
+                             [x['code'] for x in approved['blocking_errors']])
+
+    def test_verified_custom_article_can_render_premium_match_cut(self):
+        plan=[{'fx':'match-cut','start':0,'end':1.7,
+               'article_text':'Source backed summary provided and checked by editor.',
+               'source_verified':True,'text':'POLICY'}]
+        self.assertNotIn('DEMO_ARTICLE_COPY',
+                         [x['code'] for x in audit(plan,3)['blocking_errors']])
+
+    def test_brand_defaults_supply_explicit_source_neutral_cards(self):
+        from brand_presets import apply_brand
+        result=apply_brand([{'fx':'phone-fan','start':0,'end':1.7}])
+        self.assertTrue(result[0]['brand_cards'])
+        self.assertIn('GOVERNANCE',result[0]['labels'])
+        self.assertNotIn('UNAPPROVED_REPEATED_MEDIA',
+                         [x['code'] for x in audit(result,3)['blocking_errors']])
+
     def test_42_effect_gallery_is_possible_with_manual_override(self):
         from plan_validation import AVAILABLE_EFFECTS
         plan=[{'fx':fx,'start':i*2,'end':i*2+1,'text':'Reviewed'} for i,fx in enumerate(sorted(AVAILABLE_EFFECTS))]
