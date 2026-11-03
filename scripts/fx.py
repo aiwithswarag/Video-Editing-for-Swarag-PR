@@ -124,7 +124,7 @@ def comp(c, layer, x, y, alpha=1.0, behind=False, guard=False):
     L = L[y0 - y:y1 - y, x0 - x:x1 - x]
     a = L[..., 3:4] * alpha
     m = np.clip(c.m[y0:y1, x0:x1, None], 0, 1)
-    if behind or guard:
+    if behind or guard or getattr(c, "face_priority", False):
         # Face geometry is an independent failsafe when MediaPipe misses
         # hair/eyes for a frame. Do not rely on the person mask alone.
         yy, xx = np.ogrid[y0:y1, x0:x1]
@@ -2232,7 +2232,12 @@ def main():
             c.m = cv2.resize(m, (W, H), interpolation=cv2.INTER_LINEAR).astype(np.float32) / 255.0 if m is not None else np.zeros((H, W), np.float32)
             fx_, fy_, fw_ = sm[min(i, len(sm) - 1)]; c.fx, c.fy, c.fw = fx_ * sc, fy_ * sc, max(fw_ * sc, W * 0.05)
             for f in act:
-                c.lt = t - f.start; EFFECTS[f.name][0](c, f)
+                c.lt = t - f.start
+                # Swarag premium rendering prioritizes the real eyes and mouth
+                # even if individual original effects place an unguarded card.
+                # Unbranded original showcase preserves its original behavior.
+                c.face_priority = f.o.get("face_priority") is True
+                EFFECTS[f.name][0](c, f)
             frame = (np.clip(c.img, 0, 1) * 255 + 0.5).astype(np.uint8)
         if stills is not None:
             out = dst if len(stills) == 1 else dst.replace('.png', f'_{t:.2f}.png')
