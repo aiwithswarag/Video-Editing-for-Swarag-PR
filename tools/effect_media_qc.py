@@ -16,8 +16,11 @@ from PIL import Image, ImageChops, ImageStat
 def preview_evidence(path, width, expected_height=None, baseline=None):
     """Verify an actual decoded PNG, report approximate visible pixel change."""
     source=Path(path)
-    if not source.is_file() or source.stat().st_size<1000:
-        raise ValueError("Missing or tiny preview PNG")
+    # A legitimately all-black or all-white PNG compresses to far below
+    # 1 KB; treat it as a decoded low-variance warning, not a missing
+    # render. This also avoids false failing small but valid effect frames.
+    if not source.is_file() or source.stat().st_size<64:
+        raise ValueError("Missing or unreadably short preview PNG")
     try:
         with Image.open(source) as opened:
             opened.verify()
