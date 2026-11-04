@@ -2084,41 +2084,38 @@ def fx_glass_widgets(c, e):
 
 
 @effect('timeline', 'a dark red cinematic grade with an editing timeline, a REC timecode and a glowing playhead')
-def studio_timeline(c, e):
-    """Neutral studio timeline: authentic skin, no simulated red REC cast."""
-    W,H=c.W,c.H
-    al=fade(c,e)*clamp(c.lt/.12)
-    if al<=0: return
-    pw=int(W*.84);ph=int(W*.46)
-    im=rrect(pw,ph,max(6,int(W*.032)),(15,29,41,232))
-    d=ImageDraw.Draw(im)
-    pad=int(W*.052)
-    d.text((pad,ph*.15),str(e.o.get('text','EDIT TIMELINE')).upper()[:26],
-           font=font('uib',W*.052),fill=(236,244,246,255),
-           anchor='lm')
-    d.text((pw-pad,ph*.15),
-           str(e.o.get('sub','SOURCE FOOTAGE'))[:24].upper(),
-           font=font('uim',W*.029),fill=(183,204,209,255),
+def studio_timeline(c,e):
+    """Production timeline with legible tracks, no invented recording timecode."""
+    W=c.W
+    w,h=int(W*.87),int(W*.34)
+    lay=rrect(w,h,max(5,int(W*.025)),(16,31,43,244))
+    d=ImageDraw.Draw(lay)
+    pad=W*.045
+    title=str(e.o.get('text','EDIT TIMELINE')).upper()[:25]
+    f=lines_fit([title],w*.73,'uib',int(W*.049))
+    d.text((pad,W*.061),title,font=font('uib',f),
+           fill=(244,246,245,255),anchor='lm')
+    d.text((w-pad,W*.061),'SOURCE',
+           font=font('uim',int(W*.029)),fill=(188,213,215,255),
            anchor='rm')
-    d.line((pad,ph*.25,pw-pad,ph*.25),fill=(177,197,202,100),
-           width=max(1,W//240))
-    tracks=3
-    progress=clamp(c.lt/max(.2,e.d))
-    for j in range(tracks):
-        top=ph*(.34+j*.18)
-        d.rounded_rectangle((pad,top,pw-pad,top+ph*.11),
-                            radius=int(W*.013),fill=(48,64,78,255))
-        for i in range(3):
-            left=pad+(pw-2*pad)*(i*.32+.01)
-            end=left+(pw-2*pad)*(.23 if j!=1 else .18)
-            fill=(44,154,144,255) if (j+i)%2==0 else (109,132,150,255)
-            d.rounded_rectangle((left,top+ph*.012,end,top+ph*.098),
-                                radius=int(W*.009),fill=fill)
-    playhead=pad+(pw-2*pad)*(.04+.92*progress)
-    d.line((playhead,ph*.28,playhead,ph*.96),
-           fill=(250,239,214,255),width=max(2,W//130))
-    place_safe_panel(c,im,'below',alpha=al,min_scale=.38)
-
+    d.line((pad,W*.111,w-pad,W*.111),
+           fill=(191,208,212,100),width=max(1,W//180))
+    progress=clamp(c.lt/max(e.d,.25))
+    for track in range(2):
+        yy=W*(.14+.085*track)
+        d.rounded_rectangle((pad,yy,w-pad,yy+W*.058),
+                            radius=W*.008,fill=(49,67,82,255))
+        for seg in range(3):
+            x=pad+(w-pad*2)*(.035+.32*seg)
+            end=x+(w-pad*2)*(.25 if track==0 else .19)
+            col=(44,154,144,255) if (track+seg)%2==0 else (130,149,166,255)
+            d.rounded_rectangle((x,yy+W*.007,end,yy+W*.051),
+                                radius=W*.006,fill=col)
+    play=pad+(w-2*pad)*(.03+.94*progress)
+    d.line((play,W*.126,play,W*.312),
+           fill=(249,240,216,255),width=max(2,W//115))
+    place_adaptive_panel(c,lay,'below',
+                         alpha=fade(c,e)*clamp(c.lt/.12),min_scale=.35)
 
 def fx_timeline(c, e):
     studio = globals().get('studio_timeline')
@@ -2228,80 +2225,72 @@ def num_parts(s):
 
 
 @effect('liquid-glass-graph', 'a liquid glass card floats under your chin while a graph climbs and the number counts up')
-def fx_liquid_glass_graph(c, e):
-    if e.o.get('look')=='bento':
-        if getattr(c,'face_priority',False):
-            # A bento layout is deliberately one clear graph plus one useful
-            # concise heading; no partially cropped micro-widgets.
-            previous=e.o.get('look')
-            e.o['look']='standard'
-            try:
-                fx_liquid_glass_graph(c,e)
-            finally:
-                e.o['look']=previous
-            note=rrect(int(c.W*.76),int(c.W*.14),
-                       int(c.W*.023),(20,36,48,233))
-            d=ImageDraw.Draw(note)
-            lab=str(e.o.get('bento_label','ILLUSTRATIVE VIEW'))[:34]
-            d.text((note.width/2,note.height/2),lab,
-                   font=font('uib',c.W*.045),
-                   fill=(235,244,246,255),anchor='mm')
-            place_safe_panel(c,note,'above',
-                             alpha=fade(c,e)*clamp((c.lt-.1)/.15),
-                             min_scale=.42)
-            return
-        return glass_bento(c,e)
-    q=ease_out(c.lt/.4)
-    al=fade(c,e)*clamp(c.lt/.12)
-    if al<=0: return
+def fx_liquid_glass_graph(c,e):
+    """Sourced or clearly illustrative legible graph, with a distinct bento look."""
     W=c.W
-    gw,gh=int(W*.82),int(W*.49)
-    cx,cy,fit=safe_panel_layout(c,gw,gh,'below',min_scale=.36)
-    im=glass(c,gw,gh,gh*.10,cx,cy,amt=.11,
-             tint=(14,29,37),blur=max(6,W//40),dark=.48)
+    bento=e.o.get('look')=='bento'
+    w,h=int(W*.85),int(W*.38)
+    region,cx,cy,_=adaptive_panel_location(c,w,h,'below',min_scale=.34)
+    im=glass(c,w,h,W*.030,cx,cy,amt=.09,
+             tint=(16,35,43),dark=.55,blur=max(5,W//40))
     d=ImageDraw.Draw(im)
-    pad=gw*.08
-    label=str(e.o.get('text','ILLUSTRATIVE TREND')).upper()[:27]
-    d.text((pad,gh*.14),label,font=font('uib',W*.046),
-           fill=(243,250,249,255),anchor='lm')
-    hypothetical=bool(e.o.get('hypothetical_example',False))
-    if hypothetical:
-        d.text((pad,gh*.28),'ILLUSTRATIVE — NOT MEASURED',
-               font=font('uim',W*.027),fill=(252,221,165,255),
-               anchor='lm')
-    elif (getattr(c,'face_priority',False) and
-          not str(e.o.get('metric_source','')).strip()):
-        raise ValueError('GLASS_GRAPH_REQUIRES_VERIFIED_METRIC_SOURCE')
+    pad=W*.041
+    source=str(e.o.get('metric_source','')).strip()
+    illustrative=bool(e.o.get('hypothetical_example'))
+    if getattr(c,'face_priority',False) and not illustrative and not source:
+        raise ValueError('GLASS_GRAPH_REQUIRES_SOURCE_OR_EXPLICIT_ILLUSTRATION')
+    label=str(e.o.get('text','ILLUSTRATIVE TREND')).upper()[:28]
+    label_fs=lines_fit([label],w*.61,'uib',int(W*.044))
+    d.text((pad,W*.068),label,font=font('uib',label_fs),
+           fill=(244,248,246,255),anchor='lm')
+    tag='ILLUSTRATIVE · NOT MEASURED' if illustrative else source[:35].upper()
+    tag_fs=lines_fit([tag],w-pad*2,'uim',int(W*.027))
+    d.text((pad,W*.129),tag,font=font('uim',tag_fs),
+           fill=(242,212,161,255),anchor='lm')
     a,_,_=num_parts(e.o.get('from','0'))
-    b,suf,dp=num_parts(e.o.get('to','0'))
-    val=a+(b-a)*ease_inout((c.lt-.15)/max(.25,e.d*.7))
-    number=f'{val:.{dp}f}{suf}'
-    vf=font('uib',W*.080)
-    d.text((gw-pad,gh*.15),number,font=vf,fill=(240,250,245,255),
-           anchor='rm')
-    low,high=gh*.83,gh*.46
-    x0,x1=pad,gw-pad
-    for i in range(1,4):
-        yy=low-(low-high)*i/3
-        d.line((x0,yy,x1,yy),fill=(255,255,255,42),width=max(1,W//240))
-    t=ease_inout((c.lt-.20)/max(.25,e.d*.70))
-    n=max(1,int(44*t))
-    pts=[(x0+(x1-x0)*j/44,
-          low-(low-high)*(j/44)**1.4) for j in range(n+1)]
+    b,suffix,dp=num_parts(e.o.get('to','0'))
+    g=ease_inout((c.lt-.16)/max(.3,e.d*.72))
+    v=a+(b-a)*g
+    number=f'{v:.{dp}f}{suffix}'
+    vf=lines_fit([number],w*.28,'uib',int(W*.084))
+    d.text((w-pad,W*.067),number,font=font('uib',vf),
+           fill=(242,249,245,255),anchor='rm')
+    x0,x1=pad,w-pad
+    y0,y1=h-W*.040,h*.53
+    for i in range(1,3):
+        y=y0-(y0-y1)*i/3
+        d.line((x0,y,x1,y),fill=(238,248,248,36),width=max(1,W//180))
+    count=max(1,int(44*g))
+    pts=[(x0+(x1-x0)*j/44,y0-(y0-y1)*(j/44)**1.5)
+          for j in range(count+1)]
     accent=rgb(e.o.get('color'),(44,154,144))
     if len(pts)>1:
-        g=Image.new('RGBA',(gw,gh))
-        gd=ImageDraw.Draw(g)
-        gd.polygon(pts+[(pts[-1][0],low),(x0,low)],
-                   fill=accent+(58,))
-        dline=Image.new('RGBA',(gw,gh))
-        ImageDraw.Draw(dline).line(pts,fill=accent+(255,),
-                                   width=max(2,W//95),joint='curve')
-        g.alpha_composite(dline.filter(ImageFilter.GaussianBlur(max(2,W//80))))
-        im.alpha_composite(g)
-        ImageDraw.Draw(im).line(pts,fill=accent+(255,),
-                                width=max(2,W//110),joint='curve')
-    place_safe_panel(c,im,'below',alpha=al,min_scale=.36)
+        under=Image.new('RGBA',(w,h),(0,0,0,0))
+        dd=ImageDraw.Draw(under)
+        dd.polygon(pts+[(pts[-1][0],y0),(x0,y0)],
+                   fill=accent+(42,))
+        im.alpha_composite(under)
+        d=ImageDraw.Draw(im)
+        d.line(pts,fill=accent+(255,),
+               width=max(2,W//95),joint='curve')
+        ox,oy=pts[-1];rad=max(2,W*.011)
+        d.ellipse((ox-rad,oy-rad,ox+rad,oy+rad),
+                  fill=(240,249,247,255))
+    place_safe_panel(c,im,region,
+                     alpha=fade(c,e)*clamp(c.lt/.12),min_scale=.34)
+    if bento:
+        note=str(e.o.get('bento_label',
+             'ILLUSTRATIVE VIEW' if illustrative else 'SOURCE CHECK'))[:33]
+        nw,nh=int(W*.76),int(W*.13)
+        bar=rrect(nw,nh,W*.022,(18,40,54,239))
+        nd=ImageDraw.Draw(bar)
+        ff=lines_fit([note],nw*.88,'uib',int(W*.047))
+        nd.text((nw/2,nh/2),note.upper(),font=font('uib',ff),
+                fill=(242,245,242,255),anchor='mm')
+        # Two independent glass modules define the named bento composition.
+        place_adaptive_panel(c,bar,'above',
+                             alpha=fade(c,e)*clamp((c.lt-.18)/.18),
+                             min_scale=.43)
 
 @effect('carousel-spin', 'your reels spin around you in a 3D carousel, then slow to a stop')
 def fx_carousel_spin(c, e):
@@ -2459,6 +2448,38 @@ def fx_match_cut(c, e):
 @effect('apple-toggles', 'an iPhone settings card under your chin flips its switches on, one line at a time')
 def fx_apple_toggles(c, e):
     rows = e.o.get('text', 'CLARITY|GOVERNANCE|OUTCOMES').split('|')
+    if e.o.get('pos')=='below' and getattr(c,'face_priority',False):
+        # The named BELOW variant is a fully independent compact component:
+        # no shared shadow padding, no top fallback, and no hidden third row.
+        if not 1<=len(rows)<=4:raise ValueError('TOGGLE_ROW_COUNT')
+        W=c.W
+        w=int(W*.78);rh=int(W*.115);h=rh*len(rows)
+        im=rrect(w,h,max(5,int(W*.026)),(249,249,246,252))
+        d=ImageDraw.Draw(im)
+        pad=W*.045;tw=W*.115;th=W*.064
+        for i,label in enumerate(rows):
+            y=(i+.5)*rh
+            ff=lines_fit([label],w-pad*2-tw,'uim',int(W*.046))
+            if ff<int(W*.028):raise ValueError('TOGGLE_LABEL_TOO_LONG')
+            d.text((pad,y),label,font=font('uim',ff),
+                   fill=(22,33,41,255),anchor='lm')
+            if i:d.line((pad,i*rh,w-pad,i*rh),
+                        fill=(213,219,221,255),width=max(1,W//200))
+            t0=.34+.28*i
+            on=ease_out((c.lt-t0)/.21)
+            sx=w-pad-tw
+            col=tuple(int(a*(1-on)+b*on) for a,b in
+                      zip((205,209,212),(44,154,144)))+(255,)
+            d.rounded_rectangle((sx,y-th/2,sx+tw,y+th/2),
+                                radius=th*.50,fill=col)
+            kr=th*.41
+            mid=sx+th/2+(tw-th)*on
+            d.ellipse((mid-kr,y-kr,mid+kr,y+kr),
+                      fill=(255,255,255,255))
+        place_safe_panel(c,im,'below',
+                         alpha=fade(c,e)*clamp(c.lt/.12),
+                         min_scale=.27,max_scale=.92)
+        return
     if e.o.get('pos', 'above') != 'below': face_cam(c, 1 + (float(e.o.get('zoom', 1.12)) - 1) * ease_out(c.lt / 0.5), 0.56)
     if not 1 <= len(rows) <= 4:
         raise ValueError('apple-toggles requires 1–4 short rows')
