@@ -213,9 +213,6 @@
     "comment-box": {
       "look": "bar",
       "graphic_region": "above"
-    },
-    "glitter-spotlight": {
-      "push": 1.03
     }
   },
   "finish_policy": {
