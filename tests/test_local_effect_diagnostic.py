@@ -51,6 +51,34 @@ class DiagnosticReporting(unittest.TestCase):
             self.assertIn(names[9],report["technically_failed_or_unverified_effects"])
 
 
+    def test_failed_effect_includes_exact_reason_and_renderer_fingerprint(self):
+        names,_,_=read_registry()
+        labels=names+[x[0] for x in NAMED_VARIANTS]
+        with tempfile.TemporaryDirectory() as temp:
+            folder=Path(temp)
+            items=[]
+            for label in labels:
+                broken=label=="tier-list"
+                items.append({
+                    "effect":label,"ok":not broken,
+                    "preview":None if broken else label+".png",
+                    "motion":None if broken else label+".mp4",
+                    "log":("Traceback (most recent call last):\\n"
+                           "ValueError: PANEL_DOES_NOT_FIT_BELOW" if broken else ""),
+                    "media_qc":{"full_video_and_audio_decode":not broken},
+                    "preview_qc":{"visible_change_detected_in_sample":not broken}})
+            (folder/"results.json").write_text(json.dumps(items))
+            report=report_from_gallery(folder,50.4,15.624,
+                                        {"width":1080,"height":1920})
+            self.assertEqual(2,report["schema_version"])
+            self.assertEqual(41,report["technically_passed_effects"])
+            self.assertEqual("PANEL_DOES_NOT_FIT_BELOW",
+                  report["per_effect_runtime"]["tier-list"]["error_code"])
+            self.assertFalse(
+                report["per_effect_runtime"]["tier-list"]["preview_rendered"])
+            self.assertRegex(report["renderer_fingerprint_sha256_16"],
+                             r"^[0-9a-f]{16}$")
+
     def _complete_manifest(self, directory):
         names,_,_=read_registry()
         labels=names+[name for name,_,_ in NAMED_VARIANTS]
