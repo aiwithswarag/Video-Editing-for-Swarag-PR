@@ -33,16 +33,18 @@
       "color": "#2C9A90",
       "push": 1.03,
       "graphic_region": "above",
-      "dim": 0.6
+      "dim": 0.38
     },
     "led-sign": {
       "color": "#2C9A90",
       "push": 1.03,
-      "graphic_region": "above"
+      "graphic_region": "above",
+      "dim": 0.3
     },
     "moody": {
-      "grade": "cool",
-      "vignette_strength": 0.16
+      "grade": "warm",
+      "vignette_strength": 0.12,
+      "strength": 0.24
     },
     "scribble": {
       "color": "#2C9A90"
@@ -54,14 +56,14 @@
       "graphic_region": "below"
     },
     "cover-star": {
-      "look": "editorial",
+      "look": "standard",
       "color": "#F5F2EC",
       "accent": "#C5A46D",
       "graphic_region": "above"
     },
     "glass-widgets": {
-      "look": "simple",
-      "dark": 0.55,
+      "look": "standard",
+      "dark": 0.48,
       "grade": "none",
       "graphic_region": "above"
     },
@@ -81,24 +83,24 @@
     "orbit": {
       "brand_cards": true,
       "labels": "STRATEGY|EXECUTION|GOVERNANCE|AI ADOPTION|OUTCOMES|DELIVERY",
-      "count": 4,
-      "size": 0.18,
-      "speed": 0.85,
+      "count": 3,
+      "size": 0.3,
+      "speed": 0.65,
       "graphic_region": "below"
     },
     "noise": {
       "brand_cards": true,
       "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY",
-      "size": 0.23,
+      "size": 0.3,
       "graphic_region": "above",
-      "count": 4
+      "count": 3
     },
     "carousel-spin": {
       "brand_cards": true,
       "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY",
-      "count": 4,
-      "size": 0.24,
-      "turns": 0.38,
+      "count": 3,
+      "size": 0.3,
+      "turns": 0.28,
       "graphic_region": "below"
     },
     "phone-fan": {
@@ -149,7 +151,7 @@
       "graphic_region": "below"
     },
     "shortcut-rain": {
-      "count": 8
+      "count": 4
     },
     "countdown-flip": {
       "from": 3,
@@ -187,7 +189,7 @@
       "cell": 0.017
     },
     "headline-wall": {
-      "count": 3,
+      "count": 2,
       "gap": 0.15,
       "graphic_region": "above"
     },
@@ -218,6 +220,9 @@
     "purpose": "42 registered effects keep their signatures; executive defaults are restrained, script and verified figures override samples; all need real-camera creative review",
     "effects_with_explicit_defaults": 42,
     "graphics_relocate_as_intact_units": true,
-    "verified_claims_required": true
+    "verified_claims_required": true,
+    "visible_panel_gate": true,
+    "missing_effect_policy": "FAIL_RENDER_NOT_SILENT_PASS",
+    "variant_positions_strict": true
   }
 }

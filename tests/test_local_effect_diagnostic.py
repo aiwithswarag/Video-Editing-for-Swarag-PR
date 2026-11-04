@@ -51,6 +51,34 @@ class DiagnosticReporting(unittest.TestCase):
             self.assertIn(names[9],report["technically_failed_or_unverified_effects"])
 
 
+    def test_failed_effect_includes_exact_reason_and_renderer_fingerprint(self):
+        names,_,_=read_registry()
+        labels=names+[x[0] for x in NAMED_VARIANTS]
+        with tempfile.TemporaryDirectory() as temp:
+            folder=Path(temp)
+            items=[]
+            for label in labels:
+                broken=label=="tier-list"
+                items.append({
+                    "effect":label,"ok":not broken,
+                    "preview":None if broken else label+".png",
+                    "motion":None if broken else label+".mp4",
+                    "log":("Traceback (most recent call last):\\n"
+                           "ValueError: PANEL_DOES_NOT_FIT_BELOW" if broken else ""),
+                    "media_qc":{"full_video_and_audio_decode":not broken},
+                    "preview_qc":{"visible_change_detected_in_sample":not broken}})
+            (folder/"results.json").write_text(json.dumps(items))
+            report=report_from_gallery(folder,50.4,15.624,
+                                        {"width":1080,"height":1920})
+            self.assertEqual(2,report["schema_version"])
+            self.assertEqual(41,report["technically_passed_effects"])
+            self.assertEqual("PANEL_DOES_NOT_FIT_BELOW",
+                  report["per_effect_runtime"]["tier-list"]["error_code"])
+            self.assertFalse(
+                report["per_effect_runtime"]["tier-list"]["preview_rendered"])
+            self.assertRegex(report["renderer_fingerprint_sha256_16"],
+                             r"^[0-9a-f]{16}$")
+
     def _complete_manifest(self, directory):
         names,_,_=read_registry()
         labels=names+[name for name,_,_ in NAMED_VARIANTS]
@@ -157,6 +185,42 @@ class RealRendererDiagnosticSubset(unittest.TestCase):
             self.assertFalse((root/"private-health"/"review"/"all-47-effects.jpg").exists())
             for label in ("slow-push","glass-widgets"):
                 self.assertTrue((root/"private-health"/"effect-gallery"/(label+".mp4")).is_file())
+
+
+class SourceRelativeVisualFootprint(unittest.TestCase):
+    @unittest.skipUnless(__import__("importlib").util.find_spec("cv2") is not None,
+                         "OpenCV is required for moving-pixel QA")
+    def test_miniature_panel_is_flagged_and_legible_panel_is_not(self):
+        import numpy as np
+        import cv2
+        from effect_footprint_qc import effect_footprint
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            W,H=240,426
+            base=root/"source.mp4"
+            small=root/"small.mp4"
+            large=root/"large.mp4"
+            paths=(base,small,large)
+            videos=[cv2.VideoWriter(str(p),cv2.VideoWriter_fourcc(*"mp4v"),
+                       8,(W,H)) for p in paths]
+            try:
+                for _ in range(18):
+                    fr=np.full((H,W,3),112,dtype=np.uint8)
+                    tiny=fr.copy()
+                    tiny[370:382,90:120]=(230,230,230)
+                    prominent=fr.copy()
+                    prominent[38:120,30:212]=(230,230,230)
+                    for writer,frame in zip(videos,(fr,tiny,prominent)):
+                        writer.write(frame)
+            finally:
+                for w in videos:w.release()
+            micro=effect_footprint(base,small,label="checklist")
+            visible=effect_footprint(base,large,label="checklist")
+            self.assertIn("VISUAL_FOOTPRINT_TOO_SMALL_FOR_PHONE_REVIEW",
+                          micro["review_flags"])
+            self.assertNotIn("VISUAL_FOOTPRINT_TOO_SMALL_FOR_PHONE_REVIEW",
+                             visible["review_flags"])
+            self.assertEqual("NOT_CERTIFIED",visible["creative_approval"])
 
 
 if __name__=="__main__":unittest.main()

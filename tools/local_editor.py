@@ -8,6 +8,7 @@ service or media uploads. Script and effect timing remain human-verified.
 import base64
 import binascii
 import html
+import hashlib
 import json
 import os
 import secrets
@@ -33,6 +34,14 @@ EFFECT_QA_BUILD_ID="ORIGINAL-42-EFFECT-QA-2026-11-03"
 MOTION_REVIEW_BUILD_ID="ORIGINAL-42-MOTION-REVIEW-2026-11-03"
 EXECUTIVE_CAMERA_QA_BUILD_ID="EXECUTIVE-CAMERA-GALLERY-2026-11-03"
 RAG_MOTION_PREVIEW_BUILD_ID="RAG-MOTION-PREVIEW-2026-11-03"
+CAMERA_FIX_BUILD_ID="47-CAMERA-RENDER-FAIL-CLOSED-2026-11-04-R2"
+
+def renderer_fingerprint():
+    try:
+        return hashlib.sha256((ROOT/"scripts"/"fx.py").read_bytes()).hexdigest()[:16]
+    except OSError:
+        return "unavailable"
+
 
 PAGE = r'''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -52,7 +61,7 @@ pre{white-space:pre-wrap;font-size:13px;color:#dcd4ba;background:#0c1b26;padding
 </style></head><body>
 <header><h1>SWARAG / Free Video Director</h1>
 <p>Private on-device rendering · Original 42 effects · No monthly hosting</p>
-<div class="warning"><b>Editor build:</b> __LOCAL_BUILD_ID__ · <b>UI fix:</b> __RENDER_BUTTON_FIX_ID__ · <b>API fix:</b> __API_START_FIX_ID__ · <b>Creative layout:</b> __FACE_SAFE_LAYOUT_ID__ · <b>Typography:</b> __GLASS_LEGIBILITY_FIX_ID__ · <b>42-effect QA:</b> __EFFECT_QA_BUILD_ID__ · <b>Motion review:</b> __MOTION_REVIEW_BUILD_ID__ · <b>Executive camera samples:</b> __EXECUTIVE_CAMERA_QA_BUILD_ID__ · <b>RAG motion:</b> __RAG_MOTION_PREVIEW_BUILD_ID__ · Six-section RAG explainer detection and incomplete-plan protection enabled. If you do not see this build marker, stop and update your Windows ZIP/Docker image.</div>
+<div class="warning"><b>47-effect layout:</b> __CAMERA_FIX_BUILD_ID__ · Installed renderer: <code>__RENDER_FINGERPRINT__</code></div>\n<div class="warning"><b>Editor build:</b> __LOCAL_BUILD_ID__ · <b>UI fix:</b> __RENDER_BUTTON_FIX_ID__ · <b>API fix:</b> __API_START_FIX_ID__ · <b>Creative layout:</b> __FACE_SAFE_LAYOUT_ID__ · <b>Typography:</b> __GLASS_LEGIBILITY_FIX_ID__ · <b>42-effect QA:</b> __EFFECT_QA_BUILD_ID__ · <b>Motion review:</b> __MOTION_REVIEW_BUILD_ID__ · <b>Executive camera samples:</b> __EXECUTIVE_CAMERA_QA_BUILD_ID__ · <b>RAG motion:</b> __RAG_MOTION_PREVIEW_BUILD_ID__ · Six-section RAG explainer detection and incomplete-plan protection enabled. If you do not see this build marker, stop and update your Windows ZIP/Docker image.</div>
 <div class="warning">Uses your actual footage and the same FFmpeg/MediaPipe engine. It does not fake subtitles, voice, or statistics. Script-based timings must be checked before export.</div></header>
 <section><h2>1. Upload and describe</h2>
 <label>Clean original video (.mp4)</label><input type="file" accept=".mp4" id="video">
@@ -268,6 +277,26 @@ el("check42").onclick=async()=>{
           "; playable clips: "+(state.motion_clips_packaged||0)+"/47.";
        if(state.review_artifact_status)output.textContent+="\nMotion artifact assembly: "+state.review_artifact_status;
        if(state.review_artifact_error_type)output.textContent+=" ("+state.review_artifact_error_type+")";
+       try{
+         const evidence=await call("/local/effect-diagnostic/"+healthJobId+"/report");
+         output.textContent+="\\nRenderer fingerprint: "+(evidence.renderer_fingerprint_sha256_16||"old report/no fingerprint");
+         const bad=Object.entries(evidence.per_effect_runtime||{}).filter(([name,item])=>item.status!=="PASS");
+         if(bad.length)output.textContent+="\\nExact failed/unverified effects: "+
+           bad.map(([name,item])=>name+" ["+(item.error_code||"no code")+"]").join("; ");
+         if(!evidence.renderer_fingerprint_sha256_16)
+           output.textContent+="\\nReport was made by an older build; verify your Docker version.";
+         const footprint=evidence.visual_footprint_review;
+         if(footprint){
+           const flags=Object.entries(footprint.warnings_by_effect||{});
+           output.textContent+="\\nCREATIVE QA IS NOT AUTOMATICALLY APPROVED. Small/low-change effects flagged: "+
+             flags.length+"/47.";
+           if(flags.length)output.textContent+="\\nVisual review priorities: "+
+             flags.map(([name,codes])=>name+" ("+codes.join(", ")+")").join("; ");
+           output.textContent+="\\nThese are source-relative heuristics, not face-mask certification.";
+         }
+
+       }catch(err){output.textContent+="\\nDetailed failure report unreadable: "+String(err?.message||err);}
+
        if(state.error)output.textContent+="\n"+state.error;
        if(state.motion_review_status==="MOTION_SAMPLES_AVAILABLE"){
          enableEffectClipReview(state);
@@ -564,7 +593,9 @@ class LocalHandler(api.Handler):
                              "effect_qa_build_id":EFFECT_QA_BUILD_ID,
                              "motion_review_build_id":MOTION_REVIEW_BUILD_ID,
                              "executive_camera_qa_build_id":EXECUTIVE_CAMERA_QA_BUILD_ID,
-                             "rag_motion_preview_build_id":RAG_MOTION_PREVIEW_BUILD_ID})
+                             "rag_motion_preview_build_id":RAG_MOTION_PREVIEW_BUILD_ID,
+                             "camera_fix_build_id":CAMERA_FIX_BUILD_ID,
+                             "renderer_fingerprint_sha256_16":renderer_fingerprint()})
             return
         if urlsplit(self.path).path=="/":
             data=PAGE.replace("__LOCAL_BEARER_TOKEN__",html.escape(api.TOKEN,quote=True))
@@ -575,6 +606,8 @@ class LocalHandler(api.Handler):
             data=data.replace("__GLASS_LEGIBILITY_FIX_ID__",GLASS_LEGIBILITY_FIX_ID)
             data=data.replace("__EFFECT_QA_BUILD_ID__",EFFECT_QA_BUILD_ID)
             data=data.replace("__MOTION_REVIEW_BUILD_ID__",MOTION_REVIEW_BUILD_ID)
+            data=data.replace("__CAMERA_FIX_BUILD_ID__",CAMERA_FIX_BUILD_ID)
+            data=data.replace("__RENDER_FINGERPRINT__",renderer_fingerprint())
             data=data.replace("__EXECUTIVE_CAMERA_QA_BUILD_ID__",EXECUTIVE_CAMERA_QA_BUILD_ID)
             data=data.replace("__RAG_MOTION_PREVIEW_BUILD_ID__",RAG_MOTION_PREVIEW_BUILD_ID)
             data=data.replace("__ORIGINAL_EFFECT_NAMES__",json.dumps(sorted(read_registry()[0])))

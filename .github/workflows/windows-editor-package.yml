@@ -1,0 +1,66 @@
+name: Windows editor installation package
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Prepare Python for packaging
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify Python syntax before packaging
+        run: python -m compileall -q scripts tools
+
+      - name: Package tracked editor source and release manifest
+        run: python tools/package_windows_release.py --out-dir dist
+
+      - name: Verify archive contents and integrity
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, zipfile
+          dist=Path("dist")
+          archives=list(dist.glob("Swarag_Video_Editor_Windows_*.zip"))
+          assert len(archives)==1,archives
+          archive=archives[0]
+          with zipfile.ZipFile(archive) as z:
+              assert z.testzip() is None
+              names=set(z.namelist())
+              assert "Swarag-Video-Editor/START_FREE_EDITOR_WINDOWS.bat" in names
+              assert "Swarag-Video-Editor/scripts/fx.py" in names
+              assert "Swarag-Video-Editor/tools/local_editor.py" in names
+              assert not any("/PRIVATE/" in x or x.lower().endswith(".mp4") for x in names)
+              build=json.loads(z.read("Swarag-Video-Editor/RELEASE_BUILD_INFO.json"))
+              assert build["registered_original_effects"] == 42
+              assert build["named_looks"] == 5
+              assert build["renderer_fingerprint_sha256_16"] == hashlib.sha256(
+                  z.read("Swarag-Video-Editor/scripts/fx.py")).hexdigest()[:16]
+          checksum=archive.with_suffix(archive.suffix+".sha256").read_text().split()[0]
+          assert checksum == hashlib.sha256(archive.read_bytes()).hexdigest()
+          print("Verified Windows source ZIP:",archive,"sha256:",checksum)
+          PY
+
+      - name: Upload complete Windows editor source package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swarag-Windows-Editor
+          path: |
+            dist/Swarag_Video_Editor_Windows_*.zip
+            dist/*.sha256
+            dist/RELEASE_BUILD_INFO.json
+          if-no-files-found: error
+          retention-days: 30
