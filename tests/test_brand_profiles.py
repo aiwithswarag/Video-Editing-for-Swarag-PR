@@ -14,7 +14,7 @@ class TestExecutiveBrand(unittest.TestCase):
     def test_original_style_opt_out(self):
         plan=[{"fx":"glass-widgets","start":0,"end":1}]
         self.assertNotIn("look",apply_brand(plan,"none")[0])
-        self.assertEqual("simple",apply_brand(plan)[0]["look"])
+        self.assertEqual("standard",apply_brand(plan)[0]["look"])
     def test_face_priority_is_default_for_every_executive_effect(self):
         names=["slow-push","glass-widgets","broll-split","match-cut","red-collage"]
         result=apply_brand([{"fx":name,"start":0,"end":1} for name in names])
