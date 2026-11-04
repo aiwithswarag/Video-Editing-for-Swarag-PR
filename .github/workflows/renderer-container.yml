@@ -21,6 +21,8 @@ on:
       - tests/test_face_motion_qc.py
       - tests/test_effect_face_safe_composition.py
       - tests/test_gallery_creative_fixtures.py
+      - tests/test_42_effect_finish_pass.py
+      - tests/test_effect_finish_contract.py
       - tools/local_editor.py
       - tools/local_director.py
       - .github/workflows/renderer-container.yml
@@ -71,6 +73,10 @@ jobs:
             python -m unittest discover -s tests -p 'test_effect_face_safe_composition.py' -v
           docker run --rm --network none --memory 5g swarag-editor:ci \
             python -m unittest discover -s tests -p 'test_gallery_creative_fixtures.py' -v
+          docker run --rm --network none --memory 5g swarag-editor:ci \
+            python -m unittest discover -s tests -p 'test_42_effect_finish_pass.py' -v
+          docker run --rm --network none --memory 5g swarag-editor:ci \
+            python -m unittest discover -s tests -p 'test_effect_finish_contract.py' -v
 
       - name: Test confidential media is absent from image context
         run: |

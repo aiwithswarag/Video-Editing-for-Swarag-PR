@@ -23,6 +23,7 @@ from effect_catalog import read_registry
 from render_effect_gallery import NAMED_VARIANTS
 from effect_motion_review import create_motion_review
 from effect_creative_review import report_for
+from effect_finish_contract import risk_for
 
 
 def probe(source):
@@ -92,6 +93,7 @@ def report_from_gallery(folder,source_duration,source_start,original_dims):
         "no_visible_change_in_one_sample_frame":low_change,
         "per_effect_review_flags":per_effect_review_flags,
         "human_creative_review_focus":report_for(expected),
+        "effect_by_effect_finish_checklist":{name:risk_for(name) for name in expected},
         "technical_status":("ALL_42_SHORT_SAMPLE_DECODE_PASS" if
             len(passed)==42 and not variant_failed and not absent else
             "FAIL_OR_INCOMPLETE — SEE EFFECT-BY-EFFECT RESULTS"),

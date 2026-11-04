@@ -113,28 +113,121 @@ def shadowed(im, blur=18, dy=10, alpha=120):
 def to_np(im): return np.asarray(im.convert('RGBA'), dtype=np.float32) / 255.0
 
 
+
+# Deliberate editorial layout: move a complete graphic rather than cutting
+# an oval hole in its letters or glass panel. The face box follows the original
+# tracked speaker; these are geometric bounds, not identity recognition.
+_FACE_TOUCH_EFFECTS = frozenset(("locked-on", "scribble", "swipe",
+                                 "pause-point", "dot-reveal", "rabbit-hole",
+                                 "uninstall"))
+
+def face_protection_rect(c):
+    fw = max(float(c.fw), float(c.W) * 0.045, 1.0)
+    margin = max(c.W * 0.035, 3.0)
+    return (c.fx - fw * 1.08 - margin, c.fy - fw * 1.42 - margin,
+            c.fx + fw * 1.08 + margin, c.fy + fw * 1.48 + margin)
+
+
+def overlaps_face(c, x, y, w, h):
+    a, b, d, e = face_protection_rect(c)
+    return (x < d and x + w > a and y < e and y + h > b)
+
+
+def safe_graphic_xy(c, x, y, w, h, preferred=None):
+    """Return full-unit, face-clear top-left or None when it cannot fit.
+
+    Unlike the legacy pixel-mask guard, the text and its background move
+    TOGETHER; no chopped text, transparent forehead or floating UI toggle.
+    """
+    margin = max(c.W * 0.035, 4.0)
+    # Respect entrance/exit motion and large graphics that are already clear.
+    if not overlaps_face(c, x, y, w, h):
+        return (x, y)
+    if w > c.W - margin * 2 or h > c.H - margin * 2:
+        return None
+    def bounded(u, a, b): return max(a, min(b, u))
+    x0 = bounded(x, margin, c.W - w - margin)
+    y0 = bounded(y, margin, c.H - h - margin)
+    if not overlaps_face(c, x0, y0, w, h):
+        return (x0, y0)
+    face_left, face_top, face_right, face_bottom = face_protection_rect(c)
+    top = (c.W / 2 - w / 2, margin)
+    bottom = (c.W / 2 - w / 2, c.H - h - margin)
+    left = (margin, bounded(y, margin, c.H - h - margin))
+    right = (c.W - w - margin, bounded(y, margin, c.H - h - margin))
+    if preferred == 'above': candidates = [top, left, right, bottom]
+    elif preferred == 'below': candidates = [bottom, left, right, top]
+    else: candidates = [top, bottom, left, right]
+    valid = [(cx, cy) for cx, cy in candidates
+             if not overlaps_face(c, cx, cy, w, h)]
+    if not valid: return None
+    if preferred in ('above', 'below'): return valid[0]
+    return min(valid, key=lambda pt: abs(pt[0]-x)+abs(pt[1]-y))
+
+def editorial_headline_anchor(c, image, margin=.042):
+    """Place a complete editorial word only where real negative space exists.
+
+    When the upper strip is too shallow, use lower negative space. If neither
+    zone can hold legible type, omit the unsafe word rather than carve it
+    through the eyes or overlay a synthetic face-shaped black hole.
+    """
+    _, face_top, _, face_bottom = face_protection_rect(c)
+    page_top, page_bottom = c.H*margin, c.H*(1-margin)
+    air=c.H*.018
+    upper=max(0.,face_top-page_top-air)
+    lower=max(0.,page_bottom-face_bottom-air)
+    required=max(c.H*.10,image.height*.55)
+    if upper>=required:
+        scale=min(1.,upper/max(1,image.height))
+        cy=page_top+min(upper,image.height*scale)/2
+        return cy,scale
+    if lower>=required:
+        scale=min(1.,lower/max(1,image.height))
+        cy=page_bottom-image.height*scale/2
+        return cy,scale
+    return 0.,0.
+
+
 def comp(c, layer, x, y, alpha=1.0, behind=False, guard=False):
     """Alpha-composite an RGBA layer with its top-left at (x, y).
     behind=True hides it wherever the person is (so it sits behind you).
     guard=True only hides it where it would cover your face."""
     L = to_np(layer) if isinstance(layer, Image.Image) else layer
     h, w = L.shape[:2]; x, y = int(round(x)), int(round(y))
+    if alpha <= 0: return
+    executive = bool(getattr(c, "face_priority", False))
+    intentional_face_art = getattr(c, "current_fx", None) in _FACE_TOUCH_EFFECTS
+    if executive and not behind and (guard or not intentional_face_art):
+        preferred = getattr(c, "graphic_region", None)
+        pos = safe_graphic_xy(c, x, y, w, h, preferred)
+        if pos is None:
+            # Do not cover the real eyes/mouth or manufacture an oval gap.
+            c.layout_conflicts = getattr(c, "layout_conflicts", 0) + 1
+            return
+        x, y = [int(round(v)) for v in pos]
     x0, y0, x1, y1 = max(0, x), max(0, y), min(c.W, x + w), min(c.H, y + h)
-    if x1 <= x0 or y1 <= y0 or alpha <= 0: return
+    if x1 <= x0 or y1 <= y0: return
     L = L[y0 - y:y1 - y, x0 - x:x1 - x]
     a = L[..., 3:4] * alpha
     m = np.clip(c.m[y0:y1, x0:x1, None], 0, 1)
-    if behind or guard or getattr(c, "face_priority", False):
-        # Face geometry is an independent failsafe when MediaPipe misses
-        # hair/eyes for a frame. Do not rely on the person mask alone.
-        yy, xx = np.ogrid[y0:y1, x0:x1]
-        fw = max(float(c.fw), float(c.W) * 0.045, 1.0)
-        e = ((xx - c.fx) / (fw * 1.07)) ** 2 + ((yy - c.fy) / (fw * 1.43)) ** 2
-        face_protect = np.clip((1.25 - e) / 0.3, 0, 1)[..., None]
-        if behind:
-            a = a * (1 - np.maximum(m, face_protect))
+    if behind:
+        # Actual person segmentation is authoritative where available.
+        # Previous max(mask, face_ellipse) caused an obvious oval halo around
+        # the hair even when the segmentation correctly followed the person.
+        if float(c.m.max()) > 0.08:
+            a = a * (1 - m)
         else:
-            a = a * (1 - face_protect)
+            yy, xx = np.ogrid[y0:y1, x0:x1]
+            fw = max(float(c.fw), float(c.W) * 0.045, 1.0)
+            e = ((xx - c.fx)/(fw*1.08))**2 + ((yy-c.fy)/(fw*1.44))**2
+            fallback = np.clip((1.20-e)/0.30,0,1)[...,None]
+            a = a * (1 - fallback)
+    elif guard and not executive:
+        # Unbranded showcase keeps the historical guarded style.
+        yy, xx = np.ogrid[y0:y1, x0:x1]
+        fw = max(float(c.fw), float(c.W)*0.045, 1.)
+        e = ((xx-c.fx)/(fw*1.07))**2 + ((yy-c.fy)/(fw*1.43))**2
+        a = a * (1 - np.clip((1.25-e)/0.3,0,1)[...,None])
     dst = c.img[y0:y1, x0:x1]
     dst[:] = dst * (1 - a) + L[..., :3] * a
 
@@ -223,7 +316,8 @@ def cached(e, key, fn):
 def fx_noise(c, e):
     cw = int(c.W * float(e.o.get('size', 0.34)))
     def setup():
-        rnd = random.Random(7); n = min(16, max(4, int(e.d / 0.22)))
+        rnd = random.Random(7)
+        n = min(16,max(2,int(e.o['count']))) if 'count' in e.o else min(16,max(4,int(e.d/0.22)))
         return [(rnd.uniform(0.14, 0.86), rnd.uniform(0.12, 0.52), rnd.uniform(-7, 7)) for _ in range(n)]
     pos = cached(e, 'pos', setup)
     cards = cached(e, 'cards', lambda: [card(im if e.o.get('brand_cards') or e.o.get('images') is not None else vary(im, i), cw) for i, im in enumerate(e.cards)])
@@ -308,9 +402,13 @@ def fx_backdrop_word(c, e):
     word = e.o.get('text', 'STRATEGY')
     im = cached(e, 'w', lambda: fit_text(word, c.W * 0.94, e.o.get('font', 'bold'), fill=rgb(e.o.get('color'), CREAM), shadow=10))
     k = ease_back(c.lt / 0.42)
-    y_end = c.fy - c.fw * 1.05
+    if getattr(c, 'face_priority', False):
+        y_end, scale = editorial_headline_anchor(c, im)
+    else:
+        y_end, scale = c.fy - c.fw * 1.05, 1.
     y = -im.height + (y_end + im.height) * k
-    place(c, im, c.W / 2 * 0.6 + c.fx * 0.4, y, alpha=clamp((e.d - c.lt) / 0.2), behind=True)
+    place(c, im, c.W / 2 * 0.6 + c.fx * 0.4, y, scale=scale,
+          alpha=clamp((e.d - c.lt) / 0.2), behind=True)
 
 
 _grid = {}
@@ -328,7 +426,7 @@ def fx_spotlight(c, e):
     xx, yy = grid(c)
     d = ((xx - c.fx) / (c.W * 0.5)) ** 2 + ((yy - (c.fy + c.H * 0.2)) / (c.H * 0.46)) ** 2
     pool = np.clip(1 - d, 0, 1) ** 1.6
-    bright = 1 - k * (1 - (0.2 + 0.45 * pool))
+    bright = 1 - k * float(e.o.get('dim',1.0)) * (1 - (0.2 + 0.45 * pool))
     f = bright * (1 - c.m) + c.m * (1 + 0.04 * k)
     if e.o.get('text'):
         word = e.o['text']; col = rgb(e.o.get('color'), PEACH)
@@ -379,7 +477,7 @@ def fx_bill(c, e):
 def fx_moody(c, e):
     k = ramp(c, e, 0.35, 0)
     c.img = c.img * (1 - k) + grade(c.img, e.o.get('grade', 'moody')) * k
-    vignette(c, 0.4 * k)
+    vignette(c, float(e.o.get('vignette_strength',0.4)) * k)
 
 
 @effect('swipe', 'a before and after slider that sweeps across you')
@@ -399,7 +497,7 @@ def fx_swipe(c, e):
     d.text((r + 2, r + 2), '< >', font=font('mono', r * 0.7), fill=INK + (255,), anchor='mm')
     place(c, shadowed(h, 8, 4, 110), hx, hy)
     for lab, x in (('before', 0.14), ('after', 0.86)):
-        t = text_img(lab, c.W * 0.03, 'serif', INK); pill = rrect(t.width + 16, t.height, t.height / 2, (255, 255, 255, 225))
+        t = text_img(lab, c.W * 0.050, 'uim', INK); pill = rrect(t.width + 16, t.height, t.height / 2, (255, 255, 255, 225))
         pill.alpha_composite(t, (8, 0)); place(c, pill, c.W * x, c.H * 0.88)
 
 
@@ -408,12 +506,17 @@ def fx_todo(c, e):
     items = e.o.get('text', 'Strategy|Execution|Measurable value').split('|')
     # ticks = video seconds when each item gets ticked (e.g. when you say it); default is evenly spaced
     ticks = [float(t) - e.start for t in str(e.o['ticks']).split('|')] if e.o.get('ticks') else [e.d * (i + 1) / (len(items) + 1) for i in range(len(items))]
-    cw = int(c.W * 0.5); lh = int(cw * 0.13); pad = int(cw * 0.07)
+    if not 1 <= len(items) <= 4:
+        raise ValueError('todo requires 1-4 verified short items for readable phone video')
+    cw = int(c.W * 0.72); lh = max(16,int(cw * 0.142)); pad = int(cw * 0.065)
     im = rrect(cw, pad * 2 + lh * (len(items) + 1), cw * 0.07, (250, 248, 242, 235)); d = ImageDraw.Draw(im)
     done = sum(c.lt >= t for t in ticks)
     d.text((pad, pad), e.o.get('title', 'TO DO').upper(), font=font('ui', lh * 0.42), fill=(200, 140, 20, 255))
     d.text((cw - pad, pad), f'{done} of {len(items)}', font=font('ui', lh * 0.36), fill=(120, 120, 120, 255), anchor='ra')
-    f = font('ui', lh * 0.4)
+    f = font('uim', lh * 0.48)
+    for it in items:
+        if f.getlength(it) > cw-pad*2-lh*.80:
+            raise ValueError('todo label is too long for phone-sized display')
     for i, it in enumerate(items):
         y = pad + lh * (i + 1); bx = lh * 0.42
         d.rounded_rectangle([pad, y + lh * 0.12, pad + bx, y + lh * 0.12 + bx], 6, outline=(160, 160, 160, 255), width=3)
@@ -541,12 +644,15 @@ def fx_uninstall(c, e):
     place(c, shadowed(im, 16, 8, 120), c.W / 2, c.H * 0.16, 0.8 + 0.2 * ease_back(c.lt / 0.3), 0, clamp(c.lt / 0.1))
 
 
-def reel_icons(size):
+def reel_icons(size, likes=None, comments=None):
+    """Social-frame icons are decorative; counts need explicit provenance."""
     s = int(size); im = Image.new('RGBA', (s, int(s * 3.6)), (0, 0, 0, 0)); d = ImageDraw.Draw(im); w = max(3, s // 12)
     h = heart(s * 0.8, (255, 255, 255)); im.alpha_composite(h, (int(s * 0.1), 0))
-    d.text((s / 2, s * 0.95), '26.9K', font=font('ui', s * 0.24), fill=(255, 255, 255, 255), anchor='mm')
+    if likes is not None:
+        d.text((s / 2, s * 0.95), str(likes), font=font('ui', s * 0.24), fill=(255, 255, 255, 255), anchor='mm')
     d.ellipse([s * 0.15, s * 1.25, s * 0.85, s * 1.95], outline=(255, 255, 255, 255), width=w)
-    d.text((s / 2, s * 2.15), '412', font=font('ui', s * 0.24), fill=(255, 255, 255, 255), anchor='mm')
+    if comments is not None:
+        d.text((s / 2, s * 2.15), str(comments), font=font('ui', s * 0.24), fill=(255, 255, 255, 255), anchor='mm')
     d.polygon([(s * 0.12, s * 2.75), (s * 0.9, s * 2.45), (s * 0.55, s * 3.25), (s * 0.45, s * 2.88)], outline=(255, 255, 255, 255), width=w)
     return im
 
@@ -566,9 +672,12 @@ def fx_reel_frame(c, e):
     c.img = out
     mm = np.zeros_like(c.m); mm[y0:y0 + ih, x0:x0 + iw] = cv2.resize(c.m, (iw, ih)); c.m = mm
     c.fx, c.fy, c.fw = x0 + c.fx * s, y0 + c.fy * s, c.fw * s
-    ic = cached(e, 'ic', lambda: shadowed(reel_icons(c.W * 0.075), 6, 2, 120))
+    verified=e.o.get('metrics_verified') is True
+    likes=e.o.get('likes') if verified else None
+    comments=e.o.get('comments') if verified else None
+    ic = cached(e, 'ic', lambda: shadowed(reel_icons(c.W * 0.075,likes,comments), 6, 2, 120))
     comp(c, ic, x0 + iw - ic.width - c.W * 0.01, y0 + ih * 0.52, k)
-    hdl = text_img(e.o.get('text', '@your.handle'), c.W * 0.032, 'ui', (255, 255, 255), shadow=4)
+    hdl = text_img(e.o.get('text', '@aiwithswarag'), c.W * 0.036, 'ui', (255, 255, 255), shadow=4)
     comp(c, hdl, x0 + c.W * 0.03, y0 + ih - hdl.height - c.W * 0.04, k)
 
 
@@ -791,7 +900,9 @@ def glass_widgets_v1(c, e):
     a = glass(c, S, S, S * 0.2, mg + S / 2, y_top + S / 2, amt=0.14, dark=gd); d = ImageDraw.Draw(a)
     d.ellipse([S * 0.1, S * 0.115, S * 0.1 + S * 0.06, S * 0.115 + S * 0.06], fill=ORANGE + (255,))
     d.text((S * 0.2, S * 0.145), e.o.get('title', 'Swarag'), font=font('uim', S * 0.085), fill=(255, 255, 255, 235), anchor='lm')
-    d.text((S * 0.08, S * 0.2), e.o.get('text', '42'), font=font('uib', S * 0.44), fill=(255, 255, 255, 255))
+    stat=str(e.o.get('text') or 'DEMO')
+    stat_size=lines_fit([stat], S*.78,'uib', S*.33)
+    d.text((S*.08,S*.25), stat,font=font('uib',stat_size),fill=(255,255,255,255))
     for j, ln in enumerate(e.o.get('sub', 'effects|one clip').split('|')):
         d.text((S * 0.1, S * (0.7 + 0.11 * j)), ln, font=font('uim', S * 0.085), fill=(255, 255, 255, 235))
     place(c, a, mg + S / 2, y_top + S / 2, 0.6 + 0.4 * pop(c, 0.0), 0, al * clamp(c.lt / 0.1), behind=True)
@@ -828,10 +939,20 @@ def fx_red_collage(c, e):
     red = rgb(e.o.get('color'), RED); al = fade(c, e)
     w = cached(e, 'w', lambda: fit_text(e.o.get('text', 'EDIT').upper(), c.W * 0.98, 'uib', 700, fill=red, glow=(red, 34)))
     s = 1.12 - 0.12 * ease_out(c.lt / 0.4)
-    place(c, w, c.W / 2, max(w.height * 0.42, c.fy - c.fw * 1.05), s, 0, clamp(c.lt / 0.12) * al, behind=True)
+    if getattr(c,'face_priority',False):
+        upper,sc = editorial_headline_anchor(c, w)
+        place(c, w, c.W / 2, upper, s*sc, 0, clamp(c.lt / 0.12) * al, behind=True)
+    else:
+        place(c, w, c.W / 2, max(w.height * 0.42, c.fy - c.fw * 1.05),
+              s, 0, clamp(c.lt / 0.12) * al, behind=True)
     lines = e.o.get('lines', 'CLEAR STRATEGY.|SMART EXECUTION.|REAL IMPACT.').split('|')
     size = cached(e, 'sz', lambda: lines_fit(lines, c.W * 0.8, 'uib', int(c.W * 0.14)))
-    y = max(c.H * 0.5, c.fy + c.fw * 1.55)
+    if getattr(c,'face_priority',False):
+        y=min(c.H*.88-len(lines)*size*1.15,
+              max(c.H*.67,c.fy+c.fw*1.55))
+        y=max(c.H*.60,y)
+    else:
+        y=max(c.H*.5,c.fy+c.fw*1.55)
     for j, ln in enumerate(lines):
         im = cached(e, ('l', j), lambda: text_img(ln, size, 'uib', red if j == 1 else (255, 255, 255), shadow=8))
         kk = clamp((c.lt - 0.18 - 0.13 * j) / 0.16)
@@ -872,7 +993,7 @@ def fx_split_headline(c, e):
             x += f.getlength(' ') + (S * 0.12 if core == hl else 0)
     d.rectangle([0, ch - max(5, W // 180), W, ch], fill=col + (255,))
     comp(c, lay, 0, top - ch)
-    pt = text_img(e.o.get('pill', 'in seconds ↗'), W * 0.034, 'uib', (255, 255, 255))
+    pt = text_img(e.o.get('pill', 'KEY POINT'), W * 0.050, 'uib', (255, 255, 255))
     pill = rrect(pt.width + W * 0.02, pt.height * 0.95, pt.height * 0.47, col + (255,)); pill.alpha_composite(pt, (int(W * 0.01), int(-pt.height * 0.025)))
     place(c, shadowed(pill, 10, 4, 80), W * 0.93 - pill.width / 2, top + pill.height * 0.95, 0.6 + 0.4 * pop(c, 0.62), 0, clamp((c.lt - 0.62) / 0.1) * k, guard=True)
 
@@ -890,7 +1011,13 @@ def fx_pastel_word(c, e):
     c.img = c.img * (1 - k) + (you * m + bg * (1 - m)) * k
     word = cached(e, 'w', lambda: fit_text(e.o.get('text', 'INSIGHTS').upper(), W * 0.96, 'uib', 700, fill=(255, 255, 255)))
     dk = ease_out(c.lt / 0.45)
-    place(c, shadowed(word, 24, 12, 60), W / 2, max(word.height * 0.45, c.fy - c.fw * 1.2) - (1 - dk) * H * 0.06, 1, 0, al * clamp(c.lt / 0.15), behind=True)
+    if getattr(c,'face_priority',False):
+        top_y, top_scale = editorial_headline_anchor(c, word)
+    else:
+        top_y, top_scale = max(word.height * 0.45, c.fy - c.fw * 1.2), 1.0
+    place(c, shadowed(word, 24, 12, 60), W / 2,
+          top_y - (1 - dk) * H * 0.06,
+          top_scale, 0, al * clamp(c.lt / 0.15), behind=True)
     cw, chh = W * 0.86, W * 0.15; cy = H * 0.865 + (1 - ease_out((c.lt - 0.15) / 0.35)) * H * 0.2
     card_ = rrect(cw, chh, chh * 0.3, (255, 255, 255, 248)); d = ImageDraw.Draw(card_)
     av = face_chip(c, e, chh * 0.64); card_.alpha_composite(av, (int(chh * 0.18), int((chh - av.height) / 2)))
@@ -927,7 +1054,7 @@ def fx_check_pills(c, e):
         gr = thumb_grid(e.cards, 3, 3, int(bw * 0.28), int(bw * 0.025), i0=i * 3)
         im.alpha_composite(gr, ((bw - gr.width) // 2, int(bw * 0.2))); return shadowed(im, 16, 8, 70)
     b1 = cached(e, 'b1', lambda: board(0, e.o.get('handle', '@aiwithswarag')))
-    b2 = cached(e, 'b2', lambda: board(1, e.o.get('board', 'Projects  ·  42 effects')))
+    b2 = cached(e, 'b2', lambda: board(1, e.o.get('board', 'Illustrative concepts')))
     by = max(H * 0.17, c.fy - c.fw * 0.9)
     place(c, b1, W * 0.25, by, 0.6 + 0.4 * pop(c, 0.0), 8, al * clamp(c.lt / 0.1), behind=True)
     place(c, b2, W * 0.76, by - W * 0.02, 0.6 + 0.4 * pop(c, 0.1), -8, al * clamp((c.lt - 0.1) / 0.1), behind=True)
@@ -1044,7 +1171,11 @@ def fx_tier_list(c, e):
     ttl = cached(e, 'ttl', lambda: fit_text(e.o.get('title', 'best way to edit a reel?'), W * 0.88, 'serif', int(W * 0.11), fill=YELLOW, shadow=8))
     place(c, ttl, W / 2, max(ttl.height * 0.6, c.fy - c.fw * 1.65), 0.9 + 0.1 * ease_out(c.lt / 0.3), 0, al * clamp(c.lt / 0.15), behind=True)
     tiers = [('S', (255, 127, 127)), ('A', (255, 191, 127)), ('B', (255, 223, 127)), ('C', (191, 255, 127)), ('D', (127, 191, 255)), ('F', (191, 127, 255))]
-    cw = int(W * 0.66); rh = int(W * 0.082); pad = int(W * 0.015); chh = pad * 2 + rh * 6 + pad * 5
+    if getattr(c,'face_priority',False) and not e.o.get('all_tiers'):
+        tiers=tiers[:4]
+    cw = int(W * (0.80 if getattr(c,'face_priority',False) else 0.66))
+    rh = int(W * (0.105 if getattr(c,'face_priority',False) else 0.082))
+    pad = int(W * 0.015); chh = pad*2 + rh*len(tiers) + pad*(len(tiers)-1)
     fill = dict(zip('BCDF', e.o.get('others', 'templates|timelines|apps|doing it by hand').split('|')))
     def board():
         im = rrect(cw, chh, W * 0.025, (22, 22, 26, 240)); d = ImageDraw.Draw(im)
@@ -1200,7 +1331,7 @@ def fx_headline_wall(c, e):
         d.polygon([(cw * 0.08, my - s / 2), (cw * 0.08, my + s / 2), (cw * 0.08 + s * 0.9, my)], fill=(255, 48, 64, 255))
         d.text((cw * 0.08 + s * 1.5, my), ('@aiwithswarag  ·  ' + meta) if meta else '@aiwithswarag', font=font('uim', cw * 0.045), fill=fg + (170,), anchor='lm')
         return shadowed(im, 14, 8, 110)
-    N = int(e.o.get('count', 13))
+    N = max(1,min(13,int(e.o.get('count', 13))))
     cards = cached(e, 'cards', lambda: [hcard(i) for i in range(N)])
     pos = cached(e, 'pos', lambda: [(random.Random(i * 7 + 1).uniform(0.2, 0.8), random.Random(i * 7 + 2).uniform(0.07, 0.42), random.Random(i * 7 + 3).uniform(-9, 9)) for i in range(N)])
     gap = float(e.o.get('gap', 0.09))
@@ -1221,8 +1352,9 @@ def fx_headline_wall(c, e):
 @effect('checklist', 'an executive task list builds with animated check marks')
 def fx_checklist(c, e):
     W, H = c.W, c.H; u = W / 1080; al = fade(c, e)
-    rows = [x.split('::') for x in e.o.get('text', 'Found your face::every frame|Cut you out of the room::AI mask|Put the text behind you::depth|'
-                                        'Graded the colour::warm|Rendered in 4K::2160p').split('|')]
+    rows = [x.split('::') for x in e.o.get('text', 'Direction::example|Delivery::example|Outcomes::example').split('|')]
+    if not 1 <= len(rows) <= 4:
+        raise ValueError('checklist requires 1-4 concise, source-verified rows')
     n = len(rows); cw = W * 0.9; rh = 104 * u; hh = 120 * u; chh = hh + rh * n + 26 * u
     y0 = min(max(c.fy + c.fw * 1.35, H * 0.42), H * 0.93 - chh); cy = y0 + chh / 2 + (1 - ease_out(c.lt / 0.35)) * H * 0.12
     span = max(0.4, e.d - 0.55); done_at = [0.3 + span * (i + 1) / n for i in range(n)]
@@ -1301,17 +1433,20 @@ def glass_widgets_v2(c, e):
     a = G(S, S, ax, ay); d = ImageDraw.Draw(a)
     d.ellipse([S * 0.1, S * 0.115, S * 0.16, S * 0.175], fill=ORANGE + (255,))
     d.text((S * 0.2, S * 0.145), e.o.get('title', 'Swarag'), font=font('uim', S * 0.085), fill=white + (235,), anchor='lm')
-    d.text((S * 0.08, S * 0.2), e.o.get('text', '38'), font=font('uib', S * 0.44), fill=white + (255,))
+    stat=str(e.o.get('text') or 'DEMO')
+    stat_size=lines_fit([stat], S*.80,'uib',S*.34)
+    d.text((S*.08,S*.25),stat,font=font('uib',stat_size),fill=white+(255,))
     for j, ln in enumerate(e.o.get('sub', 'effects|one clip').split('|')): d.text((S * 0.1, S * (0.7 + 0.11 * j)), ln, font=font('uim', S * 0.085), fill=white + (235,))
     show(a, ax, ay, 0)
     # 2 · render bar
     bw, bh = 400 * u, 150 * u; bx, by = W - 50 * u - bw / 2, 118 * u + bh / 2
     b = G(bw, bh, bx, by, bh * 0.28); d = ImageDraw.Draw(b); p = ease_inout(c.lt / max(0.3, e.d * 0.85))
     d.ellipse([bh * 0.17, bh * 0.2, bh * 0.28, bh * 0.31], fill=(255, 69, 58, 255))
-    d.text((bh * 0.36, bh * 0.255), 'Rendering', font=font('uim', bh * 0.19), fill=white + (240,), anchor='lm')
+    d.text((bh * 0.36, bh * 0.255), e.o.get('bar_title','Illustrative progress'), font=font('uim', bh * 0.17), fill=white + (240,), anchor='lm')
     d.rounded_rectangle([bh * 0.17, bh * 0.5, bw - bh * 0.17, bh * 0.6], bh * 0.05, fill=white + (70,))
     d.rounded_rectangle([bh * 0.17, bh * 0.5, bh * 0.17 + (bw - bh * 0.34) * max(0.04, p), bh * 0.6], bh * 0.05, fill=white + (245,))
-    d.text((bh * 0.17, bh * 0.78), f"4K render  ·  {int(p * 100)}%", font=font('uim', bh * 0.14), fill=white + (210,), anchor='lm')
+    d.text((bh*.17,bh*.78), 'DEMO WORKFLOW — NOT MEASURED',
+           font=font('uim',bh*.125),fill=white+(210,),anchor='lm')
     show(b, bx, by, 1)
     # 3 · profile
     cy3 = by + bh / 2 + 22 * u + bh / 2
@@ -1359,17 +1494,17 @@ def glass_widgets_v2(c, e):
     # 6 · calendar
     kw, kh = 330 * u, 190 * u; kx, ky = 50 * u + kw / 2, dy + ah / 2 + 26 * u + kh / 2
     ca = G(kw, kh, kx, ky, 40 * u); d = ImageDraw.Draw(ca)
-    d.text((26 * u, 36 * u), e.o.get('day', 'WED'), font=font('uib', 22 * u), fill=(255, 92, 82, 255), anchor='lm')
-    d.text((26 * u, 82 * u), e.o.get('date', '21'), font=font('uib', 56 * u), fill=white + (255,), anchor='lm')
+    d.text((26 * u, 36 * u), e.o.get('day', 'SAMPLE'), font=font('uib', 22 * u), fill=(255, 92, 82, 255), anchor='lm')
+    d.text((26 * u, 82 * u), e.o.get('date', '—'), font=font('uib', 56 * u), fill=white + (255,), anchor='lm')
     d.rounded_rectangle([22 * u, 120 * u, kw - 22 * u, 168 * u], 12 * u, fill=(255, 92, 82, 210))
-    d.text((36 * u, 144 * u), e.o.get('event', 'Review video · today'), font=font('uib', 22 * u), fill=white + (255,), anchor='lm')
+    d.text((36 * u, 144 * u), e.o.get('event', 'Illustrative example'), font=font('uib', 22 * u), fill=white + (255,), anchor='lm')
     show(ca, kx, ky, 5)
     # 7 · 4K ring
     R = 250 * u; rx, ry = W - 50 * u - R / 2, my + mh / 2 + 26 * u + R / 2
     rg = G(R, R, rx, ry, 56 * u); d = ImageDraw.Draw(rg); rp = ease_inout((c.lt - 0.4) / 1.0); rr = R * 0.34
     d.ellipse([R / 2 - rr, R / 2 - rr - 8 * u, R / 2 + rr, R / 2 + rr - 8 * u], outline=white + (60,), width=int(16 * u))
     if rp > 0: d.arc([R / 2 - rr, R / 2 - rr - 8 * u, R / 2 + rr, R / 2 + rr - 8 * u], -90, -90 + 360 * rp, fill=(52, 199, 89, 255), width=int(16 * u))
-    d.text((R / 2, R / 2 - 8 * u), 'HD', font=font('uib', 52 * u), fill=white + (255,), anchor='mm')
+    d.text((R / 2, R / 2 - 8 * u), 'DEMO', font=font('uib', 44 * u), fill=white + (255,), anchor='mm')
     d.text((R / 2, R - 26 * u), 'render', font=font('uim', 20 * u), fill=white + (210,), anchor='mm')
     show(rg, rx, ry, 6)
     # 8 · editorial label (in front)
@@ -1409,26 +1544,11 @@ def rag_evidence_glass_widgets(c, e):
         return font(which, max(8,pt*u))
     def position(panel,cx,top,index=0):
         y=top+panel.height/2.0 - (1-progress)*12*u
-        # Reinforce the genuine MediaPipe person mask with an independent
-        # detector-centred face ellipse. Even if the segmentation confidence
-        # falls on hair/eyes, glass alpha stays zero over the real face.
-        fw=max(float(c.fw),W*.045)
-        x0=max(0,int(c.fx-fw*1.22));x1=min(W,int(c.fx+fw*1.22)+1)
-        y0=max(0,int(c.fy-fw*1.64));y1=min(H,int(c.fy+fw*1.45)+1)
-        if x1<=x0 or y1<=y0:
-            place(c,panel,cx,y,0.965+0.035*progress,0,
-                  alpha*clamp((c.lt-index*.065)/0.18),behind=True)
-            return
-        region=c.m[y0:y1,x0:x1]
-        original_mask=region.copy()
-        yy,xx=np.ogrid[y0:y1,x0:x1]
-        ellipse=((xx-c.fx)/(fw*1.09))**2 + ((yy-c.fy)/(fw*1.42))**2
-        region[:]=np.maximum(original_mask,(ellipse<=1.0).astype(np.float32))
-        try:
-            place(c,panel,cx,y,0.965+0.035*progress,0,
-                  alpha*clamp((c.lt-index*.065)/0.18),behind=True)
-        finally:
-            region[:]=original_mask
+        # No artificial face ellipse: the actual hair/shoulder segmentation
+        # provides behind-subject depth. The old injected oval caused visible
+        # hard-edged gaps through readable glass labels.
+        place(c,panel,cx,y,0.965+0.035*progress,0,
+              alpha*clamp((c.lt-index*.065)/0.18),behind=True)
     def pane(width,height,accent):
         panel=glass(c,width,height,min(width,height)*0.105,
                     W/2,card_top+height/2,
@@ -1708,6 +1828,57 @@ MATCH_TXT = ('one clip went in and every cut came back before lunch while editor
              'matched and the colour finally looked like the room it was shot in nobody opened an editing app all week').split()
 
 
+def match_page_editorial(c, e, page_no):
+    """Source-backed news-card match cut, without a wall of repeated prose.
+
+    The original full-page word-matching effect remains available when the
+    user explicitly selects the unbranded original look. Executive mode uses
+    an actual short excerpt over authentic moving source camera footage.
+    """
+    import textwrap
+    W,H=c.W,c.H
+    bg=Image.fromarray(np.uint8(np.clip(c.img,0,1)*255)).convert('RGBA')
+    face_top=face_protection_rect(c)[1]
+    top=int(H*.045)
+    max_height=max(int(H*.14),min(int(H*.25),int(face_top-top-H*.018)))
+    pw=int(W*.90)
+    ph=max_height
+    if ph<int(W*.26):
+        ph=int(W*.26)
+    panel=rrect(pw,ph,max(6,int(W*.022)),(242,239,233,246))
+    d=ImageDraw.Draw(panel)
+    accent=rgb(e.o.get('color'),(44,154,144))
+    margin=int(W*.047)
+    band=max(2,int(W*.012))
+    d.rectangle((margin,margin,margin+int(W*.15),margin+band),fill=accent+(255,))
+    source_ok=e.o.get('source_verified') is True
+    heading='VERIFIED SOURCE EXCERPT' if source_ok else 'ILLUSTRATIVE / DEMO'
+    d.text((margin,margin+int(W*.022)),heading,font=font('uib',W*.032),fill=(35,52,62,255))
+    word=str(e.o.get('text') or 'EXAMPLE').upper().strip()
+    word=word[:42]
+    title_size=lines_fit([word],pw-margin*2,'uib',int(W*.079))
+    d.text((margin,margin+int(W*.095)),word,font=font('uib',title_size),fill=accent+(255,))
+    supplied=str(e.o.get('article_text') or '').strip()
+    if not supplied: supplied='Demonstration typography only. No article is asserted.'
+    body_size=max(9,int(W*.041))
+    # two lines only, using the actual provided excerpt; long source text
+    # must be shortened by the editor, not tiled into fake article pages.
+    max_chars=max(12,int((pw-margin*2)/(body_size*.62)))
+    wrapped=textwrap.wrap(supplied,width=max_chars,break_long_words=False)
+    for i,line in enumerate(wrapped[:2]):
+        d.text((margin,margin+int(W*.165)+i*body_size*1.22),line,
+               font=font('uim',body_size),fill=(40,48,55,255))
+    if len(wrapped)>2:
+        d.text((pw-margin,ph-int(W*.037)),'EXCERPT',font=font('uim',max(7,int(W*.027))),
+               fill=(90,96,102,255),anchor='rm')
+    # Gentle variation between news cards; no fabricated pages/metrics.
+    if page_no % 2:
+        rule_y=ph-int(W*.03)
+        d.line((margin,rule_y,pw-margin,rule_y),fill=accent+(160,),width=band)
+    bg.alpha_composite(panel,(int((W-pw)/2),top))
+    return np.asarray(bg.convert('RGB'),np.uint8)
+
+
 def match_page(c, e, j, wx, wy):
     """One article page, with the key word in a red box locked at (wx, wy)."""
     W, H = c.W, c.H; rnd = random.Random(31 + j)
@@ -1767,25 +1938,35 @@ def fx_match_cut(c, e):
     wx, wy = cached(e, 'anchor', lambda: (c.W / 2, max(c.H * 0.1, c.fy - c.fw * 1.55)))
     durs = [0.15, 0.15, 0.17, 0.19, 0.22, 0.26, 0.3, 0.45]; t, j = c.lt, 0
     while j < len(durs) - 1 and t > durs[j]: t -= durs[j]; j += 1
-    pg = cached(e, ('pg', j), lambda: match_page(c, e, j, wx, wy)).astype(np.float32) / 255
-    m = c.m[..., None]
-    c.img = c.img * (1 - k) + (pg * (1 - m) + c.img * m) * k
+    if e.o.get('look')=='executive':
+        pg = match_page_editorial(c,e,j).astype(np.float32)/255.
+    else:
+        pg = cached(e, ('pg', j), lambda: match_page(c, e, j, wx, wy)).astype(np.float32)/255.
+    m=c.m[...,None]
+    c.img = c.img*(1-k)+(pg*(1-m)+c.img*m)*k
 
 
 @effect('apple-toggles', 'an iPhone settings card under your chin flips its switches on, one line at a time')
 def fx_apple_toggles(c, e):
     rows = e.o.get('text', 'CLARITY|GOVERNANCE|OUTCOMES').split('|')
     if e.o.get('pos', 'above') != 'below': face_cam(c, 1 + (float(e.o.get('zoom', 1.12)) - 1) * ease_out(c.lt / 0.5), 0.56)
-    W = c.W; cw = int(W * 0.72); rh = int(W * 0.125); ch = rh * len(rows); r = int(W * 0.055)
+    if not 1 <= len(rows) <= 4:
+        raise ValueError('apple-toggles requires 1–4 short rows')
+    W = c.W; cw = int(W * 0.78); rh = int(W * 0.145)
+    ch = rh * len(rows); r = int(W * 0.045)
     tw, th = int(W * 0.135), int(W * 0.08); tx = cw - int(W * 0.05) - tw
     def base():
         im = rrect(cw, ch, r, (255, 255, 255, 250)); d = ImageDraw.Draw(im)
-        f = font('ui', W * 0.05)
+        f = font('uim', W * 0.050)
+        allowed = tx - W * 0.075
         for i, s in enumerate(rows):
+            if f.getlength(s) > allowed:
+                raise ValueError('apple-toggles row is too long for readable phone typography')
             d.text((W * 0.05, i * rh + rh / 2), s, font=f, fill=(18, 18, 20, 255), anchor='lm')
             if i: d.line([(W * 0.05, i * rh), (cw, i * rh)], fill=(222, 222, 226, 255), width=max(2, W // 900))
-        pad = max(10, W // 60) * 2 + W // 90
-        return shadowed(im, max(10, W // 60), W // 90, 110), pad
+        blur = max(4, W // 55)
+        pad = blur * 2 + max(2, W // 120)
+        return shadowed(im, blur, max(2, W // 120), 75), pad
     sh, pad = cached(e, 'base', base)
     ts = [float(x) for x in e.o['ticks'].split('|')] if e.o.get('ticks') else [0.45 + 0.34 * i for i in range(len(rows))]
     im = sh.copy(); d = ImageDraw.Draw(im)
@@ -1800,10 +1981,16 @@ def fx_apple_toggles(c, e):
         d.ellipse([kx - kr, ky - kr, kx + kr, ky + kr], fill=(255, 255, 255, 255))
     q = pop(c, 0.0, 0.38); al = fade(c, e) * clamp(c.lt / 0.1)
     if e.o.get('pos', 'above') == 'below':
-        place(c, im, c.W / 2, min(c.H - ch * 0.75, c.fy + c.fw * 2.5), 0.6 + 0.4 * q, 0, al, guard=True); return
-    # above you, tucked behind your head: your hair overlaps only the bottom edge
-    cy = max(c.H * 0.08 + ch / 2, c.fy - c.fw * 0.95 + c.fw * float(e.o.get('overlap', 0.08)) - ch / 2)
-    place(c, im, c.W / 2, cy + (1 - q) * c.W * 0.04, 0.6 + 0.4 * q, 0, al, behind=True)
+        c.graphic_region = 'below'
+        scale = 0.56 + 0.20 * q if getattr(c,'face_priority',False) else 0.6 + 0.4*q
+        cy = c.H * .84 if getattr(c,'face_priority',False) else min(c.H-ch*.75,c.fy+c.fw*2.5)
+        place(c, im, c.W/2, cy, scale, 0, al, guard=True); return
+    # Keep the ENTIRE settings unit above the eyes. Earlier behind-person
+    # masking literally erased row three, producing a half-toggled panel.
+    c.graphic_region = 'above'
+    scale = 0.65 + .20*q if getattr(c,'face_priority',False) else 0.6+.4*q
+    cy = c.H*.135 if getattr(c,'face_priority',False) else max(c.H*.08+ch/2,c.fy-c.fw*.95-ch/2)
+    place(c, im, c.W/2, cy+(1-q)*c.W*.025, scale, 0, al, guard=True)
 
 
 @effect('led-sign', 'the lights drop and a glowing LED sign types itself out behind you')
@@ -1836,7 +2023,10 @@ def fx_led_sign(c, e):
     glow = cv2.GaussianBlur(pan, (0, 0), cell * 0.9)
     pan = np.clip(pan + glow * 1.6, 0, 1)
     ph, pw = pan.shape[:2]; x0 = int(c.W / 2 - pw / 2)
-    y0 = int(max(c.H * 0.03, c.fy - c.fw * 0.75 - ph))
+    y0 = int(max(c.H*.03, min(c.H*.11,
+              face_protection_rect(c)[1]-ph-c.H*.018))
+              if getattr(c,'face_priority',False)
+              else max(c.H*.03,c.fy-c.fw*.75-ph))
     xx, yy = grid(c)
     d = ((xx - c.fx) / (c.W * 0.6)) ** 2 + ((yy - (c.fy + c.H * 0.25)) / (c.H * 0.55)) ** 2
     bright = 1 - k * (0.84 - 0.3 * np.clip(1 - d, 0, 1))
@@ -2237,6 +2427,8 @@ def main():
                 # even if individual original effects place an unguarded card.
                 # Unbranded original showcase preserves its original behavior.
                 c.face_priority = f.o.get("face_priority") is True
+                c.current_fx = f.name
+                c.graphic_region = f.o.get("graphic_region")
                 EFFECTS[f.name][0](c, f)
             frame = (np.clip(c.img, 0, 1) * 255 + 0.5).astype(np.uint8)
         if stills is not None:

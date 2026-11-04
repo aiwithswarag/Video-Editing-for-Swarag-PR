@@ -33,6 +33,15 @@ DIAGNOSTIC_CARD_FX = frozenset((
 ILLUSTRATIVE_LABELS = ("STRATEGY|EXECUTION|GOVERNANCE|"
                        "DELIVERY|MEASURABLE VALUE|AI ADOPTION")
 SAFE_EXAMPLE_TEXT = {
+    "lineup":{"text":"STRATEGY|EXECUTION|OUTCOMES"},
+    "check-pills":{"text":"DIRECTION|DELIVERY|VALUE"},
+    "apple-toggles":{"text":"CLARITY|GOVERNANCE|OUTCOMES"},
+    "todo":{"text":"STRATEGY|EXECUTION|VALUE"},
+    "tier-list":{"title":"ILLUSTRATIVE PRIORITIES",
+                 "item":"Delivery","others":"Planning|Governance|Execution|Examples"},
+    "comment-box":{"text":"EXAMPLE"},
+    "reel-frame":{"text":"@aiwithswarag"},
+    "headline-box":{"text":"Strategy into|execution"},
     "the-bill": {"text":"SWARAG DEMO|STRATEGY|EXECUTION|OUTCOMES"},
     "cover-star": {"text":"EXECUTION",
                    "lines":"STRATEGY|DELIVERY|EXAMPLE ONLY",

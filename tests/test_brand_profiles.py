@@ -7,7 +7,7 @@ from brand_presets import apply_brand
 class TestExecutiveBrand(unittest.TestCase):
     def test_brand_applies(self):
         out=apply_brand([{"fx":"backdrop-word","start":0,"end":1,"text":"Outcome"}])
-        self.assertEqual("#C5A46D",out[0]["color"])
+        self.assertEqual("#B79660",out[0]["color"])
     def test_explicit_preference_wins(self):
         plan=[{"fx":"backdrop-word","start":0,"end":1,"color":"#FFFFFF"}]
         self.assertEqual("#FFFFFF",apply_brand(plan)[0]["color"])

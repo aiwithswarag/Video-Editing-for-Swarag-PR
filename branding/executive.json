@@ -25,60 +25,199 @@
   ],
   "effect_defaults": {
     "backdrop-word": {
-      "color": "#C5A46D"
+      "color": "#B79660",
+      "font": "serif",
+      "graphic_region": "above"
     },
     "spotlight": {
-      "color": "#2C9A90"
+      "color": "#2C9A90",
+      "push": 1.03,
+      "graphic_region": "above",
+      "dim": 0.6
     },
     "led-sign": {
-      "color": "#2C9A90"
+      "color": "#2C9A90",
+      "push": 1.03,
+      "graphic_region": "above"
     },
     "moody": {
-      "grade": "cool"
+      "grade": "cool",
+      "vignette_strength": 0.16
     },
     "scribble": {
       "color": "#2C9A90"
     },
     "reject-stamp": {
-      "color": "#C5A46D"
+      "color": "#17283E",
+      "angle": 4,
+      "y": 0.78,
+      "graphic_region": "below"
     },
     "cover-star": {
       "look": "editorial",
       "color": "#F5F2EC",
-      "accent": "#C5A46D"
+      "accent": "#C5A46D",
+      "graphic_region": "above"
     },
     "glass-widgets": {
       "look": "simple",
-      "dark": 0.5
+      "dark": 0.55,
+      "grade": "none",
+      "graphic_region": "above"
     },
     "liquid-glass-graph": {
-      "color": "#2C9A90"
+      "color": "#2C9A90",
+      "graphic_region": "below"
     },
     "match-cut": {
-      "color": "#2C9A90"
+      "color": "#2C9A90",
+      "look": "executive",
+      "graphic_region": "above"
     },
     "red-collage": {
-      "color": "#C5A46D"
+      "color": "#B79660",
+      "graphic_region": "below"
     },
     "orbit": {
       "brand_cards": true,
-      "labels": "STRATEGY|EXECUTION|GOVERNANCE|AI ADOPTION|OUTCOMES|DELIVERY"
+      "labels": "STRATEGY|EXECUTION|GOVERNANCE|AI ADOPTION|OUTCOMES|DELIVERY",
+      "count": 4,
+      "size": 0.18,
+      "speed": 0.85,
+      "graphic_region": "below"
     },
     "noise": {
       "brand_cards": true,
-      "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY"
+      "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY",
+      "size": 0.23,
+      "graphic_region": "above",
+      "count": 4
     },
     "carousel-spin": {
       "brand_cards": true,
-      "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY"
+      "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY",
+      "count": 4,
+      "size": 0.24,
+      "turns": 0.38,
+      "graphic_region": "below"
     },
     "phone-fan": {
       "brand_cards": true,
-      "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY"
+      "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY",
+      "graphic_region": "below"
     },
     "check-pills": {
       "brand_cards": true,
-      "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY"
+      "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY",
+      "graphic_region": "above"
+    },
+    "lineup": {
+      "graphic_region": "above"
+    },
+    "locked-on": {
+      "zoom": 1.1,
+      "text": "FOCUS"
+    },
+    "lean-in": {
+      "zoom": 1.11,
+      "speed": 0.28
+    },
+    "the-bill": {
+      "graphic_region": "above"
+    },
+    "swipe": {
+      "grade": "cool"
+    },
+    "todo": {
+      "title": "EXECUTION",
+      "graphic_region": "above"
+    },
+    "tap": {
+      "color": "#2C9A90",
+      "x": 0.78,
+      "y": 0.78,
+      "graphic_region": "below"
+    },
+    "pause-point": {
+      "label_x": 0.72,
+      "color": "#B79660"
+    },
+    "uninstall": {
+      "graphic_region": "above"
+    },
+    "reel-frame": {
+      "graphic_region": "below"
+    },
+    "shortcut-rain": {
+      "count": 8
+    },
+    "countdown-flip": {
+      "from": 3,
+      "graphic_region": "above"
+    },
+    "rabbit-hole": {
+      "ratio": 0.7,
+      "speed": 0.45,
+      "spin": 0
+    },
+    "split-headline": {
+      "height": 0.29,
+      "push": 0.75,
+      "graphic_region": "above",
+      "pill": "KEY POINT"
+    },
+    "pastel-word": {
+      "graphic_region": "above"
+    },
+    "headline-box": {
+      "zoom": 1.08,
+      "graphic_region": "above"
+    },
+    "profile-wall": {
+      "graphic_region": "below"
+    },
+    "tier-list": {
+      "graphic_region": "below"
+    },
+    "broll-split": {
+      "pick": 0,
+      "graphic_region": "below"
+    },
+    "dot-reveal": {
+      "cell": 0.017
+    },
+    "headline-wall": {
+      "count": 3,
+      "gap": 0.15,
+      "graphic_region": "above"
+    },
+    "checklist": {
+      "title": "EXECUTION",
+      "graphic_region": "below"
+    },
+    "apple-toggles": {
+      "zoom": 1.04,
+      "pos": "above",
+      "graphic_region": "above"
+    },
+    "slow-push": {
+      "zoom": 1.08,
+      "blur": 0
+    },
+    "timeline": {
+      "look": "studio",
+      "graphic_region": "below"
+    },
+    "comment-box": {
+      "look": "bar",
+      "graphic_region": "above"
     }
+  },
+  "finish_policy": {
+    "version": "SWARAG-42-EFFECT-FINISH-2026-11-04",
+    "purpose": "42 registered effects keep their signatures; executive defaults are restrained, script and verified figures override samples; all need real-camera creative review",
+    "effects_with_explicit_defaults": 42,
+    "graphics_relocate_as_intact_units": true,
+    "verified_claims_required": true
   }
 }
