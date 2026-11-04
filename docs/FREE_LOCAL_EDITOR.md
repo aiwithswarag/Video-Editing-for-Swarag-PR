@@ -1,5 +1,38 @@
 # Swarag Video Director: FREE local edition (no cloud rendering bill)
 
+## Current 47-effect repair build — 4 November 2026
+
+The active draft repair branch is `feat/47-motion-visual-repair-2026-11-04`
+(PR #10). Earlier instructions for `feat/executive-editorial-v2` or
+`feat/42-effect-finish-pass-2026-11-04` describe older builds and **must not
+be used to verify this 47-effect release candidate**. The current Windows UI
+and `/local/version` must show
+`camera_fix_build_id=47-CAMERA-RENDER-FAIL-CLOSED-2026-11-04-R2`,
+and the local diagnostic includes a 16-character SHA-256 fingerprint of the
+**actual installed** `scripts/fx.py`. Compare hashes when investigating an
+older 37/42 result; no historical local report can certify the new build.
+
+The November 4 private report found 37/42 original decodable clips and
+five failed/unverified original effects (tier-list, phone-fan, checklist,
+timeline, liquid-glass-graph), plus two named looks (graph-bento and
+apple-toggles-below). It packaged 43/47 motion clips. This is a **release
+blocker**, not a minor stylistic warning. PR #10's latest repair adds
+deterministic visible-pixel checks, compact full-unit layouts, explicit
+failure codes, and tests across 240x426 and 360x640 portrait geometries.
+These tests remain synthetic proxies, not final approval on the private
+source camera footage.
+
+**Single Windows installation path:** download the current PR #10 branch
+as a ZIP once; extract into a new folder outside any private footage;
+preserve the original `PRIVATE` directory; stop the older
+`swarag-local-editor` container; double-click
+`START_FREE_EDITOR_WINDOWS.bat`; verify `/local/version` and the SHA
+fingerprint; select the clean original video; run the **one 47-clip private
+camera diagnostic**. If any effect fails, the report and UI now include
+its exact code and failure category. Do **not** render/publish the full
+Reel until private clips, audio and on-screen copy are reviewed.
+
+
 **This replaces a paid Render service with your own computer.** It runs the
 exact same `scripts/fx.py` 42-effect Python/MediaPipe/FFmpeg engine through
 `scripts/produce_video.py` with the same natural grade and technical QA.
