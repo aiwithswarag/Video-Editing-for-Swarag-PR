@@ -1804,6 +1804,57 @@ MATCH_TXT = ('one clip went in and every cut came back before lunch while editor
              'matched and the colour finally looked like the room it was shot in nobody opened an editing app all week').split()
 
 
+def match_page_editorial(c, e, page_no):
+    """Source-backed news-card match cut, without a wall of repeated prose.
+
+    The original full-page word-matching effect remains available when the
+    user explicitly selects the unbranded original look. Executive mode uses
+    an actual short excerpt over authentic moving source camera footage.
+    """
+    import textwrap
+    W,H=c.W,c.H
+    bg=Image.fromarray(np.uint8(np.clip(c.img,0,1)*255)).convert('RGBA')
+    face_top=face_protection_rect(c)[1]
+    top=int(H*.045)
+    max_height=max(int(H*.14),min(int(H*.25),int(face_top-top-H*.018)))
+    pw=int(W*.90)
+    ph=max_height
+    if ph<int(W*.26):
+        ph=int(W*.26)
+    panel=rrect(pw,ph,max(6,int(W*.022)),(242,239,233,246))
+    d=ImageDraw.Draw(panel)
+    accent=rgb(e.o.get('color'),(44,154,144))
+    margin=int(W*.047)
+    band=max(2,int(W*.012))
+    d.rectangle((margin,margin,margin+int(W*.15),margin+band),fill=accent+(255,))
+    source_ok=e.o.get('source_verified') is True
+    heading='VERIFIED SOURCE EXCERPT' if source_ok else 'ILLUSTRATIVE / DEMO'
+    d.text((margin,margin+int(W*.022)),heading,font=font('uib',W*.032),fill=(35,52,62,255))
+    word=str(e.o.get('text') or 'EXAMPLE').upper().strip()
+    word=word[:42]
+    title_size=lines_fit([word],pw-margin*2,'uib',int(W*.079))
+    d.text((margin,margin+int(W*.095)),word,font=font('uib',title_size),fill=accent+(255,))
+    supplied=str(e.o.get('article_text') or '').strip()
+    if not supplied: supplied='Demonstration typography only. No article is asserted.'
+    body_size=max(9,int(W*.041))
+    # two lines only, using the actual provided excerpt; long source text
+    # must be shortened by the editor, not tiled into fake article pages.
+    max_chars=max(12,int((pw-margin*2)/(body_size*.62)))
+    wrapped=textwrap.wrap(supplied,width=max_chars,break_long_words=False)
+    for i,line in enumerate(wrapped[:2]):
+        d.text((margin,margin+int(W*.165)+i*body_size*1.22),line,
+               font=font('uim',body_size),fill=(40,48,55,255))
+    if len(wrapped)>2:
+        d.text((pw-margin,ph-int(W*.037)),'EXCERPT',font=font('uim',max(7,int(W*.027))),
+               fill=(90,96,102,255),anchor='rm')
+    # Gentle variation between news cards; no fabricated pages/metrics.
+    if page_no % 2:
+        rule_y=ph-int(W*.03)
+        d.line((margin,rule_y,pw-margin,rule_y),fill=accent+(160,),width=band)
+    bg.alpha_composite(panel,(int((W-pw)/2),top))
+    return np.asarray(bg.convert('RGB'),np.uint8)
+
+
 def match_page(c, e, j, wx, wy):
     """One article page, with the key word in a red box locked at (wx, wy)."""
     W, H = c.W, c.H; rnd = random.Random(31 + j)
@@ -1863,9 +1914,12 @@ def fx_match_cut(c, e):
     wx, wy = cached(e, 'anchor', lambda: (c.W / 2, max(c.H * 0.1, c.fy - c.fw * 1.55)))
     durs = [0.15, 0.15, 0.17, 0.19, 0.22, 0.26, 0.3, 0.45]; t, j = c.lt, 0
     while j < len(durs) - 1 and t > durs[j]: t -= durs[j]; j += 1
-    pg = cached(e, ('pg', j), lambda: match_page(c, e, j, wx, wy)).astype(np.float32) / 255
-    m = c.m[..., None]
-    c.img = c.img * (1 - k) + (pg * (1 - m) + c.img * m) * k
+    if e.o.get('look')=='executive':
+        pg = match_page_editorial(c,e,j).astype(np.float32)/255.
+    else:
+        pg = cached(e, ('pg', j), lambda: match_page(c, e, j, wx, wy)).astype(np.float32)/255.
+    m=c.m[...,None]
+    c.img = c.img*(1-k)+(pg*(1-m)+c.img*m)*k
 
 
 @effect('apple-toggles', 'an iPhone settings card under your chin flips its switches on, one line at a time')
