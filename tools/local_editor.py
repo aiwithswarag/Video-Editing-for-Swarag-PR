@@ -285,6 +285,16 @@ el("check42").onclick=async()=>{
            bad.map(([name,item])=>name+" ["+(item.error_code||"no code")+"]").join("; ");
          if(!evidence.renderer_fingerprint_sha256_16)
            output.textContent+="\\nReport was made by an older build; verify your Docker version.";
+         const footprint=evidence.visual_footprint_review;
+         if(footprint){
+           const flags=Object.entries(footprint.warnings_by_effect||{});
+           output.textContent+="\\nCREATIVE QA IS NOT AUTOMATICALLY APPROVED. Small/low-change effects flagged: "+
+             flags.length+"/47.";
+           if(flags.length)output.textContent+="\\nVisual review priorities: "+
+             flags.map(([name,codes])=>name+" ("+codes.join(", ")+")").join("; ");
+           output.textContent+="\\nThese are source-relative heuristics, not face-mask certification.";
+         }
+
        }catch(err){output.textContent+="\\nDetailed failure report unreadable: "+String(err?.message||err);}
 
        if(state.error)output.textContent+="\n"+state.error;
