@@ -203,7 +203,7 @@ def comp(c, layer, x, y, alpha=1.0, behind=False, guard=False):
         yy, xx = np.ogrid[y0:y1, x0:x1]
         fw = max(float(c.fw), float(c.W)*0.045, 1.)
         e = ((xx-c.fx)/(fw*1.07))**2 + ((yy-c.fy)/(fw*1.43))**2
-        a = a * (1 - np.clip((1.25-e)/0.3,0,1)[...,None] * m)
+        a = a * (1 - np.clip((1.25-e)/0.3,0,1)[...,None])
     dst = c.img[y0:y1, x0:x1]
     dst[:] = dst * (1 - a) + L[..., :3] * a
 
