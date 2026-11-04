@@ -837,31 +837,34 @@ def fx_rabbit_hole(c, e):
 
 @effect('cover-star', 'you become a magazine cover, with the title behind your head')
 def fx_cover_star(c, e):
-    if e.o.get('look') == 'editorial': return cover_editorial(c, e)
-    k = ease_out(c.lt / 0.35); al = clamp((e.d - c.lt) / 0.2)
-    c.img = c.img * (1 - 0.6 * k) + grade(c.img, 'pop') * 0.6 * k
-    title = e.o.get('text', 'EXECUTION').upper(); col = rgb(e.o.get('color'), (232, 36, 52))
-    mast = cached(e, 'm', lambda: fit_text(title, c.W * 0.92, 'bold', 600, fill=col))
-    mast_h = min(mast.height, c.H * 0.24)
-    place(c, mast, c.W / 2, c.H * 0.035 + mast_h / 2 - (1 - k) * mast_h, mast_h / mast.height, 0, al * k, behind=True)
-    iss = cached(e, 'i', lambda: text_img(e.o.get('issue', 'THE AI ISSUE  ·  2026'), c.W * 0.025, 'mono', (255, 255, 255), shadow=3))
-    place(c, iss, c.W / 2, c.H * 0.03, alpha=al * k, behind=True)
-    lines = e.o.get('lines', 'EXECUTIVE VIDEO|CLEAN DESIGN|42 EFFECTS|YOUR OWN STYLE').split('|')
-    y = c.H * 0.5
-    for j, ln in enumerate(lines):
-        big = j == 0
-        im = cached(e, ('l', j), lambda: text_img(ln, c.W * (0.085 if big else 0.045), 'serif' if big else 'bold', YELLOW if big else (255, 255, 255), shadow=5))
-        kj = ease_out((c.lt - 0.15 - 0.08 * j) / 0.3)
-        comp(c, im, c.W * 0.05 - (1 - kj) * 60, y, al * kj, guard=True); y += im.height * 0.86
-    def barcode():
-        rnd = random.Random(1); bw, bh = int(c.W * 0.16), int(c.W * 0.09)
-        im = Image.new('RGBA', (bw, bh), (255, 255, 255, 255)); d = ImageDraw.Draw(im); x = 8
-        while x < bw - 8:
-            w = rnd.choice((2, 2, 3, 5)); top = max(2, int(bh * 0.20)); bottom = max(top, bh - max(2, int(bh * 0.15))); d.rectangle([x, top, x + w - 1, bottom], fill=(0, 0, 0, 255)); x += w + rnd.choice((2, 3, 4))
-        return im
-    bc = cached(e, 'b', barcode)
-    comp(c, bc, c.W * 0.95 - bc.width, c.H * 0.93 - bc.height, al * k, guard=True)
-
+    if e.o.get('look')=='editorial':
+        return cover_editorial(c,e)
+    """A composed magazine masthead, not independent overlapping words."""
+    W,H=c.W,c.H
+    al=fade(c,e)*clamp(c.lt/.15)
+    title=str(e.o.get('text','EXECUTION')).upper()[:28]
+    issue=str(e.o.get('issue','SWARAG / EXECUTIVE')).upper()[:34]
+    lines=[x.strip() for x in str(e.o.get(
+        'lines','DIRECTION|DELIVERY')).split('|') if x.strip()][:2]
+    pw=int(W*.87);ph=int(W*.37)
+    lay=Image.new('RGBA',(pw,ph),(0,0,0,0))
+    d=ImageDraw.Draw(lay)
+    d.rounded_rectangle((0,0,pw,ph),radius=int(W*.025),
+                        fill=(14,24,35,212))
+    pad=int(W*.045)
+    d.text((pad,int(W*.052)),issue,font=font('uim',W*.030),
+           fill=(224,234,236,255))
+    mastsize=lines_fit([title],pw-2*pad,'didoneb',int(W*.108))
+    d.text((pad,int(W*.104)),title,font=font('didoneb',mastsize),
+           fill=rgb(e.o.get('color'),(197,164,109))+(255,))
+    rule=int(W*.22)
+    d.line((pad,rule,pw-pad,rule),fill=(197,164,109,220),
+           width=max(1,int(W*.006)))
+    for j,line in enumerate(lines):
+        fs=lines_fit([line],pw-2*pad,'uib',int(W*.042))
+        d.text((pad,rule+int(W*(.028+.062*j))),line.upper(),
+               font=font('uib',fs),fill=(241,244,245,255))
+    place_safe_panel(c,lay,'above',alpha=al,min_scale=.47)
 
 @effect('scribble', 'marker doodles draw themselves around you')
 def fx_scribble(c, e):
@@ -1775,6 +1778,42 @@ def fx_glass_widgets(c, e):
 
 
 @effect('timeline', 'a dark red cinematic grade with an editing timeline, a REC timecode and a glowing playhead')
+def studio_timeline(c, e):
+    """Neutral studio timeline: authentic skin, no simulated red REC cast."""
+    W,H=c.W,c.H
+    al=fade(c,e)*clamp(c.lt/.12)
+    if al<=0: return
+    pw=int(W*.84);ph=int(W*.46)
+    im=rrect(pw,ph,max(6,int(W*.032)),(15,29,41,232))
+    d=ImageDraw.Draw(im)
+    pad=int(W*.052)
+    d.text((pad,ph*.15),str(e.o.get('text','EDIT TIMELINE')).upper()[:26],
+           font=font('uib',W*.052),fill=(236,244,246,255),
+           anchor='lm')
+    d.text((pw-pad,ph*.15),
+           str(e.o.get('sub','SOURCE FOOTAGE'))[:24].upper(),
+           font=font('uim',W*.029),fill=(183,204,209,255),
+           anchor='rm')
+    d.line((pad,ph*.25,pw-pad,ph*.25),fill=(177,197,202,100),
+           width=max(1,W//240))
+    tracks=3
+    progress=clamp(c.lt/max(.2,e.d))
+    for j in range(tracks):
+        top=ph*(.34+j*.18)
+        d.rounded_rectangle((pad,top,pw-pad,top+ph*.11),
+                            radius=int(W*.013),fill=(48,64,78,255))
+        for i in range(3):
+            left=pad+(pw-2*pad)*(i*.32+.01)
+            end=left+(pw-2*pad)*(.23 if j!=1 else .18)
+            fill=(44,154,144,255) if (j+i)%2==0 else (109,132,150,255)
+            d.rounded_rectangle((left,top+ph*.012,end,top+ph*.098),
+                                radius=int(W*.009),fill=fill)
+    playhead=pad+(pw-2*pad)*(.04+.92*progress)
+    d.line((playhead,ph*.28,playhead,ph*.96),
+           fill=(250,239,214,255),width=max(2,W//130))
+    place_safe_panel(c,im,'below',alpha=al,min_scale=.38)
+
+
 def fx_timeline(c, e):
     studio = globals().get('studio_timeline')
     (studio if studio and e.o.get('look') != 'red' else red_timeline)(c, e)
@@ -2251,41 +2290,35 @@ def spotlight_sparkle(c, e):
 
 
 def cover_editorial(c, e):
-    k = ease_out(c.lt / 0.35); al = fade(c, e); W, H = c.W, c.H
-    lum = (c.img @ np.float32([0.299, 0.587, 0.114]))[..., None]
-    soft = (c.img * 0.82 + lum * 0.18) * 0.9 + np.float32((252, 238, 228)) / 255 * 0.1
-    q = 4; bl = cv2.resize(np.clip(c.img[::q, ::q] - 0.62, 0, 1), (W, H), interpolation=cv2.INTER_LINEAR)
-    bloom = cv2.GaussianBlur(bl, (0, 0), W * 0.012)
-    c.img = c.img * (1 - k) + np.clip(soft + bloom * 0.55, 0, 1) * k
-    ink, rose = rgb(e.o.get('color'), (26, 20, 22)), rgb(e.o.get('accent'), (168, 70, 94))
-    cream = (252, 244, 236)
-    title = e.o.get('text', 'EFFECTS').upper()
-    def mast():
-        size = int(H * 0.16)
-        while size > 20 and font('didoneb', size).getlength(title) + size * 0.04 * len(title) > W * 0.92: size = int(size * 0.95)
-        return tracked(title, size, 'didoneb', ink, size * 0.04)
-    m = cached(e, 'm', mast)
-    s = 1.05 - 0.05 * ease_out(c.lt / 0.5)
-    place(c, m, W / 2, H * 0.085 + m.height / 2, s, 0, al * k, behind=True)
-    iss = cached(e, 'i', lambda: tracked(e.o.get('issue', 'SWARAG  ·  EXECUTIVE EDITION'), int(W * 0.022), 'ui', ink, W * 0.006))
-    place(c, iss, W / 2, H * 0.075, alpha=al * k, behind=True)
-    rule = cached(e, 'r', lambda: rrect(W * 0.86, max(3, W // 600), 1, ink + (255,)))
-    place(c, rule, W / 2, H * 0.087 + m.height, alpha=al * k * 0.8, behind=True)
-    lines = [text for text in e.o.get('lines', 'Direction|Delivery|Outcomes').split('|') if text.strip()]
-    styles = [('didonei', 0.085, ink), ('didoneb', 0.105, rose), ('ui', 0.03, ink)]
-    y = H * float(e.o.get('lines_y', 0.575))
-    for j, ln in enumerate(lines):
-        kind, sz, col = styles[min(j, 2)]
-        im = cached(e, ('l', j), lambda: (tracked(ln, int(W * sz), kind, col, W * 0.006) if kind == 'ui' else text_img(ln, W * sz, kind, col, glow=(cream, W * 0.012))))
-        kj = ease_out((c.lt - 0.2 - 0.1 * j) / 0.35)
-        comp(c, im, W * 0.05 - (1 - kj) * W * 0.03, y, al * kj, behind=True); y += im.height * (0.82 if kind != 'ui' else 1.6)
-    right = [text for text in e.o.get('right', '').split('|') if text.strip()]
-    y = H * float(e.o.get('right_y', 0.715))
-    for j, ln in enumerate(right):
-        im = cached(e, ('r', j), lambda: text_img(ln, W * 0.058, 'didonei', ink, glow=(cream, W * 0.01)))
-        kj = ease_out((c.lt - 0.45 - 0.1 * j) / 0.35)
-        comp(c, im, W * 0.95 - im.width + (1 - kj) * W * 0.03, y, al * kj, behind=True); y += im.height * 0.78
-
+    """High-end magazine hierarchy with complete text blocks off the face."""
+    W,H=c.W,c.H
+    al=fade(c,e)*clamp(c.lt/.15)
+    title=str(e.o.get('text','EXECUTION')).upper()[:28]
+    issue=str(e.o.get('issue','SWARAG / EXECUTIVE EDITION'))[:44]
+    lines=[x.strip() for x in str(e.o.get(
+        'lines','Direction|Delivery')).split('|') if x.strip()][:2]
+    pw=int(W*.87);ph=int(W*.35)
+    im=Image.new('RGBA',(pw,ph),(0,0,0,0))
+    d=ImageDraw.Draw(im)
+    cream=(249,242,231,247)
+    d.rounded_rectangle((0,0,pw,ph),radius=int(W*.019),
+                        fill=(26,25,30,232))
+    pad=int(W*.04)
+    d.text((pad,int(W*.055)),issue.upper(),
+           font=font('uim',int(W*.030)),
+           fill=cream)
+    fsize=lines_fit([title],pw-2*pad,'didoneb',int(W*.111))
+    d.text((pad,int(W*.116)),title,font=font('didoneb',fsize),
+           fill=(248,234,214,255))
+    d.line((pad,int(W*.235),pw-pad,int(W*.235)),
+           fill=(195,163,121,220),width=max(2,int(W*.004)))
+    for i,line in enumerate(lines):
+        f=font('didonei',max(11,int(W*.041)))
+        if f.getlength(line)>pw-2*pad:
+            raise ValueError('COVER_EDITORIAL_COPY_TOO_LONG')
+        d.text((pad,int(W*(.257+.050*i))),line,
+               font=f,fill=(241,226,205,255))
+    place_safe_panel(c,im,'above',alpha=al,min_scale=.46)
 
 def donut(size, pct, col, label, value):
     S = int(size) * 2; im = Image.new('RGBA', (S, S), (0, 0, 0, 0)); d = ImageDraw.Draw(im); w = int(S * 0.1); pad = int(S * 0.08)
