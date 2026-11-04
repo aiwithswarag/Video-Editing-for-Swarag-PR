@@ -1,5 +1,28 @@
 # Swarag Video Director: FREE local edition (no cloud rendering bill)
 
+## Windows installation package (versioned source ZIP)
+
+The GitHub Actions workflow **Windows editor installation package** now creates a
+checksum-verified `Swarag_Video_Editor_Windows_<commit>.zip` artifact from
+tracked application code only. It includes `START_FREE_EDITOR_WINDOWS.bat`,
+all Python renderer/editor sources, licensing/docs, `START_HERE_WINDOWS.txt`,
+and `RELEASE_BUILD_INFO.json` with the renderer SHA-256. It does **not**
+include source videos, voice recordings, transcripts, private job data or an
+already-built Docker image. Users need Docker Desktop and an internet
+connection for the first Docker build; after that processing happens locally.
+
+For a **normal new video**, choose **Other video — original Swarag effect
+catalog** in the editor, not the RAG six-section mode. Select the actual
+source MP4 and its matching script, review and correct effect timings and
+content against the spoken words, then export MP4 and technical QA.
+
+A source package whose CI checks all pass is an **engineering-validated
+release candidate**. It is not a guarantee that all 47 treatments fit every
+future subject or that an entire original master has received human creative
+approval. For production publication, the exported full MP4 still needs the
+four quality gates in the Swarag finishing policy (media integrity, human
+realism, editorial accuracy, actual deliverables).
+
 ## Current 47-effect repair build — 4 November 2026
 
 The active draft repair branch is `feat/47-motion-visual-repair-2026-11-04`
@@ -101,7 +124,7 @@ are readable at phone size and do not cover hair, eyes or expressions.
 Technical smoke tests are not artistic signoff.
 
 1. Stop the existing Docker Desktop `swarag-local-editor` container.
-2. Download latest `feat/executive-editorial-v2` ZIP and extract into a new
+2. Download latest `feat/47-motion-visual-repair-2026-11-04` ZIP or the versioned Windows package and extract into a new
    folder; keep old PRIVATE media out of the repository.
 3. Double-click `START_FREE_EDITOR_WINDOWS.bat`. In
    http://127.0.0.1:8765/local/version verify:
@@ -132,7 +155,7 @@ inside the 42-effect `glass-widgets` catalog entry, not a 43rd effect.
 2. Download your Swarag repository branch as a ZIP from GitHub and extract
    it to a private folder. Or use your existing checkout.
    Repo: https://github.com/aiwithswarag/Video-Editing-for-Swarag-PR
-   Branch: `feat/executive-editorial-v2` (draft PR #5; update the branch
+   Branch: `feat/47-motion-visual-repair-2026-11-04` (draft PR #10; update the branch
    only after reviewing repository changes).
 3. Start Docker Desktop and open the extracted folder.
 4. **Windows:** double-click `START_FREE_EDITOR_WINDOWS.bat`.
@@ -153,7 +176,7 @@ editorially incomplete. **Do not simply re-render using the old ZIP**.
 1. Keep a safe local copy of the original camera video, script and first render.
 2. Close the old local-editor command window and stop the `swarag-local-editor`
    container in Docker Desktop. The old port `8765` must be free.
-3. Download the **latest ZIP of branch `feat/executive-editorial-v2`** from
+3. Download the **latest ZIP of branch `feat/47-motion-visual-repair-2026-11-04`** from
    GitHub, extract it into a NEW private folder, and ensure Docker Desktop is
    running. Do not overwrite the old `PRIVATE` media files.
 4. Double-click `START_FREE_EDITOR_WINDOWS.bat`. Docker rebuilds the
