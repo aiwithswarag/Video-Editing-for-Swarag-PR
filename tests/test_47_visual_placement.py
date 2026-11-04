@@ -132,5 +132,65 @@ class CriticalFrameVisibility(unittest.TestCase):
         self.assertTrue(self.np.isfinite(c.img).all())
 
 
+    def test_reported_missing_and_unverified_effects_across_realistic_portrait_geometry(self):
+        """The known 37/42 local regression must not recur on portrait frames.
+
+        Six generic speaker bounding boxes at the two diagnostic resolutions
+        cover different face positions; this does not replace real-video QA.
+        """
+        for W,H in ((240,426),(360,640)):
+            for center_frac,fw_frac in ((.45,.14),(.53,.17),(.58,.19)):
+                for label in ('tier-list','phone-fan','checklist','timeline',
+                              'liquid-glass-graph','liquid-glass-graph-bento',
+                              'apple-toggles-below'):
+                    with self.subTest(frame=(W,H),center=center_frac,
+                                      effect=label):
+                        c=self.canvas(label)
+                        c.W=W;c.H=H;c.fx=W*.5;c.fy=H*center_frac
+                        c.fw=W*fw_frac;c.t=1.0;c.lt=1.0
+                        c.img=self.np.full((H,W,3),
+                          (.48,.43,.37),dtype=self.np.float32)
+                        c.m=self.np.zeros((H,W),dtype=self.np.float32)
+                        opts={'hypothetical_example':True} if label.startswith(
+                              'liquid-glass-graph') else {}
+                        if label=='liquid-glass-graph-bento':
+                            opts.update(look='bento')
+                        if label=='apple-toggles-below':
+                            opts.update(pos='below',
+                                text='CLARITY|GOVERNANCE|OUTCOMES')
+                        e=self.effect(label,**opts)
+                        if label=='tier-list':
+                            self.fx.fx_tier_list(c,e)
+                        elif label=='phone-fan':
+                            self.fx.fx_phone_fan(c,e)
+                        elif label=='checklist':
+                            self.fx.fx_checklist(c,e)
+                        elif label=='timeline':
+                            self.fx.fx_timeline(c,e)
+                        elif label.startswith('liquid-glass-graph'):
+                            self.fx.fx_liquid_glass_graph(c,e)
+                        elif label=='apple-toggles-below':
+                            self.fx.fx_apple_toggles(c,e)
+                        self.assertGreaterEqual(
+                            c.visible_safe_panels,1,'Entire panel disappeared')
+                        self.assertEqual(getattr(c,'layout_conflicts',0),0)
+                        self.assertTrue(self.np.isfinite(c.img).all())
+                        # A drawn panel must change pixels, not merely set an
+                        # internal counter without compositing any image.
+                        self.assertGreater(
+                            float(self.np.abs(c.img-
+                               self.np.float32((.48,.43,.37))).sum()),30)
+
+    def test_visibility_counter_only_increases_after_pixels_are_drawn(self):
+        c=self.canvas('checklist')
+        blank=self.Image.new('RGBA',(90,35),(0,0,0,0))
+        with self.assertRaisesRegex(ValueError,
+                                    'SAFE_PANEL_NOT_COMPOSITED_ABOVE'):
+            self.fx.place_safe_panel(c,blank,'above',alpha=1,
+                                      min_scale=.2)
+        self.assertEqual(c.visible_safe_panels,0)
+
+
+
 if __name__=='__main__':
     unittest.main()
