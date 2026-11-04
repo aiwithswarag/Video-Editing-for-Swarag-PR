@@ -525,24 +525,45 @@ def fx_moody(c, e):
 
 @effect('swipe', 'a before and after slider that sweeps across you')
 def fx_swipe(c, e):
-    after = grade(c.img, e.o.get('grade', 'moody'))
-    p = c.lt / e.d
-    sp = 1.05 - 0.95 * ease_inout(p / 0.5) if p < 0.5 else 0.1 + 0.4 * ease_inout((p - 0.5) / 0.4)
-    xx, yy = grid(c)
-    line = sp * c.W + 0.22 * (yy - c.H / 2)
-    a = np.clip((xx - line) / 3 + 0.5, 0, 1)[..., None]
-    c.img = c.img * (1 - a) + after * a
-    hy = c.H * 0.62; hx = sp * c.W + 0.22 * (hy - c.H / 2)
-    edge = np.clip(1 - np.abs(xx - line) / 3.5, 0, 1)[..., None]
-    c.img = c.img * (1 - edge) + edge
-    r = int(c.W * 0.035); h = Image.new('RGBA', (2 * r + 4, 2 * r + 4), (0, 0, 0, 0)); d = ImageDraw.Draw(h)
-    d.ellipse([2, 2, 2 * r + 2, 2 * r + 2], fill=(255, 255, 255, 255))
-    d.text((r + 2, r + 2), '< >', font=font('mono', r * 0.7), fill=INK + (255,), anchor='mm')
-    place(c, shadowed(h, 8, 4, 110), hx, hy)
-    for lab, x in (('before', 0.14), ('after', 0.86)):
-        t = text_img(lab, c.W * 0.050, 'uim', INK); pill = rrect(t.width + 16, t.height, t.height / 2, (255, 255, 255, 225))
-        pill.alpha_composite(t, (8, 0)); place(c, pill, c.W * x, c.H * 0.88)
+    """Actual same-source grade comparison without a line across the face.
 
+    This effect compares the ungraded and graded original camera shot. A
+    decorative diagonal crossing the eyes was not a safe before/after UI.
+    """
+    p = ease_inout(c.lt / max(.25, e.d*.80))
+    before = c.img.copy()
+    after = grade(before, e.o.get('grade','warm'))
+    # The image gradually reveals the actual treatment rather than drawing
+    # a sharp divider through mouth, eyes and facial expressions.
+    c.img = before * (1-p) + after * p
+    if getattr(c,'face_priority',False):
+        W = c.W
+        bw, bh = int(W*.82), int(W*.20)
+        im = rrect(bw,bh,W*.025,(24,35,43,232))
+        d = ImageDraw.Draw(im)
+        labels=(e.o.get('before_label','BEFORE GRADE'),
+                e.o.get('after_label','AFTER GRADE'))
+        f = font('uib',W*.041)
+        for i,label in enumerate(labels):
+            cx=bw*(.26 if i==0 else .75)
+            d.text((cx,bh*.33),label,font=f,
+                   fill=(225,234,239,255),anchor='mm')
+        pct=clamp(p)
+        track_y=bh*.68
+        d.rounded_rectangle((bw*.10,track_y,bw*.90,track_y+bh*.09),
+                            bh*.045,fill=(75,93,108,255))
+        d.rounded_rectangle((bw*.10,track_y,
+                             bw*(.10+.80*max(.01,pct)),track_y+bh*.09),
+                            bh*.045,fill=(44,154,144,255))
+        place_safe_panel(c,im,'above',alpha=fade(c,e)*clamp(c.lt/.10),
+                         min_scale=.60)
+    else:
+        # Preserve the distinct original catalog's diagonal wipe aesthetic.
+        xx, yy=grid(c)
+        sp=1.05-.95*ease_inout(p/.5) if p<.5 else .1+.4*ease_inout((p-.5)/.4)
+        line=sp*c.W+.22*(yy-c.H/2)
+        a=np.clip((xx-line)/3+.5,0,1)[...,None]
+        c.img=before*(1-a)+after*a
 
 @effect('todo', 'a checklist card beside your head that ticks off as you talk')
 def fx_todo(c, e):
@@ -1394,39 +1415,58 @@ def fx_headline_wall(c, e):
 
 @effect('checklist', 'an executive task list builds with animated check marks')
 def fx_checklist(c, e):
-    W, H = c.W, c.H; u = W / 1080; al = fade(c, e)
-    rows = [x.split('::') for x in e.o.get('text', 'Direction::example|Delivery::example|Outcomes::example').split('|')]
-    if not 1 <= len(rows) <= 4:
-        raise ValueError('checklist requires 1-4 concise, source-verified rows')
-    n = len(rows); cw = W * 0.9; rh = 104 * u; hh = 120 * u; chh = hh + rh * n + 26 * u
-    y0 = min(max(c.fy + c.fw * 1.35, H * 0.42), H * 0.93 - chh); cy = y0 + chh / 2 + (1 - ease_out(c.lt / 0.35)) * H * 0.12
-    span = max(0.4, e.d - 0.55); done_at = [0.3 + span * (i + 1) / n for i in range(n)]
-    g = glass(c, cw, chh, 40 * u, W / 2, cy, amt=0.78, tint=(14, 13, 16), blur=int(30 * u)); d = ImageDraw.Draw(g)
-    sx, sy = 44 * u, hh / 2
-    for a in range(4):
-        ang = a * math.pi / 2 + math.pi / 4
-        d.line([(sx, sy), (sx + 18 * u * math.cos(ang), sy + 18 * u * math.sin(ang))], fill=(217, 119, 87, 255), width=int(7 * u))
-        d.line([(sx, sy), (sx + 18 * u * math.cos(ang + math.pi / 4), sy + 18 * u * math.sin(ang + math.pi / 4))], fill=(217, 119, 87, 255), width=int(5 * u))
-    d.text((80 * u, hh / 2), e.o.get('title', 'Executive Brief'), font=font('uib', 42 * u), fill=(255, 255, 255, 255), anchor='lm')
-    nd = sum(c.lt >= t for t in done_at)
-    d.text((cw - 36 * u, hh / 2), f'{nd} of {n}', font=font('uim', 28 * u), fill=(170, 170, 176, 255), anchor='rm')
-    d.line([(30 * u, hh), (cw - 30 * u, hh)], fill=(255, 255, 255, 30), width=max(1, int(2 * u)))
-    for i, (txt, meta) in enumerate([(r + [''])[:2] for r in rows]):
-        y = hh + 13 * u + rh * i + rh / 2; x = 56 * u; r_ = 24 * u
-        start = done_at[i - 1] if i else 0.3
-        if c.lt >= done_at[i]:
-            q = ease_back((c.lt - done_at[i]) / 0.25); rr = r_ * (0.6 + 0.4 * q)
-            d.ellipse([x - rr, y - rr, x + rr, y + rr], fill=(52, 199, 89, 255)); tick(d, x - rr * 0.5, y - rr * 0.45, rr, w=int(5 * u))
-            fc, mc = (255, 255, 255, 255), (52, 199, 89, 255)
-        elif c.lt >= start:
-            a0 = (c.lt * 540) % 360; d.ellipse([x - r_, y - r_, x + r_, y + r_], outline=(255, 255, 255, 50), width=int(5 * u))
-            d.arc([x - r_, y - r_, x + r_, y + r_], a0, a0 + 100, fill=(217, 119, 87, 255), width=int(5 * u)); fc, mc = (255, 255, 255, 255), (170, 170, 176, 255)
-        else:
-            d.ellipse([x - r_, y - r_, x + r_, y + r_], outline=(255, 255, 255, 60), width=int(4 * u)); fc, mc = (255, 255, 255, 110), (170, 170, 176, 90)
-        d.text((x + 48 * u, y), txt, font=font('uib', 40 * u), fill=fc, anchor='lm')
-        d.text((cw - 36 * u, y), meta, font=font('mono', 28 * u), fill=mc, anchor='rm')
-    place(c, shadowed(g, 24, 12, 120), W / 2, cy, 1, 0, al * clamp(c.lt / 0.12), guard=True)
-
+    """One complete readable checklist panel, never silently suppressed."""
+    W,H=c.W,c.H
+    rows=[(x.split('::')+[''])[:2]
+          for x in e.o.get('text',
+              'Direction::example|Delivery::example|Outcomes::example').split('|')
+          if x.strip()]
+    if not 1<=len(rows)<=4:
+        raise ValueError('checklist requires 1–4 short verified rows')
+    n=len(rows)
+    w=int(W*.82)
+    rh=int(W*.132)
+    head=int(W*.145)
+    h=head+n*rh+int(W*.045)
+    cx,cy,fit=safe_panel_layout(c,w,h,'below',min_scale=.36)
+    # Sample the original camera beneath the intended panel position.
+    im=glass(c,w,h,max(5,int(W*.025)),cx,cy,amt=.12,
+             tint=(15,26,36),dark=.42,blur=max(6,int(W*.025)))
+    d=ImageDraw.Draw(im)
+    pad=int(W*.05)
+    title=str(e.o.get('title','EXECUTION CHECKS')).upper()
+    d.text((pad,head*.45),title,font=font('uib',W*.048),
+           fill=(244,246,248,255),anchor='lm')
+    done_at=[.28+max(.3,e.d-.55)*(i+1)/n for i in range(n)]
+    done=sum(c.lt>=t for t in done_at)
+    d.text((w-pad,head*.45),f'{done}/{n}',font=font('uim',W*.038),
+           fill=(205,222,224,255),anchor='rm')
+    d.line((pad,head,w-pad,head),fill=(190,205,211,80),width=max(1,W//240))
+    for i,(label,meta) in enumerate(rows):
+        y=head+(i+.50)*rh
+        mark_x=pad+rh*.24
+        on=c.lt>=done_at[i]
+        color=(44,154,144,255) if on else (132,152,160,255)
+        r=max(4,int(rh*.17))
+        d.ellipse((mark_x-r,y-r,mark_x+r,y+r),
+                  fill=color if on else (0,0,0,0),
+                  outline=color,width=max(1,W//240))
+        if on: tick(d,mark_x-r*.45,y-r*.25,r*.85,
+                    w=max(2,W//120))
+        txt=label.strip()
+        max_w=w-pad*2-rh*.48-(W*.16 if meta else 0)
+        fs=int(W*.049)
+        while fs>=int(W*.035) and font('uib',fs).getlength(txt)>max_w:
+            fs-=1
+        if font('uib',fs).getlength(txt)>max_w:
+            raise ValueError('CHECKLIST_MOBILE_COPY_OVERFLOW')
+        d.text((pad+rh*.49,y),txt,font=font('uib',fs),
+               fill=(245,246,248,255),anchor='lm')
+        if meta:
+            d.text((w-pad,y),str(meta)[:9],font=font('uim',W*.032),
+                   fill=(182,204,209,255),anchor='rm')
+    place_safe_panel(c,im,'below',alpha=fade(c,e)*clamp(c.lt/.12),
+                     min_scale=.36)
 
 def np_thumb(c, w, h):
     """The current frame as a small PIL thumbnail (cropped to w:h around your face)."""
@@ -1797,46 +1837,58 @@ def num_parts(s):
 
 @effect('liquid-glass-graph', 'a liquid glass card floats under your chin while a graph climbs and the number counts up')
 def fx_liquid_glass_graph(c, e):
-    if e.o.get('look') == 'bento': return glass_bento(c, e)
-    q = ease_out(c.lt / 0.4); al = fade(c, e) * clamp(c.lt / 0.12)
-    if al <= 0: return
-    W = c.W; cw, ch = int(W * 0.74), int(W * 0.46); sc = 0.88 + 0.12 * q
-    cx = W / 2; cy = min(c.H - ch * 0.62, c.fy + c.fw * 2.7) + (1 - q) * W * 0.08
-    gw, gh = int(cw * sc), int(ch * sc)
-    im = glass(c, gw, gh, gh * 0.12, cx, cy, amt=0.16, blur=max(10, W // 30), dark=0.12)
-    hi = cached(e, ('hi', gw, gh), lambda: Image.fromarray(np.dstack([np.full((gh, gw, 3), 255, np.uint8),
-        (np.clip(1 - np.linspace(0, 1, gh) * 2.2, 0, 1)[:, None] * np.ones(gw) * 46).astype(np.uint8)]), 'RGBA'))
-    hm = Image.new('L', (gw, gh), 0); ImageDraw.Draw(hm).rounded_rectangle([0, 0, gw - 1, gh - 1], int(gh * 0.12), fill=255)
-    hl = hi.copy(); hl.putalpha(Image.fromarray(np.minimum(np.asarray(hi)[..., 3], np.asarray(hm)))); im.alpha_composite(hl)
-    lay = Image.new('RGBA', (gw, gh), (0, 0, 0, 0)); d = ImageDraw.Draw(lay); pad = gw * 0.07
-    g = ease_inout((c.lt - 0.25) / max(0.3, e.d * 0.72))
-    lab = e.o.get('text', 'RETENTION').upper()
-    d.text((pad, pad * 0.9), lab, font=font('mono', gw * 0.04), fill=(255, 255, 255, 190))
-    if e.o.get('hypothetical_example'):
-        d.text((pad, pad * 2.0), 'ILLUSTRATIVE — NOT MEASURED',
-               font=font('uib', gw * 0.025), fill=(255, 218, 162, 245))
-    a, _, _ = num_parts(e.o.get('from', '0')); b, suf, dp = num_parts(e.o.get('to', '59%'))
-    v = a + (b - a) * g; s = f'{v:.{dp}f}{suf}'
-    f = font('uib', gw * 0.12); d.text((gw - pad - f.getlength(s), pad * 0.55), s, font=f, fill=(255, 255, 255, 255))
-    x0, x1, y0, y1 = pad, gw - pad, gh - pad * 0.9, gh * 0.36
-    def ycurve(u): return y0 - (y0 - y1) * (u ** 1.5) + math.sin(u * 13) * gh * 0.018 * (1 - u)
-    n = 60; pts = [(x0 + (x1 - x0) * j / n, ycurve(j / n)) for j in range(int(n * g) + 1)]
-    green = rgb(e.o.get('color'), (52, 211, 110))
-    if len(pts) > 1:
-        area = Image.new('RGBA', (gw, gh), (0, 0, 0, 0))
-        ImageDraw.Draw(area).polygon(pts + [(pts[-1][0], y0), (x0, y0)], fill=green + (55,)); lay.alpha_composite(area)
-        glow = Image.new('RGBA', (gw, gh), (0, 0, 0, 0)); lw = max(4, int(gw * 0.011))
-        ImageDraw.Draw(glow).line(pts, fill=green + (255,), width=lw * 3, joint='curve')
-        lay.alpha_composite(glow.filter(ImageFilter.GaussianBlur(lw * 2)))
-        ImageDraw.Draw(lay).line(pts, fill=green + (255,), width=lw, joint='curve')
-        hx, hy = pts[-1]; r = lw * 1.9
-        ImageDraw.Draw(lay).ellipse([hx - r, hy - r, hx + r, hy + r], fill=(255, 255, 255, 255), outline=green + (255,), width=max(2, lw // 2))
-    for j in range(1, 4):
-        yy = y0 - (y0 - y1) * j / 3.4
-        d.line([(x0, yy), (x1, yy)], fill=(255, 255, 255, 40), width=max(1, int(gw * 0.002)))
-    im.alpha_composite(lay)
-    place(c, shadowed(im, max(10, W // 70), W // 90, 90), cx, cy, alpha=al, guard=True)
-
+    if e.o.get('look')=='bento':
+        return glass_bento(c,e)
+    q=ease_out(c.lt/.4)
+    al=fade(c,e)*clamp(c.lt/.12)
+    if al<=0: return
+    W=c.W
+    gw,gh=int(W*.82),int(W*.49)
+    cx,cy,fit=safe_panel_layout(c,gw,gh,'below',min_scale=.36)
+    im=glass(c,gw,gh,gh*.10,cx,cy,amt=.11,
+             tint=(14,29,37),blur=max(6,W//40),dark=.48)
+    d=ImageDraw.Draw(im)
+    pad=gw*.08
+    label=str(e.o.get('text','ILLUSTRATIVE TREND')).upper()[:27]
+    d.text((pad,gh*.14),label,font=font('uib',W*.046),
+           fill=(243,250,249,255),anchor='lm')
+    hypothetical=bool(e.o.get('hypothetical_example',False))
+    if hypothetical:
+        d.text((pad,gh*.28),'ILLUSTRATIVE — NOT MEASURED',
+               font=font('uim',W*.027),fill=(252,221,165,255),
+               anchor='lm')
+    elif not str(e.o.get('metric_source','')).strip():
+        raise ValueError('GLASS_GRAPH_REQUIRES_VERIFIED_METRIC_SOURCE')
+    a,_,_=num_parts(e.o.get('from','0'))
+    b,suf,dp=num_parts(e.o.get('to','0'))
+    val=a+(b-a)*ease_inout((c.lt-.15)/max(.25,e.d*.7))
+    number=f'{val:.{dp}f}{suf}'
+    vf=font('uib',W*.080)
+    d.text((gw-pad,gh*.15),number,font=vf,fill=(240,250,245,255),
+           anchor='rm')
+    low,high=gh*.83,gh*.46
+    x0,x1=pad,gw-pad
+    for i in range(1,4):
+        yy=low-(low-high)*i/3
+        d.line((x0,yy,x1,yy),fill=(255,255,255,42),width=max(1,W//240))
+    t=ease_inout((c.lt-.20)/max(.25,e.d*.70))
+    n=max(1,int(44*t))
+    pts=[(x0+(x1-x0)*j/44,
+          low-(low-high)*(j/44)**1.4) for j in range(n+1)]
+    accent=rgb(e.o.get('color'),(44,154,144))
+    if len(pts)>1:
+        g=Image.new('RGBA',(gw,gh))
+        gd=ImageDraw.Draw(g)
+        gd.polygon(pts+[(pts[-1][0],low),(x0,low)],
+                   fill=accent+(58,))
+        dline=Image.new('RGBA',(gw,gh))
+        ImageDraw.Draw(dline).line(pts,fill=accent+(255,),
+                                   width=max(2,W//95),joint='curve')
+        g.alpha_composite(dline.filter(ImageFilter.GaussianBlur(max(2,W//80))))
+        im.alpha_composite(g)
+        ImageDraw.Draw(im).line(pts,fill=accent+(255,),
+                                width=max(2,W//110),joint='curve')
+    place_safe_panel(c,im,'below',alpha=al,min_scale=.36)
 
 @effect('carousel-spin', 'your reels spin around you in a 3D carousel, then slow to a stop')
 def fx_carousel_spin(c, e):
