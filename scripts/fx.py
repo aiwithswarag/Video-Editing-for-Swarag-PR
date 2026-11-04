@@ -1781,9 +1781,50 @@ def rag_evidence_glass_widgets(c, e):
 
 
 @effect('glass-widgets', 'minimalist floating data widgets and mini artifacts')
+def executive_glass_widgets(c, e):
+    """One or two useful Swarag glass panels, with real readable copy."""
+    W=c.W
+    simple=e.o.get('look')=='simple'
+    headline=str(e.o.get('text') or 'ILLUSTRATIVE CONCEPT')[:34].upper()
+    detail=str(e.o.get('sub') or 'STRATEGY  •  DELIVERY')[:55]
+    if not e.o.get('metric_source') and not e.o.get('hypothetical_example'):
+        # These are conceptual labels, not invented business measurements.
+        if any(ch.isdigit() for ch in headline):
+            raise ValueError('GLASS_WIDGET_NUMERIC_CLAIM_REQUIRES_SOURCE')
+    w,h=int(W*.83),int(W*.30)
+    cx,cy,sc=safe_panel_layout(c,w,h,'above',min_scale=.43)
+    g=glass(c,w,h,W*.028,cx,cy,amt=.10,
+            tint=(18,34,45),dark=.47,blur=max(6,W//34))
+    d=ImageDraw.Draw(g)
+    pad=int(W*.052)
+    title_font=lines_fit([headline],w-2*pad,'uib',int(W*.061))
+    d.text((pad,h*.38),headline,font=font('uib',title_font),
+           fill=(243,248,246,255),anchor='lm')
+    d.line((pad,h*.59,w-pad,h*.59),
+           fill=(44,154,144,195),width=max(2,W//110))
+    sub_font=lines_fit([detail],w-2*pad,'uim',int(W*.042))
+    d.text((pad,h*.78),detail,font=font('uim',sub_font),
+           fill=(219,236,237,255),anchor='lm')
+    place_safe_panel(c,g,'above',
+                     alpha=fade(c,e)*clamp(c.lt/.15),min_scale=.43)
+    if not simple:
+        label=str(e.o.get('pill') or 'REVIEW → EXECUTION')[:37].upper()
+        bw,bh=int(W*.76),int(W*.15)
+        note=rrect(bw,bh,int(W*.025),(20,39,52,240))
+        nd=ImageDraw.Draw(note)
+        fs=lines_fit([label],bw*.87,'uib',int(W*.046))
+        nd.text((bw/2,bh/2),label,font=font('uib',fs),
+                fill=(224,242,239,255),anchor='mm')
+        place_safe_panel(c,note,'below',
+                         alpha=fade(c,e)*clamp((c.lt-.25)/.15),
+                         min_scale=.45)
+
+
 def fx_glass_widgets(c, e):
     if e.o.get('look') == 'rag-evidence':
         return rag_evidence_glass_widgets(c,e)
+    if getattr(c,'face_priority',False):
+        return executive_glass_widgets(c,e)
     (glass_widgets_v1 if e.o.get('look') == 'simple' else glass_widgets_v2)(c, e)
 
 
@@ -1934,6 +1975,26 @@ def num_parts(s):
 @effect('liquid-glass-graph', 'a liquid glass card floats under your chin while a graph climbs and the number counts up')
 def fx_liquid_glass_graph(c, e):
     if e.o.get('look')=='bento':
+        if getattr(c,'face_priority',False):
+            # A bento layout is deliberately one clear graph plus one useful
+            # concise heading; no partially cropped micro-widgets.
+            previous=e.o.get('look')
+            e.o['look']='standard'
+            try:
+                fx_liquid_glass_graph(c,e)
+            finally:
+                e.o['look']=previous
+            note=rrect(int(c.W*.76),int(c.W*.14),
+                       int(c.W*.023),(20,36,48,233))
+            d=ImageDraw.Draw(note)
+            lab=str(e.o.get('bento_label','ILLUSTRATIVE VIEW'))[:34]
+            d.text((note.width/2,note.height/2),lab,
+                   font=font('uib',c.W*.045),
+                   fill=(235,244,246,255),anchor='mm')
+            place_safe_panel(c,note,'above',
+                             alpha=fade(c,e)*clamp((c.lt-.1)/.15),
+                             min_scale=.42)
+            return
         return glass_bento(c,e)
     q=ease_out(c.lt/.4)
     al=fade(c,e)*clamp(c.lt/.12)
