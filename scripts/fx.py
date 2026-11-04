@@ -315,6 +315,33 @@ def executive_motion_cards(c, e, mode="noise"):
                             min_scale=.43)
 
 
+def adaptive_panel_location(c, width, height, preferred="below", min_scale=.34):
+    """Use the speaker's actual negative space; do not erase a panel.
+
+    'below' is a preference for ordinary informational effects, NOT the
+    strict named apple-toggles-below variant. Return an explicit region
+    before building glass, so the blur samples the true background.
+    """
+    others=("above",) if preferred=="below" else ("below",)
+    for region in (preferred,)+others:
+        try:
+            cx,cy,scale=safe_panel_layout(c,width,height,region,
+                                           min_scale=min_scale)
+            return region,cx,cy,scale
+        except ValueError:
+            continue
+    raise ValueError("NO_FACE_CLEAR_EDITORIAL_PANEL_FOR_"+preferred.upper())
+
+
+def place_adaptive_panel(c, image, preferred="below", alpha=1.0,
+                         min_scale=.34):
+    if alpha<=0: return False
+    region,_,_,_=adaptive_panel_location(
+        c,image.width,image.height,preferred,min_scale)
+    return place_safe_panel(c,image,region,alpha=alpha,
+                            min_scale=min_scale)
+
+
 def comp(c, layer, x, y, alpha=1.0, behind=False, guard=False):
     """Alpha-composite an RGBA layer with its top-left at (x, y).
     behind=True hides it wherever the person is (so it sits behind you).
@@ -1508,45 +1535,51 @@ def fx_profile_wall(c, e):
                      alpha=fade(c,e)*clamp((c.lt-.3)/.20),min_scale=.36)
 
 @effect('tier-list', 'an executive tier list with a highlighted item')
-def fx_tier_list(c, e):
-    """Render all tiers as ONE readable panel, not a flying isolated badge."""
-    W,H=c.W,c.H
-    rows=[x.strip() for x in str(e.o.get('rows',
-       'Strategy|Execution|Delivery|Outcomes')).split('|') if x.strip()]
+def fx_tier_list(c,e):
+    """Full priority tier board in two compact rows, never a lone badge."""
+    W=c.W
+    rows=[v.strip() for v in str(e.o.get('rows',
+         'Strategy|Execution|Delivery|Outcomes')).split('|') if v.strip()]
     rows=rows[:6] if e.o.get('all_tiers') else rows[:4]
-    if not rows: raise ValueError('tier-list needs approved row labels')
-    labels='SABCDF'
-    accent=[(44,154,144),(69,124,165),(197,164,109),(130,147,165),
-            (182,171,151),(171,75,73)]
-    w=int(W*.80)
-    rh=int(W*.116)
-    hh=int(W*.16)
-    h=hh+rh*len(rows)+int(W*.035)
-    im=rrect(w,h,max(5,int(W*.029)),(17,31,43,240))
-    d=ImageDraw.Draw(im)
-    pad=int(W*.04)
-    title=str(e.o.get('title','EXECUTIVE PRIORITIES'))[:30].upper()
-    d.text((pad,hh*.50),title,font=font('uib',W*.049),
-           fill=(244,247,248,255),anchor='lm')
-    n=max(1,min(len(rows),int(len(rows)*clamp(c.lt/max(.3,e.d*.8)))+1))
-    for i,(label,txt) in enumerate(zip(labels,rows)):
-        top=hh+i*rh
-        if i>=n: continue
-        col=accent[i]
-        d.rounded_rectangle((pad,top+rh*.12,pad+rh*.74,top+rh*.88),
-                            rh*.14,fill=col+(255,))
-        d.text((pad+rh*.37,top+rh*.50),label,
-               font=font('uib',rh*.45),fill=(18,28,32,255),anchor='mm')
-        fs=int(W*.044)
-        avail=w-2*pad-rh*.98
-        while fs>int(W*.031) and font('uib',fs).getlength(txt)>avail:
-            fs-=1
-        if font('uib',fs).getlength(txt)>avail:
-            raise ValueError('TIER_LABEL_TOO_LONG')
-        d.text((pad+rh*.96,top+rh*.50),txt,font=font('uib',fs),
-               fill=(235,243,246,255),anchor='lm')
-    place_safe_panel(c,im,'below',alpha=fade(c,e)*clamp(c.lt/.12),
-                     min_scale=.36)
+    if not rows: raise ValueError("TIER_LIST_NEEDS_APPROVED_ROWS")
+    labels="SABCDF"
+    colors=((44,154,144),(69,124,165),(197,164,109),
+            (130,147,165),(170,151,121),(171,75,73))
+    w,h=int(W*.86),int(W*(.17+.16*math.ceil(len(rows)/2)))
+    lay=rrect(w,h,max(5,int(W*.029)),(17,31,43,248))
+    d=ImageDraw.Draw(lay)
+    pad=W*.037
+    title=str(e.o.get('title','EXECUTIVE PRIORITIES')).upper()
+    title_size=lines_fit([title],w-2*pad,'uib',int(W*.047))
+    d.text((pad,W*.065),title,font=font('uib',title_size),
+           fill=(243,245,243,255),anchor='lm')
+    d.line((pad,W*.129,w-pad,W*.129),fill=(197,164,109,200),
+           width=max(1,W//160))
+    half=(w-pad*3)/2
+    visible=max(1,min(len(rows),int(clamp(c.lt/max(.4,e.d*.7))*len(rows))+1))
+    for i,txt in enumerate(rows):
+        x=pad+(i%2)*(half+pad)
+        y=W*(.15+.16*(i//2))
+        # Keep the board geometry fixed so rows cannot jump during animation.
+        fill=(34,49,61,255)
+        d.rounded_rectangle((x,y,x+half,y+W*.135),
+                            radius=max(3,int(W*.013)),fill=fill)
+        c0=colors[i]
+        d.rounded_rectangle((x+W*.009,y+W*.012,
+                             x+W*.115,y+W*.123),
+                            radius=max(3,int(W*.012)),fill=c0+(255,))
+        d.text((x+W*.062,y+W*.067),labels[i],
+               font=font('uib',W*.057),fill=(15,29,37,255),
+               anchor='mm')
+        fsz=lines_fit([txt],half-W*.145,'uib',int(W*.042))
+        if fsz<int(W*.029):
+            raise ValueError("TIER_LIST_LABEL_OVERFLOW")
+        d.text((x+W*.127,y+W*.068),txt,
+               font=font('uib',fsz),
+               fill=(239,244,245,255) if i<visible else (132,149,159,255),
+               anchor='lm')
+    place_adaptive_panel(c,lay,'below',
+                         alpha=fade(c,e)*clamp(c.lt/.12),min_scale=.35)
 
 @effect('broll-split', 'split screen: b-roll on top with a price-tag sticker, you on the bottom')
 def fx_broll_split(c, e):
@@ -1580,57 +1613,48 @@ def fx_broll_split(c, e):
 
 
 @effect('phone-fan', 'your reels fan out like a hand of phones in front of you, under a two-line headline')
-def fx_phone_fan(c, e):
-    """One grouped 4-phone carousel, fully within the lower safe region."""
-    W,H=c.W,c.H
-    cards=e.cards
-    if not cards:
-        raise ValueError('phone-fan needs four approved visual assets')
-    lines=[x.strip() for x in e.o.get('text','STRATEGY|EXECUTION').split('|')
-           if x.strip()][:2]
-    headline='  '.join(lines).upper()
-    font_size=lines_fit([headline],W*.83,'uib',int(W*.068))
-    hd=text_img(headline,font_size,'uib',(246,245,238),shadow=5)
-    cap=rrect(int(W*.88),int(W*.14),int(W*.024),(18,30,42,218))
-    cap.alpha_composite(hd,((cap.width-hd.width)//2,
-                             (cap.height-hd.height)//2))
-    place_safe_panel(c,cap,'above',alpha=fade(c,e)*clamp(c.lt/.10),
-                     min_scale=.55)
-    pw=max(24,int(W*.185))
-    ph=int(pw*1.80)
-    gw=int(W*.92)
-    gh=int(W*.63)
-    def phone(i):
-        outer=rrect(pw,ph,max(5,int(pw*.13)),(13,24,35,255))
-        src=cards[i%len(cards)].convert('RGB')
-        ar=(pw-8)/(ph-8)
-        sw,sh=src.size
-        if sw/sh>ar:
-            crop_w=max(1,int(sh*ar))
-            left=(sw-crop_w)//2
-            src=src.crop((left,0,left+crop_w,sh))
+def fx_phone_fan(c,e):
+    """Four genuinely visible phone cards, not a missing mini-carousel."""
+    W=c.W
+    approved=list(getattr(e,'cards',[]) or [])
+    if not approved: raise ValueError("PHONE_FAN_REQUIRES_APPROVED_ASSETS")
+    lines=[s.strip() for s in str(e.o.get('text','Strategy|Execution')
+          ).split('|') if s.strip()][:2]
+    heading='  •  '.join(lines).upper()
+    w,h=int(W*.89),int(W*.52)
+    lay=rrect(w,h,max(5,int(W*.026)),(15,29,42,232))
+    d=ImageDraw.Draw(lay)
+    f=lines_fit([heading],w*.91,'uib',int(W*.048))
+    d.text((w/2,W*.065),heading,font=font('uib',f),
+           fill=(245,244,239,255),anchor='mm')
+    count=4
+    pw,ph=int(W*.178),int(W*.325)
+    gap=int(W*.022)
+    left=(w-(count*pw+(count-1)*gap))/2
+    t=clamp((c.lt-.05)/.45)
+    for i in range(count):
+        item=approved[i%len(approved)].convert('RGB')
+        sw,sh=item.size
+        ratio=(pw-6)/(ph-6)
+        if sw/sh>ratio:
+            cw=max(1,int(sh*ratio))
+            item=item.crop(((sw-cw)//2,0,(sw+cw)//2,sh))
         else:
-            crop_h=max(1,int(sw/ar))
-            top=(sh-crop_h)//2
-            src=src.crop((0,top,sw,top+crop_h))
-        src=src.resize((pw-8,ph-8),Image.LANCZOS).convert('RGBA')
-        outer.alpha_composite(src,(4,4))
-        return outer
-    group=Image.new('RGBA',(gw,gh),(0,0,0,0))
-    # Paint all four into one visual group. Its safe placement is tested
-    # once, avoiding the old individual-card compositor suppression.
-    positions=[(.07,.31,-11),(.28,.22,-4),(.50,.22,4),(.72,.31,11)]
-    arrival=clamp((c.lt-.15)/.4)
-    for i,(xp,yp,angle) in enumerate(positions):
-        card_im=phone(i)
-        tilted=card_im.rotate(angle*arrival,Image.BICUBIC,expand=True)
-        x=int(gw*xp+((1-arrival)*(i-1.5)*W*.12))
-        y=int(gh*yp+(1-arrival)*W*.07)
-        x=max(0,min(gw-tilted.width,x))
-        y=max(0,min(gh-tilted.height,y))
-        group.alpha_composite(tilted,(x,y))
-    place_safe_panel(c,group,'below',alpha=fade(c,e)*clamp((c.lt-.12)/.12),
-                     min_scale=.39)
+            ch=max(1,int(sw/ratio))
+            item=item.crop((0,(sh-ch)//2,sw,(sh+ch)//2))
+        item=item.resize((pw-6,ph-6),Image.LANCZOS).convert('RGBA')
+        phone=rrect(pw,ph,max(3,int(W*.012)),(10,23,37,255))
+        phone.alpha_composite(item,(3,3))
+        a=(i-1.5)*5*t
+        rotated=phone.rotate(a,Image.BICUBIC,expand=True)
+        x=left+i*(pw+gap)+(pw-rotated.width)/2
+        y=W*.135+abs(i-1.5)*W*.028+(1-t)*W*.06
+        x=max(0,min(w-rotated.width,int(x)))
+        y=max(0,min(h-rotated.height,int(y)))
+        lay.alpha_composite(rotated,(x,y))
+    place_adaptive_panel(c,lay,'below',
+                         alpha=fade(c,e)*clamp((c.lt-.1)/.12),
+                         min_scale=.31)
 
 @effect('dot-reveal', 'your shot builds itself out of glowing dots, then snaps into the full picture')
 def fx_dot_reveal(c, e):
@@ -1711,58 +1735,52 @@ def fx_headline_wall(c, e):
                      alpha=fade(c,e)*clamp(c.lt/.12),min_scale=.38)
 
 @effect('checklist', 'an executive task list builds with animated check marks')
-def fx_checklist(c, e):
-    """One complete readable checklist panel, never silently suppressed."""
-    W,H=c.W,c.H
-    rows=[(x.split('::')+[''])[:2]
-          for x in e.o.get('text',
-              'Direction::example|Delivery::example|Outcomes::example').split('|')
-          if x.strip()]
+def fx_checklist(c,e):
+    """Compact four-check editorial panel with real visible checkboxes."""
+    W=c.W
+    rows=[(s.split('::')+[''])[:2] for s in str(
+         e.o.get('text','Direction::sample|Delivery::sample|'
+                 'Outcomes::sample')).split('|') if s.strip()]
     if not 1<=len(rows)<=4:
-        raise ValueError('checklist requires 1–4 short verified rows')
-    n=len(rows)
-    w=int(W*.82)
-    rh=int(W*.132)
-    head=int(W*.145)
-    h=head+n*rh+int(W*.045)
-    cx,cy,fit=safe_panel_layout(c,w,h,'below',min_scale=.36)
-    # Sample the original camera beneath the intended panel position.
-    im=glass(c,w,h,max(5,int(W*.025)),cx,cy,amt=.12,
-             tint=(15,26,36),dark=.42,blur=max(6,int(W*.025)))
-    d=ImageDraw.Draw(im)
-    pad=int(W*.05)
-    title=str(e.o.get('title','EXECUTION CHECKS')).upper()
-    d.text((pad,head*.45),title,font=font('uib',W*.048),
-           fill=(244,246,248,255),anchor='lm')
-    done_at=[.28+max(.3,e.d-.55)*(i+1)/n for i in range(n)]
-    done=sum(c.lt>=t for t in done_at)
-    d.text((w-pad,head*.45),f'{done}/{n}',font=font('uim',W*.038),
-           fill=(205,222,224,255),anchor='rm')
-    d.line((pad,head,w-pad,head),fill=(190,205,211,80),width=max(1,W//240))
+        raise ValueError("CHECKLIST_REQUIRES_1_TO_4_APPROVED_ROWS")
+    n=len(rows);w=int(W*.87)
+    h=int(W*(.14+.18*math.ceil(n/2)))
+    region,cx,cy,_=adaptive_panel_location(c,w,h,'below',min_scale=.36)
+    lay=glass(c,w,h,W*.030,cx,cy,amt=.13,
+              tint=(16,32,43),dark=.50,blur=max(5,W//36))
+    d=ImageDraw.Draw(lay)
+    pad=W*.038
+    name=str(e.o.get('title','EXECUTION CHECKS'))[:28].upper()
+    fs=lines_fit([name],w-pad*2,'uib',int(W*.049))
+    d.text((pad,W*.061),name,font=font('uib',fs),
+           fill=(241,246,246,255),anchor='lm')
+    done_times=[.27+max(.3,e.d-.55)*(j+1)/n for j in range(n)]
     for i,(label,meta) in enumerate(rows):
-        y=head+(i+.50)*rh
-        mark_x=pad+rh*.24
-        on=c.lt>=done_at[i]
-        color=(44,154,144,255) if on else (132,152,160,255)
-        r=max(4,int(rh*.17))
-        d.ellipse((mark_x-r,y-r,mark_x+r,y+r),
-                  fill=color if on else (0,0,0,0),
-                  outline=color,width=max(1,W//240))
-        if on: tick(d,mark_x-r*.45,y-r*.25,r*.85,
-                    w=max(2,W//120))
-        txt=label.strip()
-        max_w=w-pad*2-rh*.48-(W*.16 if meta else 0)
-        fs=int(W*.049)
-        while fs>=int(W*.035) and font('uib',fs).getlength(txt)>max_w:
-            fs-=1
-        if font('uib',fs).getlength(txt)>max_w:
-            raise ValueError('CHECKLIST_MOBILE_COPY_OVERFLOW')
-        d.text((pad+rh*.49,y),txt,font=font('uib',fs),
-               fill=(245,246,248,255),anchor='lm')
+        col=i%2;rr=i//2
+        x=pad+col*(w*.5-pad*.5);y=W*(.125+.18*rr)
+        box_w=w*.48-pad*.6;box_h=W*.156
+        d.rounded_rectangle((x,y,x+box_w,y+box_h),
+                            radius=max(3,int(W*.015)),
+                            fill=(24,42,52,235))
+        on=c.lt>=done_times[i]
+        r=max(4,int(W*.026));mk_x=x+W*.044;mk_y=y+W*.062
+        color=(44,154,144,255) if on else (140,163,172,255)
+        d.ellipse((mk_x-r,mk_y-r,mk_x+r,mk_y+r),
+                  outline=color,width=max(2,W//120),
+                  fill=color if on else (0,0,0,0))
+        if on:tick(d,mk_x-r*.45,mk_y-r*.23,r*.8,
+                   w=max(2,W//110))
+        txt=str(label).strip()
+        fsz=lines_fit([txt],box_w-W*.10,'uib',int(W*.043))
+        if fsz<int(W*.030):raise ValueError("CHECKLIST_LABEL_TOO_LONG")
+        d.text((x+W*.085,y+W*.068),txt,font=font('uib',fsz),
+               fill=(242,245,244,255),anchor='lm')
         if meta:
-            d.text((w-pad,y),str(meta)[:9],font=font('uim',W*.032),
-                   fill=(182,204,209,255),anchor='rm')
-    place_safe_panel(c,im,'below',alpha=fade(c,e)*clamp(c.lt/.12),
+            sub=str(meta)[:16]
+            sf=lines_fit([sub],box_w-W*.08,'uim',int(W*.025))
+            d.text((x+W*.085,y+W*.119),sub,font=font('uim',sf),
+                   fill=(183,205,211,255),anchor='lm')
+    place_safe_panel(c,lay,region,alpha=fade(c,e)*clamp(c.lt/.12),
                      min_scale=.36)
 
 def np_thumb(c, w, h):
