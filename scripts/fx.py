@@ -706,29 +706,23 @@ def heart(size, color=(255, 48, 64)):
 
 
 def comment_bar(c, e):
-    word = e.o.get('text', 'EFFECTS')
-    bw, bh = int(c.W * 0.9), int(c.W * 0.11)
-    slide = ease_out(c.lt / 0.3); y = c.H * 0.8 + (1 - slide) * c.H * 0.25
-    type_t, post_t = 0.35, 0.35 + 0.08 * len(word) + 0.25
-    typed = word[:int(clamp((c.lt - type_t) / (0.08 * len(word))) * len(word) + 0.001)] if c.lt < post_t else ''
-    im = rrect(bw, bh, bh / 2, (255, 255, 255, 245)); d = ImageDraw.Draw(im)
-    r = bh * 0.32; d.ellipse([bh * 0.2, bh / 2 - r, bh * 0.2 + 2 * r, bh / 2 + r], fill=(214, 41, 118, 255))
-    f = font('ui', bh * 0.3)
-    if typed: d.text((bh * 0.95, bh / 2), typed + ('|' if int(c.lt * 4) % 2 else ''), font=f, fill=INK + (255,), anchor='lm')
-    elif c.lt < post_t: d.text((bh * 0.95, bh / 2), 'Add a comment...', font=f, fill=(150, 150, 150, 255), anchor='lm')
-    d.text((bw - bh * 0.4, bh / 2), 'Post', font=f, fill=((0, 149, 246, 255) if typed else (180, 210, 240, 255)), anchor='rm')
-    al = clamp((e.d - c.lt) / 0.2)
-    place(c, shadowed(im, 14, 6, 100), c.W / 2, y, alpha=al, guard=True)
-    if c.lt >= post_t:
-        k = ease_back((c.lt - post_t) / 0.3)
-        b = rrect(int(c.W * 0.52), int(bh * 0.85), bh * 0.3, (255, 255, 255, 240)); bd = ImageDraw.Draw(b)
-        bd.text((bh * 0.3, b.height * 0.32), 'you', font=font('ui', bh * 0.2), fill=(120, 120, 120, 255), anchor='lm')
-        bd.text((bh * 0.3, b.height * 0.66), word, font=font('ui', bh * 0.3), fill=INK + (255,), anchor='lm')
-        hk = ease_back((c.lt - post_t - 0.3) / 0.3)
-        if hk > 0:
-            hh = heart(bh * 0.4 * hk); b.alpha_composite(hh, (int(b.width - bh * 0.3 - hh.width), int(b.height / 2 - hh.height / 2)))
-        place(c, shadowed(b, 12, 5, 90), c.W * 0.07 + b.width / 2, y - bh * 1.05, 0.7 + 0.3 * k, 0, al * clamp((c.lt - post_t) / 0.1), guard=True)
-
+    """Readable intentional quote; no simulated posting/replies as facts."""
+    W=c.W
+    quote=str(e.o.get('text') or 'ILLUSTRATIVE COMMENT')[:70]
+    w,h=int(W*.82),int(W*.30)
+    panel=rrect(w,h,int(W*.028),(19,34,46,239))
+    d=ImageDraw.Draw(panel)
+    pad=int(W*.046)
+    d.text((pad,h*.20),'COMMENT / QUOTE',
+           font=font('uib',W*.034),fill=(196,215,221,255),
+           anchor='lm')
+    fs=lines_fit([quote],w-2*pad,'uib',int(W*.053))
+    d.text((pad,h*.57),quote,font=font('uib',fs),
+           fill=(244,246,247,255),anchor='lm')
+    d.line((pad,h*.82,w-pad,h*.82),fill=(44,154,144,220),
+           width=max(2,W//110))
+    place_safe_panel(c,panel,'above',alpha=fade(c,e)*clamp(c.lt/.15),
+                     min_scale=.45)
 
 @effect('tap', 'a Follow button pops up and flips to Following')
 def fx_tap(c, e):
@@ -858,28 +852,69 @@ def fx_reel_frame(c, e):
     comments=e.o.get('comments') if verified else None
     ic = cached(e, 'ic', lambda: shadowed(reel_icons(c.W * 0.075,likes,comments), 6, 2, 120))
     comp(c, ic, x0 + iw - ic.width - c.W * 0.01, y0 + ih * 0.52, k)
-    hdl = text_img(e.o.get('text', '@aiwithswarag'), c.W * 0.036, 'ui', (255, 255, 255), shadow=4)
-    comp(c, hdl, x0 + c.W * 0.03, y0 + ih - hdl.height - c.W * 0.04, k)
+    hdl=text_img(e.o.get('text','@aiwithswarag'),
+                 c.W*.049,'uib',(255,255,255),shadow=5)
+    # One coherent, readable inset credit strip.
+    hbg=rrect(int(min(iw*.83,hdl.width+c.W*.11)),
+               int(hdl.height+c.W*.055),max(4,int(c.W*.013)),
+               (14,26,35,222))
+    hbg.alpha_composite(hdl,(int(c.W*.035),
+           max(0,(hbg.height-hdl.height)//2)))
+    comp(c,hbg,x0+c.W*.035,y0+ih-hbg.height-c.W*.055,k)
 
 
 @effect('shortcut-rain', 'keyboard keys rain down behind you')
 def fx_shortcut_rain(c, e):
-    keys = e.o.get('text', 'cmd|/|C|V|Z|esc|tab|shift|enter|opt').split('|')
-    ks = int(c.W * 0.1)
+    if getattr(c,'face_priority',False):
+        W=c.W
+        keys=[x.strip() for x in str(e.o.get(
+            'text','CMD|TAB|SHIFT|ENTER')).split('|') if x.strip()][:4]
+        w,h=int(W*.82),int(W*.27)
+        layer=rrect(w,h,int(W*.026),(16,29,41,238))
+        d=ImageDraw.Draw(layer)
+        d.text((W*.04,h*.22),'KEYBOARD SHORTCUTS',
+               font=font('uib',W*.038),fill=(217,230,231,255),
+               anchor='lm')
+        row_y=h*.56
+        key_gap=W*.02
+        available=w-W*.07-key_gap*(len(keys)-1)
+        key_w=available/max(1,len(keys))
+        for i,key in enumerate(keys):
+            x=W*.035+i*(key_w+key_gap)
+            enter=clamp((c.lt-.09-i*.10)/.18)
+            y=row_y+(1-enter)*W*.02
+            d.rounded_rectangle((x,y-key_w*.25,x+key_w,y+key_w*.36),
+                                radius=max(3,int(W*.01)),
+                                fill=(238,239,234,int(255*enter)))
+            fs=lines_fit([key.upper()],key_w*.84,'uim',int(W*.043))
+            d.text((x+key_w/2,y+key_w*.07),key.upper(),
+                   font=font('uim',fs),fill=(23,37,49,int(255*enter)),
+                   anchor='mm')
+        return place_safe_panel(c,layer,'above',alpha=fade(c,e)*clamp(c.lt/.10),
+                                min_scale=.45)
+    keys=e.o.get('text','cmd|/|C|V|Z|esc|tab|shift|enter|opt').split('|')
+    ks=int(c.W*.1)
     def cap(k):
-        w = max(ks, int(font('mono', ks * 0.36).getlength(k) + ks * 0.5))
-        im = rrect(w, ks, ks * 0.18, (190, 190, 198, 255)); top = rrect(w - 8, ks - 14, ks * 0.16, (246, 246, 248, 255))
-        im.alpha_composite(top, (4, 3)); ImageDraw.Draw(im).text((w / 2, ks * 0.44), k, font=font('mono', ks * 0.36), fill=INK + (255,), anchor='mm')
-        return shadowed(im, 8, 6, 100)
-    caps = cached(e, 'caps', lambda: [cap(k) for k in keys])
-    parts = cached(e, 'p', lambda: [(random.Random(i).random(), random.Random(i + 99).random() * max(0.1, e.d - 0.8),
-                                     0.45 + 0.4 * random.Random(i + 7).random(), random.Random(i + 3).uniform(-25, 25),
-                                     random.Random(i + 5).uniform(-60, 60)) for i in range(int(e.o.get('count', 26)))])
-    for i, (x, t0, v, r0, w) in enumerate(parts):
-        if c.lt < t0: continue
-        y = -ks + (c.lt - t0) * v * c.H
-        place(c, caps[i % len(caps)], c.W * (0.04 + 0.92 * x), y, 0.75 + 0.35 * v, r0 + w * (c.lt - t0), clamp((e.d - c.lt) / 0.2), behind=True)
-
+        w=max(ks,int(font('mono',ks*.36).getlength(k)+ks*.5))
+        im=rrect(w,ks,ks*.18,(190,190,198,255))
+        top=rrect(w-8,ks-14,ks*.16,(246,246,248,255))
+        im.alpha_composite(top,(4,3))
+        ImageDraw.Draw(im).text((w/2,ks*.44),k,
+                font=font('mono',ks*.36),fill=INK+(255,),anchor='mm')
+        return shadowed(im,8,6,100)
+    caps=cached(e,'caps',lambda:[cap(k) for k in keys])
+    parts=cached(e,'p',lambda:[
+        (random.Random(i).random(),
+         random.Random(i+99).random()*max(.1,e.d-.8),
+         .45+.4*random.Random(i+7).random(),
+         random.Random(i+3).uniform(-25,25),
+         random.Random(i+5).uniform(-60,60))
+         for i in range(int(e.o.get('count',26)))])
+    for i,(x,t0,v,r0,w) in enumerate(parts):
+        if c.lt<t0: continue
+        y=-ks+(c.lt-t0)*v*c.H
+        place(c,caps[i%len(caps)],c.W*(.04+.92*x),y,
+              .75+.35*v,r0+w*(c.lt-t0),fade(c,e),behind=True)
 
 @effect('reject-stamp', 'a big red stamp slams onto the screen')
 def fx_reject_stamp(c, e):
@@ -2203,7 +2238,7 @@ def match_page_editorial(c, e, page_no):
     d.text((margin,margin+int(W*.095)),word,font=font('uib',title_size),fill=accent+(255,))
     supplied=str(e.o.get('article_text') or '').strip()
     if not supplied: supplied='Demonstration typography only. No article is asserted.'
-    body_size=max(9,int(W*.041))
+    body_size=max(11,int(W*.051))
     # two lines only, using the actual provided excerpt; long source text
     # must be shortened by the editor, not tiled into fake article pages.
     max_chars=max(12,int((pw-margin*2)/(body_size*.62)))
@@ -2369,7 +2404,8 @@ def fx_led_sign(c, e):
               else max(c.H*.03,c.fy-c.fw*.75-ph))
     xx, yy = grid(c)
     d = ((xx - c.fx) / (c.W * 0.6)) ** 2 + ((yy - (c.fy + c.H * 0.25)) / (c.H * 0.55)) ** 2
-    bright = 1 - k * (0.84 - 0.3 * np.clip(1 - d, 0, 1))
+    dim=float(e.o.get('dim',.36 if getattr(c,'face_priority',False) else .84))
+    bright=1-k*(dim-.3*dim*np.clip(1-d,0,1))
     c.img *= (bright * (1 - c.m) + c.m * (1 - 0.18 * k))[..., None]
     xa, xb = max(0, x0), min(c.W, x0 + pw); ya, yb = max(0, y0), min(c.H, y0 + ph)
     if xb > xa and yb > ya:
