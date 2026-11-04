@@ -254,65 +254,95 @@ def place_safe_panel(c, im, region="above", alpha=1.0, min_scale=0.42,
     return True
 
 
-def executive_motion_cards(c, e, mode="noise"):
-    """Readable source-media focal card preserving each effect's motion cue.
-
-    Uses real approved media or explicitly labeled original Swarag concepts,
-    never tiny repeated selfie thumbnails. One complete unit is reserved
-    above the face, with separate animation modes for noise/orbit/carousel.
-    """
+def executive_motion_cards(c,e,mode="noise"):
+    """Distinct face-clear cards: scatter, orbit or carousel (not one template)."""
     W=c.W
-    cards=list(getattr(e,'cards',[]) or [])
-    if not cards: raise ValueError(mode+' requires approved source cards')
-    labels=[x.strip() for x in str(e.o.get('labels','')).split('|') if x.strip()]
-    if not labels: labels=['ILLUSTRATIVE CONCEPT']*len(cards)
-    count=max(1,min(4,int(e.o.get('count',3))))
-    phase=clamp(c.lt/max(.3,e.d))
-    step=min(count-1,int(phase*count))
-    label=labels[step%len(labels)]
-    src=cards[step%len(cards)].convert('RGB')
-    w,h=int(W*.84),int(W*.29)
-    body=rrect(w,h,int(W*.025),(16,31,43,236))
-    tile_w,tile_h=int(W*.19),int(W*.22)
-    sw,sh=src.size
-    ratio=tile_w/tile_h
-    if sw/sh>ratio:
-        tw=int(sh*ratio);src=src.crop(((sw-tw)//2,0,(sw+tw)//2,sh))
-    else:
-        th=int(sw/ratio);src=src.crop((0,(sh-th)//2,sw,(sh+th)//2))
-    body.alpha_composite(src.resize((tile_w,tile_h),
-                         Image.LANCZOS).convert('RGBA'),
-                         (int(W*.034),int(W*.035)))
+    sources=list(getattr(e,'cards',[]) or [])
+    if not sources: raise ValueError("MOTION_CARDS_NEED_APPROVED_ASSETS")
+    labels=[v.strip() for v in str(e.o.get('labels','')).split('|') if v.strip()]
+    if not labels:
+        labels=['ILLUSTRATIVE CONCEPT']*len(sources)
+    n=max(2,min(4,int(e.o.get('count',3))))
+    p=clamp(c.lt/max(.3,e.d))
+    w,h=int(W*.86),int(W*.35)
+    body=Image.new('RGBA',(w,h),(0,0,0,0))
+    background=rrect(w,h,max(5,int(W*.024)),(15,29,41,234))
+    body.alpha_composite(background,(0,0))
     d=ImageDraw.Draw(body)
-    x=int(W*.27)
-    d.text((x,int(h*.29)),
-           ('ORBITING IDEA' if mode=='orbit' else
-            'CURRENT CARD' if mode=='carousel' else 'FOCUS CARD'),
-           font=font('uim',W*.027),fill=(184,206,211,255))
-    fs=lines_fit([label],w-x-W*.045,'uib',int(W*.057))
-    d.text((x,int(h*.60)),label.upper(),font=font('uib',fs),
-           fill=(242,245,247,255),anchor='lm')
-    d.text((x,int(h*.81)),f'{step+1:02d} / {count:02d}',
-           font=font('uim',W*.030),fill=(197,164,109,255),
-           anchor='lm')
-    # The motion identity persists in the compact preview without throwing
-    # unreadable cards across eyes or hair.
-    if mode=='orbit':
-        rad=W*.035
-        theta=phase*2*math.pi
-        ox=w*.89+rad*math.cos(theta)
-        oy=h*.50+rad*math.sin(theta)
-        rr=max(3,int(W*.012))
-        d.ellipse((ox-rr,oy-rr,ox+rr,oy+rr),fill=(44,154,144,255))
+    pad=int(W*.032)
+    name={'noise':'IDEA COLLAGE','orbit':'IDEAS IN ORBIT',
+          'carousel':'CONTENT CAROUSEL'}.get(mode,'CONCEPT CARDS')
+    d.text((pad,W*.039),name,font=font('uim',W*.029),
+           fill=(188,215,214,255),anchor='lm')
+    def tile(index,tw,th,focus=False):
+        src=sources[index%len(sources)].convert('RGB')
+        sw,sh=src.size
+        thumbw=int(tw*.32);thumbh=int(th*.74)
+        ratio=thumbw/max(1,thumbh)
+        if sw/sh>ratio:
+            crop=int(sh*ratio);src=src.crop(((sw-crop)//2,0,
+                                           (sw+crop)//2,sh))
+        else:
+            crop=int(sw/ratio);src=src.crop((0,(sh-crop)//2,
+                                           sw,(sh+crop)//2))
+        image=src.resize((max(1,thumbw),max(1,thumbh)),
+                         Image.LANCZOS).convert('RGBA')
+        pane=rrect(tw,th,max(4,int(W*.013)),
+                   (29,49,61,252) if focus else (35,52,65,239))
+        pane.alpha_composite(image,(int(W*.014),(th-thumbh)//2))
+        dd=ImageDraw.Draw(pane)
+        x=int(W*.022)+thumbw
+        label=str(labels[index%len(labels)]).upper()
+        fsz=lines_fit([label],tw-x-W*.014,'uib',
+                      int(W*(.043 if focus else .034)))
+        dd.text((x,th*.50),label,font=font('uib',fsz),
+                fill=(247,245,239,255),anchor='lm')
+        return pane
+    if mode=='noise':
+        # Independently staggered cards create a genuine layered collage.
+        layout=((.035,.29,.44,.58),(.49,.19,.34,.39),(.50,.64,.33,.29))
+        for i,(x,y,rw,rh) in enumerate(layout[:n]):
+            if c.lt<.09+.12*i: continue
+            tw,th=int(w*rw),int(h*rh)
+            im=tile(i,tw,th,i==0)
+            q=ease_out((c.lt-.09-.12*i)/.35)
+            left=int(w*x+(1-q)*W*.022*(1 if i%2 else -1))
+            top=int(h*y)
+            if top+im.height>h: top=h-im.height
+            body.alpha_composite(im,(max(0,left),max(0,top)))
+    elif mode=='orbit':
+        # Three visible depth-ordered ideas travel along a shallow orbital arc.
+        rx=w*.305
+        count=3
+        for i in range(count):
+            angle=2*math.pi*i/count+.40*math.sin(2*math.pi*p)
+            depth=math.sin(angle)
+            tw=int(W*(.255+.025*(depth+1)))
+            th=int(W*.190)
+            im=tile(i,tw,th,i==int(p*count)%count)
+            cx=w*.50+rx*math.cos(angle)
+            cy=h*.55+h*.10*math.sin(angle)
+            left=max(0,min(w-im.width,int(cx-im.width/2)))
+            top=max(0,min(h-im.height,int(cy-im.height/2)))
+            body.alpha_composite(im,(left,top))
     elif mode=='carousel':
-        bar_y=h*.91
-        d.rounded_rectangle((x,bar_y,w-W*.04,bar_y+W*.008),
-                            radius=W*.003,fill=(76,99,111,255))
-        d.rounded_rectangle((x,bar_y,x+(w-W*.04-x)*phase,bar_y+W*.008),
-                            radius=W*.003,fill=(44,154,144,255))
-    return place_safe_panel(c,body,'above',
-                            alpha=fade(c,e)*clamp((c.lt-.04)/.15),
-                            min_scale=.43)
+        # Horizontal adjacent-card peeks and a clear active central card.
+        active=int(p*n)%n
+        ww=[int(W*.21),int(W*.38),int(W*.21)]
+        hh=int(W*.215)
+        positions=[int(w*.035),int(w*.31),int(w*.735)]
+        order=[(active-1)%n,active,(active+1)%n]
+        for slot,i in enumerate(order):
+            im=tile(i,ww[slot],hh,focus=slot==1)
+            y=int(h*.23)+int(abs(1-slot)*W*.018)
+            body.alpha_composite(im,(positions[slot],y))
+        y0=h-W*.026
+        d.rounded_rectangle((w*.26,y0,w*.74,y0+W*.007),
+                            radius=max(1,W*.004),fill=(69,98,109,255))
+        d.rounded_rectangle((w*.26,y0,w*(.26+.48*p),y0+W*.007),
+                            radius=max(1,W*.004),fill=(44,154,144,255))
+    return place_adaptive_panel(c,body,'above',
+                alpha=fade(c,e)*clamp((c.lt-.05)/.18),min_scale=.32)
 
 
 def adaptive_panel_location(c, width, height, preferred="below", min_scale=.34):
