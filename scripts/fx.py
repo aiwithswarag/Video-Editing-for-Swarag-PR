@@ -23,6 +23,16 @@ NAMES = ['The Noise', 'The Lineup', 'Locked On', 'Orbit', 'Lean-In', 'Backdrop W
          'Moody', 'Swipe', 'The To-Do', 'Comment Box', 'The Tap', 'Pause & Point', 'Uninstall', 'Reel Frame',
          'Shortcut Rain', 'Reject Stamp', 'Countdown Flip', 'Rabbit Hole', 'Cover Star', 'Scribble']
 EFFECTS = {}
+# Production UI must never disappear while the output MP4 remains technically
+# decodable. These original functions now use place_safe_panel.
+_REQUIRED_PANEL_VISIBLE = frozenset({
+    'swipe','todo','tap','pause-point','the-bill','noise','lineup',
+    'orbit','reject-stamp','cover-star','scribble','red-collage',
+    'check-pills','headline-box','profile-wall','tier-list',
+    'phone-fan','headline-wall','checklist','glass-widgets',
+    'timeline','comment-box','liquid-glass-graph','carousel-spin',
+    'apple-toggles','shortcut-rain','backdrop-word'
+})
 ALIASES = {'the-noise': 'noise', 'the-lineup': 'lineup', 'bill': 'the-bill', 'to-do': 'todo', 'the-todo': 'todo', 'the-to-do': 'todo',
            'the-tap': 'tap', 'follow': 'tap', 'comment': 'comment-box', 'pause': 'pause-point', 'pause-and-point': 'pause-point',
            'backdrop': 'backdrop-word', 'stamp': 'reject-stamp', 'countdown': 'countdown-flip', 'cover': 'cover-star', 'rain': 'shortcut-rain',
@@ -2868,7 +2878,16 @@ def main():
                 c.face_priority = f.o.get("face_priority") is True
                 c.current_fx = f.name
                 c.graphic_region = f.o.get("graphic_region")
+                visible_before=getattr(c,'visible_safe_panels',0)
                 EFFECTS[f.name][0](c, f)
+                if (c.face_priority and f.name in _REQUIRED_PANEL_VISIBLE
+                    and not (f.name=='glass-widgets' and
+                             f.o.get('look')=='rag-evidence')
+                    and c.lt>.35 and
+                    getattr(c,'visible_safe_panels',0)==visible_before):
+                    raise RuntimeError(
+                        'VISIBLE_PANEL_MISSING: '+f.name+
+                        ' at source time %.3fs' % t)
             frame = (np.clip(c.img, 0, 1) * 255 + 0.5).astype(np.uint8)
         if stills is not None:
             out = dst if len(stills) == 1 else dst.replace('.png', f'_{t:.2f}.png')
