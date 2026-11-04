@@ -144,8 +144,13 @@ _FACE_TOUCH_EFFECTS = frozenset(("locked-on", "scribble", "swipe",
 def face_protection_rect(c):
     fw = max(float(c.fw), float(c.W) * 0.045, 1.0)
     margin = max(c.W * 0.035, 3.0)
+    # YuNet's face centre and width already represent the detected
+    # facial area. Protect the hairline generously while keeping the
+    # chest available for genuinely lower-third graphics. Extending
+    # 1.48 face-widths below the centre had reserved the entire torso,
+    # collapsing informational panels into unreadable postage stamps.
     return (c.fx - fw * 1.08 - margin, c.fy - fw * 1.42 - margin,
-            c.fx + fw * 1.08 + margin, c.fy + fw * 1.48 + margin)
+            c.fx + fw * 1.08 + margin, c.fy + fw * 1.12 + margin)
 
 
 def overlaps_face(c, x, y, w, h):
@@ -2086,43 +2091,53 @@ def rag_evidence_glass_widgets(c, e):
 
 
 @effect('glass-widgets', 'minimalist floating data widgets and mini artifacts')
-def executive_glass_widgets(c, e):
-    """One or two useful Swarag glass panels, with real readable copy."""
+def executive_glass_widgets(c,e):
+    """Native frosted executive glass, not a duplicated dark template."""
     W=c.W
     simple=e.o.get('look')=='simple'
-    headline=str(e.o.get('text') or 'ILLUSTRATIVE CONCEPT')[:34].upper()
-    detail=str(e.o.get('sub') or 'STRATEGY  •  DELIVERY')[:55]
+    headline=str(e.o.get('text') or 'ILLUSTRATIVE CONCEPT').upper()[:38]
+    detail=str(e.o.get('sub') or 'STRATEGY  •  DELIVERY')[:54]
     if not e.o.get('metric_source') and not e.o.get('hypothetical_example'):
-        # These are conceptual labels, not invented business measurements.
         if any(ch.isdigit() for ch in headline):
             raise ValueError('GLASS_WIDGET_NUMERIC_CLAIM_REQUIRES_SOURCE')
-    w,h=int(W*.83),int(W*.30)
-    cx,cy,sc=safe_panel_layout(c,w,h,'above',min_scale=.43)
-    g=glass(c,w,h,W*.028,cx,cy,amt=.10,
-            tint=(18,34,45),dark=.47,blur=max(6,W//34))
-    d=ImageDraw.Draw(g)
-    pad=int(W*.052)
-    title_font=lines_fit([headline],w-2*pad,'uib',int(W*.061))
-    d.text((pad,h*.38),headline,font=font('uib',title_font),
-           fill=(243,248,246,255),anchor='lm')
-    d.line((pad,h*.59,w-pad,h*.59),
-           fill=(44,154,144,195),width=max(2,W//110))
-    sub_font=lines_fit([detail],w-2*pad,'uim',int(W*.042))
-    d.text((pad,h*.78),detail,font=font('uim',sub_font),
-           fill=(219,236,237,255),anchor='lm')
-    place_safe_panel(c,g,'above',
-                     alpha=fade(c,e)*clamp(c.lt/.15),min_scale=.43)
+    w=int(W*.88)
+    h=int(W*(.275 if simple else .385))
+    cx,cy,scale=safe_panel_layout(c,w,h,'above',min_scale=.56)
+    lay=glass(c,w,h,max(5,int(W*.026)),cx,cy,
+              amt=.18,tint=(24,41,51),dark=.33,
+              blur=max(7,W//27))
+    d=ImageDraw.Draw(lay)
+    pad=int(W*.047)
+    # Strong enough ivory type for actual phone-sized playback.
+    fs=lines_fit([headline],w-2*pad,'uib',int(W*.061))
+    if fs<int(W*.041):raise ValueError('GLASS_WIDGET_HEADLINE_TOO_LONG')
+    d.text((pad,W*.069),headline,font=font('uib',fs),
+           fill=(249,249,244,255),anchor='lm')
+    d.line((pad,W*.128,w-pad,W*.128),
+           fill=(44,154,144,230),width=max(2,W//118))
+    subsize=lines_fit([detail],w-2*pad,'uim',int(W*.042))
+    d.text((pad,W*.195),detail,font=font('uim',subsize),
+           fill=(231,243,240,255),anchor='lm')
     if not simple:
-        label=str(e.o.get('pill') or 'REVIEW → EXECUTION')[:37].upper()
-        bw,bh=int(W*.76),int(W*.15)
-        note=rrect(bw,bh,int(W*.025),(20,39,52,240))
-        nd=ImageDraw.Draw(note)
-        fs=lines_fit([label],bw*.87,'uib',int(W*.046))
-        nd.text((bw/2,bh/2),label,font=font('uib',fs),
-                fill=(224,242,239,255),anchor='mm')
-        place_safe_panel(c,note,'below',
-                         alpha=fade(c,e)*clamp((c.lt-.25)/.15),
-                         min_scale=.45)
+        # The standard look has a distinct second glass compartment,
+        # grouped with the primary content. The SIMPLE look has none.
+        pill=str(e.o.get('pill') or 'REVIEW → EXECUTION').upper()[:36]
+        bottom_y=int(W*.252)
+        d.rounded_rectangle((pad,bottom_y,w-pad,h-W*.027),
+                            radius=max(4,int(W*.018)),
+                            fill=(14,37,46,196),
+                            outline=(108,175,175,142),
+                            width=max(1,W//180))
+        pf=lines_fit([pill],w-3*pad,'uib',int(W*.044))
+        d.text((w/2,(bottom_y+h-W*.027)/2),pill,
+               font=font('uib',pf),
+               fill=(237,247,245,255),anchor='mm')
+    d.rounded_rectangle((1,1,w-2,h-2),
+                        radius=max(5,int(W*.026)),
+                        outline=(228,239,238,94),
+                        width=max(1,W//220))
+    place_safe_panel(c,lay,'above',alpha=fade(c,e)*clamp(c.lt/.16),
+                     min_scale=.56)
 
 
 def fx_glass_widgets(c, e):
@@ -2326,21 +2341,25 @@ def fx_liquid_glass_graph(c,e):
         ox,oy=pts[-1];rad=max(2,W*.011)
         d.ellipse((ox-rad,oy-rad,ox+rad,oy+rad),
                   fill=(240,249,247,255))
+    if bento:
+        # One atomic two-part bento unit. The old second independent strip
+        # was placed across the first chart when both sought the top zone.
+        note=str(e.o.get('bento_label',
+            'ILLUSTRATIVE VIEW' if illustrative else 'SOURCE CHECK'))[:33]
+        ix,iy=int(W*.033),int(W*.245)
+        iw,ih=int(w-W*.066),int(W*.097)
+        bd=ImageDraw.Draw(im)
+        bd.rounded_rectangle((ix,iy,ix+iw,iy+ih),
+                             radius=max(3,int(W*.014)),
+                             fill=(21,45,57,240),
+                             outline=(44,154,144,190),
+                             width=max(1,W//180))
+        ff=lines_fit([note],iw*.91,'uib',int(W*.041))
+        bd.text((ix+iw*.50,iy+ih*.50),note.upper(),
+                font=font('uib',ff),
+                fill=(241,249,247,255),anchor='mm')
     place_safe_panel(c,im,region,
                      alpha=fade(c,e)*clamp(c.lt/.12),min_scale=.34)
-    if bento:
-        note=str(e.o.get('bento_label',
-             'ILLUSTRATIVE VIEW' if illustrative else 'SOURCE CHECK'))[:33]
-        nw,nh=int(W*.76),int(W*.13)
-        bar=rrect(nw,nh,W*.022,(18,40,54,239))
-        nd=ImageDraw.Draw(bar)
-        ff=lines_fit([note],nw*.88,'uib',int(W*.047))
-        nd.text((nw/2,nh/2),note.upper(),font=font('uib',ff),
-                fill=(242,245,242,255),anchor='mm')
-        # Two independent glass modules define the named bento composition.
-        place_adaptive_panel(c,bar,'above',
-                             alpha=fade(c,e)*clamp((c.lt-.18)/.18),
-                             min_scale=.43)
 
 @effect('carousel-spin', 'your reels spin around you in a 3D carousel, then slow to a stop')
 def fx_carousel_spin(c, e):
