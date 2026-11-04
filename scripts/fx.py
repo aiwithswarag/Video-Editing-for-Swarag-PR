@@ -643,23 +643,29 @@ def comment_bar(c, e):
 
 @effect('tap', 'a Follow button pops up and flips to Following')
 def fx_tap(c, e):
-    at = float(e.o['at']) - e.start if 'at' in e.o else e.d * 0.45  # 'at' = video second of the tap
-    bw, bh = int(c.W * 0.3), int(c.W * 0.09)
-    x = clamp(float(e.o['x']) * c.W if 'x' in e.o else c.fx + c.fw * 1.9, bw / 2 + 30, c.W - bw / 2 - 30)
-    y = clamp(float(e.o['y']) * c.H if 'y' in e.o else c.fy + c.fw * 1.6, bh + 30, c.H - bh - 30)
-    on = c.lt >= at
-    col = rgb(e.o.get('color'), (124, 92, 255)) if on else (0, 149, 246)
-    im = rrect(bw, bh, bh * 0.28, col + (255,)); d = ImageDraw.Draw(im)
-    d.text((bw / 2, bh / 2), 'Following' if on else '+ Follow', font=font('ui', bh * 0.4), fill=(255, 255, 255, 255), anchor='mm')
-    pop = ease_back(c.lt / 0.3)
-    sq = 1.0
-    if on: q = (c.lt - at) / 0.3; sq = 1 - 0.12 * math.sin(math.pi * clamp(q)) if q < 1 else 1
-    place(c, shadowed(im, 12, 6, 110), x, y, (0.6 + 0.4 * pop) * sq, 0, clamp(c.lt / 0.1) * clamp((e.d - c.lt) / 0.2), guard=True)
-    if on and c.lt - at < 0.4:
-        q = (c.lt - at) / 0.4; r = int(bh * (0.3 + 0.9 * q)); ring = Image.new('RGBA', (2 * r + 8, 2 * r + 8), (0, 0, 0, 0))
-        ImageDraw.Draw(ring).ellipse([4, 4, 2 * r + 4, 2 * r + 4], outline=(255, 255, 255, int(220 * (1 - q))), width=5)
-        place(c, ring, x, y, guard=True)
-
+    """One coherent button/ripple unit; both always share the same anchor."""
+    W=c.W
+    bw,bh=int(W*.42),int(W*.135)
+    at=float(e.o['at'])-e.start if e.o.get('at') else e.d*.45
+    on=c.lt>=at
+    col=rgb(e.o.get('color'),(44,154,144)) if on else (44,116,165)
+    gw,gh=int(W*.65),int(W*.24)
+    layer=Image.new('RGBA',(gw,gh),(0,0,0,0))
+    button=rrect(bw,bh,int(W*.025),col+(255,))
+    d=ImageDraw.Draw(button)
+    d.text((bw/2,bh/2),'Following' if on else '+ Follow',
+           font=font('uib',W*.052),fill=(255,255,255,255),anchor='mm')
+    layer.alpha_composite(button,((gw-bw)//2,(gh-bh)//2))
+    if on and c.lt-at<.45:
+        q=clamp((c.lt-at)/.45)
+        r=int(bh*(.68+.32*q))
+        ring=Image.new('RGBA',(gw,gh))
+        ImageDraw.Draw(ring).ellipse(
+            (gw/2-r,gh/2-r,gw/2+r,gh/2+r),
+            outline=(230,248,244,int(200*(1-q))),width=max(2,W//120))
+        layer.alpha_composite(ring)
+    place_safe_panel(c,layer,'below',alpha=fade(c,e)*clamp(c.lt/.12),
+                     min_scale=.40)
 
 def hand_path(d, pts, color, width, frac):
     n = max(2, int(len(pts) * clamp(frac)))
@@ -680,23 +686,33 @@ def arrow_head(d, pts, color, width, size):
 
 @effect('pause-point', 'freeze the frame and point at something with a hand-drawn arrow')
 def fx_pause_point(c, e):
-    if 'f' not in e.state: e.state['f'] = (c.img.copy(), c.m.copy(), c.fx, c.fy, c.fw)
-    img, m, c.fx, c.fy, c.fw = e.state['f']; c.img, c.m = img.copy(), m
-    face_cam(c, 1 + 0.06 * ease_out(c.lt / e.d), 0.4)
-    c.img = c.img * 0.92 + grade(c.img, 'bw') * 0.08
-    col = rgb(e.o.get('color'), YELLOW) + (255,)
-    lay = Image.new('RGBA', (c.W, c.H), (0, 0, 0, 0)); d = ImageDraw.Draw(lay)
-    d.rounded_rectangle([c.W * 0.05, c.H * 0.06, c.W * 0.05 + c.W * 0.1, c.H * 0.06 + c.W * 0.1], 16, fill=(0, 0, 0, 150))
-    for bx in (0.075, 0.11): d.rectangle([c.W * bx, c.H * 0.06 + c.W * 0.025, c.W * (bx + 0.017), c.H * 0.06 + c.W * 0.075], fill=(255, 255, 255, 230))
-    tx, ty = c.W * float(e.o.get('label_x', 0.72)), c.fy - c.fw * 2.2
-    pts = arrow_pts(tx - c.W * 0.05, ty + c.W * 0.06, c.fx + c.fw * 0.75, c.fy - c.fw * 0.35, 0.3)
-    k = ease_out((c.lt - 0.15) / 0.4)
-    hand_path(d, pts, col, max(6, c.W // 140), k)
-    if k >= 0.99: arrow_head(d, pts, col, max(6, c.W // 140), c.W * 0.04)
-    comp(c, to_np(lay), 0, 0)
-    lab = text_img(e.o.get('text', 'look here'), c.W * 0.07, 'hand', col[:3], shadow=6)
-    place(c, lab, tx, ty - lab.height * 0.2, 0.7 + 0.3 * ease_back(c.lt / 0.3), -6, clamp(c.lt / 0.1), guard=True)
-
+    if 'f' not in e.state:
+        e.state['f']=(c.img.copy(),c.m.copy(),c.fx,c.fy,c.fw)
+    img,m,c.fx,c.fy,c.fw=e.state['f']
+    c.img,c.m=img.copy(),m.copy()
+    # Freeze the camera, draw toward a verified on-screen idea. A missing
+    # target defaults to background shelf space, never the real eyes.
+    W,H=c.W,c.H
+    target_x=W*float(e.o.get('target_x',.78))
+    target_y=H*float(e.o.get('target_y',.16))
+    if overlaps_face(c,target_x-W*.02,target_y-W*.02,W*.04,W*.04):
+        raise ValueError('PAUSE_POINT_TARGET_OVER_FACE')
+    label=str(e.o.get('text','KEY DETAIL'))[:32].upper()
+    panel=rrect(int(W*.76),int(W*.18),int(W*.026),
+                (18,31,42,236))
+    d=ImageDraw.Draw(panel)
+    f=lines_fit([label],panel.width*.88,'uib',int(W*.065))
+    d.text((panel.width/2,panel.height/2),label,
+           font=font('uib',f),fill=(247,243,232,255),anchor='mm')
+    place_safe_panel(c,panel,'above',alpha=clamp(c.lt/.18)*fade(c,e),
+                     min_scale=.45)
+    # Mark the factual target with a compact, unobtrusive ring.
+    radius=max(5,int(W*.020))
+    im=Image.new('RGBA',(radius*3,radius*3),(0,0,0,0))
+    col=rgb(e.o.get('color'),(197,164,109))+(255,)
+    ImageDraw.Draw(im).ellipse((radius*.5,radius*.5,
+         radius*2.5,radius*2.5),outline=col,width=max(2,W//130))
+    place(c,im,target_x,target_y,alpha=fade(c,e)*clamp(c.lt/.2))
 
 @effect('uninstall', 'a glitchy uninstall bar that breaks the frame apart')
 def fx_uninstall(c, e):
@@ -778,24 +794,23 @@ def fx_shortcut_rain(c, e):
 
 @effect('reject-stamp', 'a big red stamp slams onto the screen')
 def fx_reject_stamp(c, e):
-    word = e.o.get('text', 'REJECTED').upper(); col = rgb(e.o.get('color'), (214, 40, 40))
-    def build():
-        t = fit_text(word, c.W * 0.62, 'bold', 200, fill=col); pad = int(t.height * 0.12)
-        im = Image.new('RGBA', (t.width + 4 * pad, t.height + 2 * pad), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
-        d.rounded_rectangle([3, 3, im.width - 4, im.height - 4], 18, outline=col + (255,), width=max(6, pad // 2))
-        im.alpha_composite(t, (2 * pad, pad))
-        a = np.asarray(im.split()[3], np.float32) * np.clip(np.random.default_rng(3).uniform(0.55, 1.6, (im.height, im.width)), 0, 1)
-        im.putalpha(Image.fromarray(a.astype(np.uint8)))
-        return im
-    st = cached(e, 's', build)
-    k = clamp(c.lt / 0.16); sc = 2.3 - 1.3 * k * k
-    if 0.16 < c.lt < 0.45:
-        a = (0.45 - c.lt) / 0.29 * c.W * 0.012; rnd = np.random.default_rng(int(c.t * 30))
-        M = np.float32([[1, 0, rnd.uniform(-a, a)], [0, 1, rnd.uniform(-a, a)]])
-        c.img = cv2.warpAffine(c.img, M, (c.W, c.H), borderMode=cv2.BORDER_REFLECT)
-    y = clamp(float(e.o['y']) * c.H if 'y' in e.o else c.fy + c.fw * 2.7, 0, c.H * 0.85)
-    place(c, st, c.W / 2, y, sc, float(e.o.get('angle', 12)), k * clamp((e.d - c.lt) / 0.2), guard=True)
-
+    """Legible judgment stamp with contrast plate, never over facial details."""
+    W=c.W
+    txt=str(e.o.get('text','REJECTED')).upper()[:26]
+    w,h=int(W*.74),int(W*.215)
+    im=rrect(w,h,int(W*.022),(20,32,43,242))
+    d=ImageDraw.Draw(im)
+    edge=(197,164,109,255)
+    pad=int(W*.016)
+    d.rounded_rectangle((pad,pad,w-pad,h-pad),
+                        radius=int(W*.014),outline=edge,
+                        width=max(2,int(W*.008)))
+    fs=lines_fit([txt],w-pad*5,'uib',int(W*.090))
+    d.text((w/2,h/2),txt,font=font('uib',fs),
+           fill=(242,235,218,255),anchor='mm')
+    place_safe_panel(c,im,'below',
+                     alpha=fade(c,e)*ease_out(c.lt/.21),
+                     min_scale=.40)
 
 @effect('countdown-flip', 'a 3, 2, 1 flip clock above your head')
 def fx_countdown(c, e):
