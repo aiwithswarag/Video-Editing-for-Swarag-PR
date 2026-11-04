@@ -113,28 +113,94 @@ def shadowed(im, blur=18, dy=10, alpha=120):
 def to_np(im): return np.asarray(im.convert('RGBA'), dtype=np.float32) / 255.0
 
 
+
+# Deliberate editorial layout: move a complete graphic rather than cutting
+# an oval hole in its letters or glass panel. The face box follows the original
+# tracked speaker; these are geometric bounds, not identity recognition.
+_FACE_TOUCH_EFFECTS = frozenset(("locked-on", "scribble", "swipe",
+                                 "pause-point", "dot-reveal", "rabbit-hole",
+                                 "uninstall"))
+
+def face_protection_rect(c):
+    fw = max(float(c.fw), float(c.W) * 0.045, 1.0)
+    margin = max(c.W * 0.035, 3.0)
+    return (c.fx - fw * 1.08 - margin, c.fy - fw * 1.42 - margin,
+            c.fx + fw * 1.08 + margin, c.fy + fw * 1.48 + margin)
+
+
+def overlaps_face(c, x, y, w, h):
+    a, b, d, e = face_protection_rect(c)
+    return (x < d and x + w > a and y < e and y + h > b)
+
+
+def safe_graphic_xy(c, x, y, w, h, preferred=None):
+    """Return full-unit, face-clear top-left or None when it cannot fit.
+
+    Unlike the legacy pixel-mask guard, the text and its background move
+    TOGETHER; no chopped text, transparent forehead or floating UI toggle.
+    """
+    margin = max(c.W * 0.035, 4.0)
+    if w > c.W - margin * 2 or h > c.H - margin * 2:
+        return None
+    def bounded(u, a, b): return max(a, min(b, u))
+    x0 = bounded(x, margin, c.W - w - margin)
+    y0 = bounded(y, margin, c.H - h - margin)
+    if not overlaps_face(c, x0, y0, w, h):
+        return (x0, y0)
+    face_left, face_top, face_right, face_bottom = face_protection_rect(c)
+    top = (c.W / 2 - w / 2, margin)
+    bottom = (c.W / 2 - w / 2, c.H - h - margin)
+    left = (margin, bounded(y, margin, c.H - h - margin))
+    right = (c.W - w - margin, bounded(y, margin, c.H - h - margin))
+    if preferred == 'above': candidates = [top, left, right, bottom]
+    elif preferred == 'below': candidates = [bottom, left, right, top]
+    else: candidates = [top, bottom, left, right]
+    valid = [(cx, cy) for cx, cy in candidates
+             if not overlaps_face(c, cx, cy, w, h)]
+    if not valid: return None
+    if preferred in ('above', 'below'): return valid[0]
+    return min(valid, key=lambda pt: abs(pt[0]-x)+abs(pt[1]-y))
+
 def comp(c, layer, x, y, alpha=1.0, behind=False, guard=False):
     """Alpha-composite an RGBA layer with its top-left at (x, y).
     behind=True hides it wherever the person is (so it sits behind you).
     guard=True only hides it where it would cover your face."""
     L = to_np(layer) if isinstance(layer, Image.Image) else layer
     h, w = L.shape[:2]; x, y = int(round(x)), int(round(y))
+    if alpha <= 0: return
+    executive = bool(getattr(c, "face_priority", False))
+    intentional_face_art = getattr(c, "current_fx", None) in _FACE_TOUCH_EFFECTS
+    if executive and not behind and (guard or not intentional_face_art):
+        preferred = getattr(c, "graphic_region", None)
+        pos = safe_graphic_xy(c, x, y, w, h, preferred)
+        if pos is None:
+            # Do not cover the real eyes/mouth or manufacture an oval gap.
+            c.layout_conflicts = getattr(c, "layout_conflicts", 0) + 1
+            return
+        x, y = [int(round(v)) for v in pos]
     x0, y0, x1, y1 = max(0, x), max(0, y), min(c.W, x + w), min(c.H, y + h)
-    if x1 <= x0 or y1 <= y0 or alpha <= 0: return
+    if x1 <= x0 or y1 <= y0: return
     L = L[y0 - y:y1 - y, x0 - x:x1 - x]
     a = L[..., 3:4] * alpha
     m = np.clip(c.m[y0:y1, x0:x1, None], 0, 1)
-    if behind or guard or getattr(c, "face_priority", False):
-        # Face geometry is an independent failsafe when MediaPipe misses
-        # hair/eyes for a frame. Do not rely on the person mask alone.
-        yy, xx = np.ogrid[y0:y1, x0:x1]
-        fw = max(float(c.fw), float(c.W) * 0.045, 1.0)
-        e = ((xx - c.fx) / (fw * 1.07)) ** 2 + ((yy - c.fy) / (fw * 1.43)) ** 2
-        face_protect = np.clip((1.25 - e) / 0.3, 0, 1)[..., None]
-        if behind:
-            a = a * (1 - np.maximum(m, face_protect))
+    if behind:
+        # Actual person segmentation is authoritative where available.
+        # Previous max(mask, face_ellipse) caused an obvious oval halo around
+        # the hair even when the segmentation correctly followed the person.
+        if float(c.m.max()) > 0.08:
+            a = a * (1 - m)
         else:
-            a = a * (1 - face_protect)
+            yy, xx = np.ogrid[y0:y1, x0:x1]
+            fw = max(float(c.fw), float(c.W) * 0.045, 1.0)
+            e = ((xx - c.fx)/(fw*1.08))**2 + ((yy-c.fy)/(fw*1.44))**2
+            fallback = np.clip((1.20-e)/0.30,0,1)[...,None]
+            a = a * (1 - fallback)
+    elif guard and not executive:
+        # Unbranded showcase keeps the historical guarded style.
+        yy, xx = np.ogrid[y0:y1, x0:x1]
+        fw = max(float(c.fw), float(c.W)*0.045, 1.)
+        e = ((xx-c.fx)/(fw*1.07))**2 + ((yy-c.fy)/(fw*1.43))**2
+        a = a * (1 - np.clip((1.25-e)/0.3,0,1)[...,None] * m)
     dst = c.img[y0:y1, x0:x1]
     dst[:] = dst * (1 - a) + L[..., :3] * a
 
@@ -2237,6 +2303,8 @@ def main():
                 # even if individual original effects place an unguarded card.
                 # Unbranded original showcase preserves its original behavior.
                 c.face_priority = f.o.get("face_priority") is True
+                c.current_fx = f.name
+                c.graphic_region = f.o.get("graphic_region")
                 EFFECTS[f.name][0](c, f)
             frame = (np.clip(c.img, 0, 1) * 255 + 0.5).astype(np.uint8)
         if stills is not None:
