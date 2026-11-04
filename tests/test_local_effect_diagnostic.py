@@ -187,4 +187,40 @@ class RealRendererDiagnosticSubset(unittest.TestCase):
                 self.assertTrue((root/"private-health"/"effect-gallery"/(label+".mp4")).is_file())
 
 
+class SourceRelativeVisualFootprint(unittest.TestCase):
+    @unittest.skipUnless(__import__("importlib").util.find_spec("cv2") is not None,
+                         "OpenCV is required for moving-pixel QA")
+    def test_miniature_panel_is_flagged_and_legible_panel_is_not(self):
+        import numpy as np
+        import cv2
+        from effect_footprint_qc import effect_footprint
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            W,H=240,426
+            base=root/"source.mp4"
+            small=root/"small.mp4"
+            large=root/"large.mp4"
+            paths=(base,small,large)
+            videos=[cv2.VideoWriter(str(p),cv2.VideoWriter_fourcc(*"mp4v"),
+                       8,(W,H)) for p in paths]
+            try:
+                for _ in range(18):
+                    fr=np.full((H,W,3),112,dtype=np.uint8)
+                    tiny=fr.copy()
+                    tiny[370:382,90:120]=(230,230,230)
+                    prominent=fr.copy()
+                    prominent[38:120,30:212]=(230,230,230)
+                    for writer,frame in zip(videos,(fr,tiny,prominent)):
+                        writer.write(frame)
+            finally:
+                for w in videos:w.release()
+            micro=effect_footprint(base,small,label="checklist")
+            visible=effect_footprint(base,large,label="checklist")
+            self.assertIn("VISUAL_FOOTPRINT_TOO_SMALL_FOR_PHONE_REVIEW",
+                          micro["review_flags"])
+            self.assertNotIn("VISUAL_FOOTPRINT_TOO_SMALL_FOR_PHONE_REVIEW",
+                             visible["review_flags"])
+            self.assertEqual("NOT_CERTIFIED",visible["creative_approval"])
+
+
 if __name__=="__main__":unittest.main()
