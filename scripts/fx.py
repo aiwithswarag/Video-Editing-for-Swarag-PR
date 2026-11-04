@@ -493,12 +493,17 @@ def fx_todo(c, e):
     items = e.o.get('text', 'Strategy|Execution|Measurable value').split('|')
     # ticks = video seconds when each item gets ticked (e.g. when you say it); default is evenly spaced
     ticks = [float(t) - e.start for t in str(e.o['ticks']).split('|')] if e.o.get('ticks') else [e.d * (i + 1) / (len(items) + 1) for i in range(len(items))]
-    cw = int(c.W * 0.5); lh = int(cw * 0.13); pad = int(cw * 0.07)
+    if not 1 <= len(items) <= 4:
+        raise ValueError('todo requires 1-4 verified short items for readable phone video')
+    cw = int(c.W * 0.72); lh = max(16,int(cw * 0.142)); pad = int(cw * 0.065)
     im = rrect(cw, pad * 2 + lh * (len(items) + 1), cw * 0.07, (250, 248, 242, 235)); d = ImageDraw.Draw(im)
     done = sum(c.lt >= t for t in ticks)
     d.text((pad, pad), e.o.get('title', 'TO DO').upper(), font=font('ui', lh * 0.42), fill=(200, 140, 20, 255))
     d.text((cw - pad, pad), f'{done} of {len(items)}', font=font('ui', lh * 0.36), fill=(120, 120, 120, 255), anchor='ra')
-    f = font('ui', lh * 0.4)
+    f = font('uim', lh * 0.48)
+    for it in items:
+        if f.getlength(it) > cw-pad*2-lh*.80:
+            raise ValueError('todo label is too long for phone-sized display')
     for i, it in enumerate(items):
         y = pad + lh * (i + 1); bx = lh * 0.42
         d.rounded_rectangle([pad, y + lh * 0.12, pad + bx, y + lh * 0.12 + bx], 6, outline=(160, 160, 160, 255), width=3)
@@ -626,12 +631,15 @@ def fx_uninstall(c, e):
     place(c, shadowed(im, 16, 8, 120), c.W / 2, c.H * 0.16, 0.8 + 0.2 * ease_back(c.lt / 0.3), 0, clamp(c.lt / 0.1))
 
 
-def reel_icons(size):
+def reel_icons(size, likes=None, comments=None):
+    """Social-frame icons are decorative; counts need explicit provenance."""
     s = int(size); im = Image.new('RGBA', (s, int(s * 3.6)), (0, 0, 0, 0)); d = ImageDraw.Draw(im); w = max(3, s // 12)
     h = heart(s * 0.8, (255, 255, 255)); im.alpha_composite(h, (int(s * 0.1), 0))
-    d.text((s / 2, s * 0.95), '26.9K', font=font('ui', s * 0.24), fill=(255, 255, 255, 255), anchor='mm')
+    if likes is not None:
+        d.text((s / 2, s * 0.95), str(likes), font=font('ui', s * 0.24), fill=(255, 255, 255, 255), anchor='mm')
     d.ellipse([s * 0.15, s * 1.25, s * 0.85, s * 1.95], outline=(255, 255, 255, 255), width=w)
-    d.text((s / 2, s * 2.15), '412', font=font('ui', s * 0.24), fill=(255, 255, 255, 255), anchor='mm')
+    if comments is not None:
+        d.text((s / 2, s * 2.15), str(comments), font=font('ui', s * 0.24), fill=(255, 255, 255, 255), anchor='mm')
     d.polygon([(s * 0.12, s * 2.75), (s * 0.9, s * 2.45), (s * 0.55, s * 3.25), (s * 0.45, s * 2.88)], outline=(255, 255, 255, 255), width=w)
     return im
 
@@ -651,9 +659,12 @@ def fx_reel_frame(c, e):
     c.img = out
     mm = np.zeros_like(c.m); mm[y0:y0 + ih, x0:x0 + iw] = cv2.resize(c.m, (iw, ih)); c.m = mm
     c.fx, c.fy, c.fw = x0 + c.fx * s, y0 + c.fy * s, c.fw * s
-    ic = cached(e, 'ic', lambda: shadowed(reel_icons(c.W * 0.075), 6, 2, 120))
+    verified=e.o.get('metrics_verified') is True
+    likes=e.o.get('likes') if verified else None
+    comments=e.o.get('comments') if verified else None
+    ic = cached(e, 'ic', lambda: shadowed(reel_icons(c.W * 0.075,likes,comments), 6, 2, 120))
     comp(c, ic, x0 + iw - ic.width - c.W * 0.01, y0 + ih * 0.52, k)
-    hdl = text_img(e.o.get('text', '@your.handle'), c.W * 0.032, 'ui', (255, 255, 255), shadow=4)
+    hdl = text_img(e.o.get('text', '@aiwithswarag'), c.W * 0.036, 'ui', (255, 255, 255), shadow=4)
     comp(c, hdl, x0 + c.W * 0.03, y0 + ih - hdl.height - c.W * 0.04, k)
 
 
@@ -1298,7 +1309,7 @@ def fx_headline_wall(c, e):
         d.polygon([(cw * 0.08, my - s / 2), (cw * 0.08, my + s / 2), (cw * 0.08 + s * 0.9, my)], fill=(255, 48, 64, 255))
         d.text((cw * 0.08 + s * 1.5, my), ('@aiwithswarag  ·  ' + meta) if meta else '@aiwithswarag', font=font('uim', cw * 0.045), fill=fg + (170,), anchor='lm')
         return shadowed(im, 14, 8, 110)
-    N = int(e.o.get('count', 13))
+    N = max(1,min(13,int(e.o.get('count', 13))))
     cards = cached(e, 'cards', lambda: [hcard(i) for i in range(N)])
     pos = cached(e, 'pos', lambda: [(random.Random(i * 7 + 1).uniform(0.2, 0.8), random.Random(i * 7 + 2).uniform(0.07, 0.42), random.Random(i * 7 + 3).uniform(-9, 9)) for i in range(N)])
     gap = float(e.o.get('gap', 0.09))
@@ -1319,8 +1330,9 @@ def fx_headline_wall(c, e):
 @effect('checklist', 'an executive task list builds with animated check marks')
 def fx_checklist(c, e):
     W, H = c.W, c.H; u = W / 1080; al = fade(c, e)
-    rows = [x.split('::') for x in e.o.get('text', 'Found your face::every frame|Cut you out of the room::AI mask|Put the text behind you::depth|'
-                                        'Graded the colour::warm|Rendered in 4K::2160p').split('|')]
+    rows = [x.split('::') for x in e.o.get('text', 'Direction::example|Delivery::example|Outcomes::example').split('|')]
+    if not 1 <= len(rows) <= 4:
+        raise ValueError('checklist requires 1-4 concise, source-verified rows')
     n = len(rows); cw = W * 0.9; rh = 104 * u; hh = 120 * u; chh = hh + rh * n + 26 * u
     y0 = min(max(c.fy + c.fw * 1.35, H * 0.42), H * 0.93 - chh); cy = y0 + chh / 2 + (1 - ease_out(c.lt / 0.35)) * H * 0.12
     span = max(0.4, e.d - 0.55); done_at = [0.3 + span * (i + 1) / n for i in range(n)]
