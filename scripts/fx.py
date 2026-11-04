@@ -729,6 +729,25 @@ def fx_moody(c, e):
 
 @effect('swipe', 'a before and after slider that sweeps across you')
 def fx_swipe(c, e):
+    if not getattr(c,'face_priority',False):
+        after = grade(c.img, e.o.get('grade', 'moody'))
+        p = c.lt / e.d
+        sp = 1.05 - 0.95 * ease_inout(p / 0.5) if p < 0.5 else 0.1 + 0.4 * ease_inout((p - 0.5) / 0.4)
+        xx, yy = grid(c)
+        line = sp * c.W + 0.22 * (yy - c.H / 2)
+        a = np.clip((xx - line) / 3 + 0.5, 0, 1)[..., None]
+        c.img = c.img * (1 - a) + after * a
+        hy = c.H * 0.62; hx = sp * c.W + 0.22 * (hy - c.H / 2)
+        edge = np.clip(1 - np.abs(xx - line) / 3.5, 0, 1)[..., None]
+        c.img = c.img * (1 - edge) + edge
+        r = int(c.W * 0.035); h = Image.new('RGBA', (2 * r + 4, 2 * r + 4), (0, 0, 0, 0)); d = ImageDraw.Draw(h)
+        d.ellipse([2, 2, 2 * r + 2, 2 * r + 2], fill=(255, 255, 255, 255))
+        d.text((r + 2, r + 2), '< >', font=font('mono', r * 0.7), fill=INK + (255,), anchor='mm')
+        place(c, shadowed(h, 8, 4, 110), hx, hy)
+        for lab, x in (('before', 0.14), ('after', 0.86)):
+            t = text_img(lab, c.W * 0.050, 'uim', INK); pill = rrect(t.width + 16, t.height, t.height / 2, (255, 255, 255, 225))
+            pill.alpha_composite(t, (8, 0)); place(c, pill, c.W * x, c.H * 0.88)
+        return
     """Source-authentic A/B grade comparison, no divider through the face."""
     W=c.W
     phase=ease_inout(c.lt/max(.30,e.d*.77))
@@ -766,7 +785,6 @@ def fx_swipe(c, e):
            fill=(197,164,109,255),width=max(2,W//115))
     place_adaptive_panel(c,deck,'above',
               alpha=fade(c,e)*clamp(c.lt/.14),min_scale=.48)
-
 
 @effect('todo', 'a checklist card beside your head that ticks off as you talk')
 def fx_todo(c, e):
@@ -1115,6 +1133,32 @@ def fx_rabbit_hole(c, e):
 
 @effect('cover-star', 'you become a magazine cover, with the title behind your head')
 def fx_cover_star(c, e):
+    if not getattr(c,'face_priority',False):
+        if e.o.get('look') == 'editorial': return cover_editorial(c, e)
+        k = ease_out(c.lt / 0.35); al = clamp((e.d - c.lt) / 0.2)
+        c.img = c.img * (1 - 0.6 * k) + grade(c.img, 'pop') * 0.6 * k
+        title = e.o.get('text', 'EXECUTION').upper(); col = rgb(e.o.get('color'), (232, 36, 52))
+        mast = cached(e, 'm', lambda: fit_text(title, c.W * 0.92, 'bold', 600, fill=col))
+        mast_h = min(mast.height, c.H * 0.24)
+        place(c, mast, c.W / 2, c.H * 0.035 + mast_h / 2 - (1 - k) * mast_h, mast_h / mast.height, 0, al * k, behind=True)
+        iss = cached(e, 'i', lambda: text_img(e.o.get('issue', 'THE AI ISSUE  ·  2026'), c.W * 0.025, 'mono', (255, 255, 255), shadow=3))
+        place(c, iss, c.W / 2, c.H * 0.03, alpha=al * k, behind=True)
+        lines = e.o.get('lines', 'EXECUTIVE VIDEO|CLEAN DESIGN|42 EFFECTS|YOUR OWN STYLE').split('|')
+        y = c.H * 0.5
+        for j, ln in enumerate(lines):
+            big = j == 0
+            im = cached(e, ('l', j), lambda: text_img(ln, c.W * (0.085 if big else 0.045), 'serif' if big else 'bold', YELLOW if big else (255, 255, 255), shadow=5))
+            kj = ease_out((c.lt - 0.15 - 0.08 * j) / 0.3)
+            comp(c, im, c.W * 0.05 - (1 - kj) * 60, y, al * kj, guard=True); y += im.height * 0.86
+        def barcode():
+            rnd = random.Random(1); bw, bh = int(c.W * 0.16), int(c.W * 0.09)
+            im = Image.new('RGBA', (bw, bh), (255, 255, 255, 255)); d = ImageDraw.Draw(im); x = 8
+            while x < bw - 8:
+                w = rnd.choice((2, 2, 3, 5)); top = max(2, int(bh * 0.20)); bottom = max(top, bh - max(2, int(bh * 0.15))); d.rectangle([x, top, x + w - 1, bottom], fill=(0, 0, 0, 255)); x += w + rnd.choice((2, 3, 4))
+            return im
+        bc = cached(e, 'b', barcode)
+        comp(c, bc, c.W * 0.95 - bc.width, c.H * 0.93 - bc.height, al * k, guard=True)
+        return
     if e.o.get('look')=='editorial':
         return cover_editorial(c,e)
     """A composed magazine masthead, not independent overlapping words."""
@@ -1536,6 +1580,35 @@ def fx_headline_box(c, e):
 
 @effect('profile-wall', 'your profile grid fills the wall behind you while a counter ticks up')
 def fx_profile_wall(c, e):
+    if not getattr(c,'face_priority',False):
+        W, H = c.W, c.H; al = fade(c, e)
+        def wall():
+            pw = int(W * 0.92); ph = int(H * 0.36); im = rrect(pw, ph, W * 0.035, (16, 16, 18, 240)); d = ImageDraw.Draw(im)
+            tabs = ('Posts', 'Reels', 'Tagged'); f = font('uim', W * 0.032)
+            for j, tb in enumerate(tabs):
+                x = pw * (0.2 + 0.3 * j); d.text((x, ph * 0.06), tb, font=f, fill=((255, 255, 255, 255) if j == 1 else (130, 130, 136, 255)), anchor='mm')
+                if j == 1: d.rectangle([x - pw * 0.08, ph * 0.1, x + pw * 0.08, ph * 0.1 + 4], fill=(255, 255, 255, 255))
+            gr = thumb_grid(e.cards, 4, 2, int(pw * 0.225), int(pw * 0.012), look=False)
+            im.alpha_composite(gr, ((pw - gr.width) // 2, int(ph * 0.14))); return shadowed(im, 20, 10, 110)
+        wl = cached(e, 'wall', wall)
+        place(c, wl, W / 2, H * 0.04 + wl.height / 2, 0.94 + 0.06 * ease_out(c.lt / 0.35), 0, al * clamp(c.lt / 0.15), behind=True)
+        cw, chh = W * 0.76, W * 0.25; cy = min(H * 0.86, c.fy + c.fw * 2.6)
+        g = glass(c, cw, chh, chh * 0.18, W / 2, cy, amt=0.5, tint=(12, 12, 14)); d = ImageDraw.Draw(g)
+        # The gallery uses deliberately neutral copy until a verified count is
+        # supplied. Never make a demo look like a real engagement metric.
+        target = int(e.o['count']) if e.o.get('count') is not None else None
+        n = int(target * ease_out((c.lt - 0.2) / 0.8)) if target is not None else None
+        swap = clamp((c.lt - 1.15) / 0.2)
+        if swap < 1: d.text((cw / 2, chh * 0.33), f'{n:,}' if n is not None else 'DEMO', font=font('uib', chh * 0.3), fill=(255, 255, 255, int(255 * (1 - swap))), anchor='mm')
+        if swap > 0: d.text((cw / 2, chh * 0.33), e.o.get('label', 'example only' if n is None else 'views'), font=font('uib', chh * 0.3), fill=(255, 255, 255, int(255 * swap)), anchor='mm')
+        av = face_chip(c, e, chh * 0.3); g.alpha_composite(av, (int(chh * 0.14), int(chh * 0.58)))
+        d.text((chh * 0.52, chh * 0.68), e.o.get('name', 'aiwithswarag'), font=font('uib', chh * 0.09), fill=(255, 255, 255, 255), anchor='lm')
+        d.text((chh * 0.52, chh * 0.8), e.o.get('sub', 'top reel'), font=font('uim', chh * 0.075), fill=(170, 170, 176, 255), anchor='lm')
+        on = c.lt >= e.d * 0.7
+        d.rounded_rectangle([cw - chh * 0.95, chh * 0.62, cw - chh * 0.14, chh * 0.86], chh * 0.12, fill=((60, 60, 66, 255) if on else (255, 255, 255, 255)))
+        d.text((cw - chh * 0.545, chh * 0.74), 'Following' if on else 'Follow', font=font('uib', chh * 0.08), fill=((255, 255, 255, 255) if on else (16, 16, 18, 255)), anchor='mm')
+        place(c, g, W / 2, cy + (1 - ease_out((c.lt - 0.05) / 0.3)) * H * 0.1, 1, 0, al * clamp((c.lt - 0.05) / 0.12), guard=True)
+        return
     """Readable real/approved portfolio cards without a forehead cutout."""
     W=c.W
     cards=e.cards
@@ -1591,6 +1664,41 @@ def fx_profile_wall(c, e):
 
 @effect('tier-list', 'an executive tier list with a highlighted item')
 def fx_tier_list(c,e):
+    if not getattr(c,'face_priority',False):
+        W, H = c.W, c.H; al = fade(c, e)
+        ttl = cached(e, 'ttl', lambda: fit_text(e.o.get('title', 'best way to edit a reel?'), W * 0.88, 'serif', int(W * 0.11), fill=YELLOW, shadow=8))
+        place(c, ttl, W / 2, max(ttl.height * 0.6, c.fy - c.fw * 1.65), 0.9 + 0.1 * ease_out(c.lt / 0.3), 0, al * clamp(c.lt / 0.15), behind=True)
+        tiers = [('S', (255, 127, 127)), ('A', (255, 191, 127)), ('B', (255, 223, 127)), ('C', (191, 255, 127)), ('D', (127, 191, 255)), ('F', (191, 127, 255))]
+        if getattr(c,'face_priority',False) and not e.o.get('all_tiers'):
+            tiers=tiers[:4]
+        cw = int(W * (0.80 if getattr(c,'face_priority',False) else 0.66))
+        rh = int(W * (0.105 if getattr(c,'face_priority',False) else 0.082))
+        pad = int(W * 0.015); chh = pad*2 + rh*len(tiers) + pad*(len(tiers)-1)
+        fill = dict(zip('BCDF', e.o.get('others', 'templates|timelines|apps|doing it by hand').split('|')))
+        def board():
+            im = rrect(cw, chh, W * 0.025, (22, 22, 26, 240)); d = ImageDraw.Draw(im)
+            for i, (lab, col) in enumerate(tiers):
+                y = pad + i * (rh + pad)
+                d.rounded_rectangle([pad, y, pad + rh, y + rh], rh * 0.14, fill=col + (255,))
+                d.text((pad + rh / 2, y + rh / 2), lab, font=font('uib', rh * 0.5), fill=(20, 20, 22, 255), anchor='mm')
+                d.rounded_rectangle([pad * 2 + rh, y, cw - pad, y + rh], rh * 0.14, fill=(40, 40, 46, 255))
+                if lab in fill:
+                    f = font('uim', rh * 0.3); tw = f.getlength(fill[lab]) + rh * 0.4
+                    d.rounded_rectangle([pad * 3 + rh, y + rh * 0.15, pad * 3 + rh + tw, y + rh * 0.85], rh * 0.12, fill=(78, 78, 86, 255))
+                    d.text((pad * 3 + rh + rh * 0.2, y + rh / 2), fill[lab], font=f, fill=(225, 225, 230, 255), anchor='lm')
+            return shadowed(im, 18, 10, 120)
+        bd = cached(e, 'bd', board)
+        top = min(H * 0.95 - bd.height, max(c.fy + c.fw * 1.4, H * 0.45))
+        k = ease_back(c.lt / 0.35); bx, by = W / 2, top + bd.height / 2 + (1 - k) * H * 0.15
+        place(c, bd, bx, by, 1, 0, al * clamp(c.lt / 0.12), guard=True)
+        tile = cached(e, 'tile', lambda: shadowed(rrect(int(rh * 2.6), int(rh * 0.8), rh * 0.16, ORANGE + (255,)), 8, 4, 100))
+        tx = cached(e, 'tx', lambda: text_img(e.o.get('item', 'AI Strategy'), rh * 0.36, 'uib', (255, 255, 255)))
+        tl = tile.copy(); tl.alpha_composite(tx, ((tl.width - tx.width) // 2, (tl.height - tx.height) // 2 - 3))
+        sx, sy = W * 0.86, c.fy + c.fw * 0.4
+        ex = bx - bd.width / 2 + 18 + pad * 3 + rh + tile.width / 2 - 10; ey = by - bd.height / 2 + 18 + pad + rh / 2
+        q = ease_back((c.lt - 0.45) / 0.4)
+        if c.lt > 0.4: place(c, tl, sx + (ex - sx) * q, sy + (ey - sy) * q, 1.25 - 0.25 * clamp(q), 18 * (1 - clamp(q)), al, guard=True)
+        return
     """Full priority tier board in two compact rows, never a lone badge."""
     W=c.W
     rows=[v.strip() for v in str(e.o.get('rows',
@@ -1669,6 +1777,31 @@ def fx_broll_split(c, e):
 
 @effect('phone-fan', 'your reels fan out like a hand of phones in front of you, under a two-line headline')
 def fx_phone_fan(c,e):
+    if not getattr(c,'face_priority',False):
+        W, H = c.W, c.H; al = fade(c, e)
+        lines = e.o.get('text', 'STRATEGY.|EXECUTION.').split('|')
+        S = cached(e, 'sz', lambda: lines_fit(lines, W * 0.84, 'uib', int(W * 0.08)))
+        y = max(H * 0.06, c.fy - c.fw * 1.3 - S * 1.3 * len(lines))
+        for j, ln in enumerate(lines):
+            kj = clamp((c.lt - 0.05 - 0.1 * j) / 0.18); last = j == len(lines) - 1
+            t = cached(e, ('t', j), lambda: text_img(ln, S, 'uib', (16, 16, 18) if last else (255, 255, 255), shadow=0 if last else 9))
+            if last: comp(c, rrect(t.width - S * 0.15, S * 1.22, S * 0.08, (255, 255, 255, 255)), W / 2 - (t.width - S * 0.15) / 2, y, al * kj, guard=True)
+            place(c, t, W / 2, y + S * 0.6, 1, 0, al * kj, guard=True); y += S * 1.3
+        pw = int(W * 0.23); ph = int(pw * 2.0)
+        def phone(i):
+            im = rrect(pw, ph, pw * 0.16, (14, 14, 16, 255))
+            scr = card(vary(e.cards[i % len(e.cards)], i) if e.o.get('images') is None else e.cards[i % len(e.cards)], pw - 10)
+            inner = scr.crop(((scr.width - (pw - 10)) // 2, (scr.height - (ph - 10)) // 2 - 6, (scr.width + pw - 10) // 2, (scr.height + ph - 10) // 2 - 6))
+            im.alpha_composite(inner, (5, 5))
+            ImageDraw.Draw(im).rounded_rectangle([pw * 0.36, ph * 0.025, pw * 0.64, ph * 0.045], pw * 0.03, fill=(0, 0, 0, 255))
+            return shadowed(im, 14, 8, 120)
+        ph_ = cached(e, 'ph', lambda: [phone(i) for i in range(4)])
+        cx = W / 2 * 0.5 + c.fx * 0.5; cy = max(c.fy + c.fw * 1.1 + ph / 2, H * 0.62)
+        cy = min(cy, H - ph * 0.42)
+        for i, o in enumerate((-1.5, -0.5, 0.5, 1.5)):
+            q = ease_back((c.lt - 0.2 - 0.06 * i) / 0.4)
+            place(c, ph_[i], cx + o * W * 0.19 * q, cy + o * o * W * 0.025 * q, 0.9, -o * 11 * q, al * clamp((c.lt - 0.2) / 0.1), guard=True)
+        return
     """Four genuinely visible phone cards, not a missing mini-carousel."""
     W=c.W
     approved=list(getattr(e,'cards',[]) or [])
@@ -1791,6 +1924,40 @@ def fx_headline_wall(c, e):
 
 @effect('checklist', 'an executive task list builds with animated check marks')
 def fx_checklist(c,e):
+    if not getattr(c,'face_priority',False):
+        W, H = c.W, c.H; u = W / 1080; al = fade(c, e)
+        rows = [x.split('::') for x in e.o.get('text', 'Direction::example|Delivery::example|Outcomes::example').split('|')]
+        if not 1 <= len(rows) <= 4:
+            raise ValueError('checklist requires 1-4 concise, source-verified rows')
+        n = len(rows); cw = W * 0.9; rh = 104 * u; hh = 120 * u; chh = hh + rh * n + 26 * u
+        y0 = min(max(c.fy + c.fw * 1.35, H * 0.42), H * 0.93 - chh); cy = y0 + chh / 2 + (1 - ease_out(c.lt / 0.35)) * H * 0.12
+        span = max(0.4, e.d - 0.55); done_at = [0.3 + span * (i + 1) / n for i in range(n)]
+        g = glass(c, cw, chh, 40 * u, W / 2, cy, amt=0.78, tint=(14, 13, 16), blur=int(30 * u)); d = ImageDraw.Draw(g)
+        sx, sy = 44 * u, hh / 2
+        for a in range(4):
+            ang = a * math.pi / 2 + math.pi / 4
+            d.line([(sx, sy), (sx + 18 * u * math.cos(ang), sy + 18 * u * math.sin(ang))], fill=(217, 119, 87, 255), width=int(7 * u))
+            d.line([(sx, sy), (sx + 18 * u * math.cos(ang + math.pi / 4), sy + 18 * u * math.sin(ang + math.pi / 4))], fill=(217, 119, 87, 255), width=int(5 * u))
+        d.text((80 * u, hh / 2), e.o.get('title', 'Executive Brief'), font=font('uib', 42 * u), fill=(255, 255, 255, 255), anchor='lm')
+        nd = sum(c.lt >= t for t in done_at)
+        d.text((cw - 36 * u, hh / 2), f'{nd} of {n}', font=font('uim', 28 * u), fill=(170, 170, 176, 255), anchor='rm')
+        d.line([(30 * u, hh), (cw - 30 * u, hh)], fill=(255, 255, 255, 30), width=max(1, int(2 * u)))
+        for i, (txt, meta) in enumerate([(r + [''])[:2] for r in rows]):
+            y = hh + 13 * u + rh * i + rh / 2; x = 56 * u; r_ = 24 * u
+            start = done_at[i - 1] if i else 0.3
+            if c.lt >= done_at[i]:
+                q = ease_back((c.lt - done_at[i]) / 0.25); rr = r_ * (0.6 + 0.4 * q)
+                d.ellipse([x - rr, y - rr, x + rr, y + rr], fill=(52, 199, 89, 255)); tick(d, x - rr * 0.5, y - rr * 0.45, rr, w=int(5 * u))
+                fc, mc = (255, 255, 255, 255), (52, 199, 89, 255)
+            elif c.lt >= start:
+                a0 = (c.lt * 540) % 360; d.ellipse([x - r_, y - r_, x + r_, y + r_], outline=(255, 255, 255, 50), width=int(5 * u))
+                d.arc([x - r_, y - r_, x + r_, y + r_], a0, a0 + 100, fill=(217, 119, 87, 255), width=int(5 * u)); fc, mc = (255, 255, 255, 255), (170, 170, 176, 255)
+            else:
+                d.ellipse([x - r_, y - r_, x + r_, y + r_], outline=(255, 255, 255, 60), width=int(4 * u)); fc, mc = (255, 255, 255, 110), (170, 170, 176, 90)
+            d.text((x + 48 * u, y), txt, font=font('uib', 40 * u), fill=fc, anchor='lm')
+            d.text((cw - 36 * u, y), meta, font=font('mono', 28 * u), fill=mc, anchor='rm')
+        place(c, shadowed(g, 24, 12, 120), W / 2, cy, 1, 0, al * clamp(c.lt / 0.12), guard=True)
+        return
     """Compact four-check editorial panel with real visible checkboxes."""
     W=c.W
     rows=[(s.split('::')+[''])[:2] for s in str(
@@ -2291,6 +2458,47 @@ def num_parts(s):
 
 @effect('liquid-glass-graph', 'a liquid glass card floats under your chin while a graph climbs and the number counts up')
 def fx_liquid_glass_graph(c,e):
+    if not getattr(c,'face_priority',False):
+        if e.o.get('look') == 'bento': return glass_bento(c, e)
+        q = ease_out(c.lt / 0.4); al = fade(c, e) * clamp(c.lt / 0.12)
+        if al <= 0: return
+        W = c.W; cw, ch = int(W * 0.74), int(W * 0.46); sc = 0.88 + 0.12 * q
+        cx = W / 2; cy = min(c.H - ch * 0.62, c.fy + c.fw * 2.7) + (1 - q) * W * 0.08
+        gw, gh = int(cw * sc), int(ch * sc)
+        im = glass(c, gw, gh, gh * 0.12, cx, cy, amt=0.16, blur=max(10, W // 30), dark=0.12)
+        hi = cached(e, ('hi', gw, gh), lambda: Image.fromarray(np.dstack([np.full((gh, gw, 3), 255, np.uint8),
+            (np.clip(1 - np.linspace(0, 1, gh) * 2.2, 0, 1)[:, None] * np.ones(gw) * 46).astype(np.uint8)]), 'RGBA'))
+        hm = Image.new('L', (gw, gh), 0); ImageDraw.Draw(hm).rounded_rectangle([0, 0, gw - 1, gh - 1], int(gh * 0.12), fill=255)
+        hl = hi.copy(); hl.putalpha(Image.fromarray(np.minimum(np.asarray(hi)[..., 3], np.asarray(hm)))); im.alpha_composite(hl)
+        lay = Image.new('RGBA', (gw, gh), (0, 0, 0, 0)); d = ImageDraw.Draw(lay); pad = gw * 0.07
+        g = ease_inout((c.lt - 0.25) / max(0.3, e.d * 0.72))
+        lab = e.o.get('text', 'RETENTION').upper()
+        d.text((pad, pad * 0.9), lab, font=font('mono', gw * 0.04), fill=(255, 255, 255, 190))
+        if e.o.get('hypothetical_example'):
+            d.text((pad, pad * 2.0), 'ILLUSTRATIVE — NOT MEASURED',
+                   font=font('uib', gw * 0.025), fill=(255, 218, 162, 245))
+        a, _, _ = num_parts(e.o.get('from', '0')); b, suf, dp = num_parts(e.o.get('to', '59%'))
+        v = a + (b - a) * g; s = f'{v:.{dp}f}{suf}'
+        f = font('uib', gw * 0.12); d.text((gw - pad - f.getlength(s), pad * 0.55), s, font=f, fill=(255, 255, 255, 255))
+        x0, x1, y0, y1 = pad, gw - pad, gh - pad * 0.9, gh * 0.36
+        def ycurve(u): return y0 - (y0 - y1) * (u ** 1.5) + math.sin(u * 13) * gh * 0.018 * (1 - u)
+        n = 60; pts = [(x0 + (x1 - x0) * j / n, ycurve(j / n)) for j in range(int(n * g) + 1)]
+        green = rgb(e.o.get('color'), (52, 211, 110))
+        if len(pts) > 1:
+            area = Image.new('RGBA', (gw, gh), (0, 0, 0, 0))
+            ImageDraw.Draw(area).polygon(pts + [(pts[-1][0], y0), (x0, y0)], fill=green + (55,)); lay.alpha_composite(area)
+            glow = Image.new('RGBA', (gw, gh), (0, 0, 0, 0)); lw = max(4, int(gw * 0.011))
+            ImageDraw.Draw(glow).line(pts, fill=green + (255,), width=lw * 3, joint='curve')
+            lay.alpha_composite(glow.filter(ImageFilter.GaussianBlur(lw * 2)))
+            ImageDraw.Draw(lay).line(pts, fill=green + (255,), width=lw, joint='curve')
+            hx, hy = pts[-1]; r = lw * 1.9
+            ImageDraw.Draw(lay).ellipse([hx - r, hy - r, hx + r, hy + r], fill=(255, 255, 255, 255), outline=green + (255,), width=max(2, lw // 2))
+        for j in range(1, 4):
+            yy = y0 - (y0 - y1) * j / 3.4
+            d.line([(x0, yy), (x1, yy)], fill=(255, 255, 255, 40), width=max(1, int(gw * 0.002)))
+        im.alpha_composite(lay)
+        place(c, shadowed(im, max(10, W // 70), W // 90, 90), cx, cy, alpha=al, guard=True)
+        return
     """Sourced or clearly illustrative legible graph, with a distinct bento look."""
     W=c.W
     bento=e.o.get('look')=='bento'
