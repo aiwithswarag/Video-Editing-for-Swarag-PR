@@ -164,11 +164,17 @@
     "slow-push": {
       "zoom": 1.08,
       "blur": 0
+    },
+    "timeline": {
+      "look": "studio"
+    },
+    "comment-box": {
+      "look": "bar"
     }
   },
   "finish_policy": {
     "version": "SWARAG-42-EFFECT-FINISH-2026-11-04",
     "purpose": "42 registered effects keep their signatures; executive defaults are restrained, script and verified figures override samples; all need real-camera creative review",
-    "effects_with_explicit_defaults": 40
+    "effects_with_explicit_defaults": 42
   }
 }
