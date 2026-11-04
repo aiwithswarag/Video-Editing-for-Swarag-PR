@@ -1200,71 +1200,92 @@ def fx_headline_box(c, e):
 
 @effect('profile-wall', 'your profile grid fills the wall behind you while a counter ticks up')
 def fx_profile_wall(c, e):
-    W, H = c.W, c.H; al = fade(c, e)
-    def wall():
-        pw = int(W * 0.92); ph = int(H * 0.36); im = rrect(pw, ph, W * 0.035, (16, 16, 18, 240)); d = ImageDraw.Draw(im)
-        tabs = ('Posts', 'Reels', 'Tagged'); f = font('uim', W * 0.032)
-        for j, tb in enumerate(tabs):
-            x = pw * (0.2 + 0.3 * j); d.text((x, ph * 0.06), tb, font=f, fill=((255, 255, 255, 255) if j == 1 else (130, 130, 136, 255)), anchor='mm')
-            if j == 1: d.rectangle([x - pw * 0.08, ph * 0.1, x + pw * 0.08, ph * 0.1 + 4], fill=(255, 255, 255, 255))
-        gr = thumb_grid(e.cards, 4, 2, int(pw * 0.225), int(pw * 0.012), look=False)
-        im.alpha_composite(gr, ((pw - gr.width) // 2, int(ph * 0.14))); return shadowed(im, 20, 10, 110)
-    wl = cached(e, 'wall', wall)
-    place(c, wl, W / 2, H * 0.04 + wl.height / 2, 0.94 + 0.06 * ease_out(c.lt / 0.35), 0, al * clamp(c.lt / 0.15), behind=True)
-    cw, chh = W * 0.76, W * 0.25; cy = min(H * 0.86, c.fy + c.fw * 2.6)
-    g = glass(c, cw, chh, chh * 0.18, W / 2, cy, amt=0.5, tint=(12, 12, 14)); d = ImageDraw.Draw(g)
-    # The gallery uses deliberately neutral copy until a verified count is
-    # supplied. Never make a demo look like a real engagement metric.
-    target = int(e.o['count']) if e.o.get('count') is not None else None
-    n = int(target * ease_out((c.lt - 0.2) / 0.8)) if target is not None else None
-    swap = clamp((c.lt - 1.15) / 0.2)
-    if swap < 1: d.text((cw / 2, chh * 0.33), f'{n:,}' if n is not None else 'DEMO', font=font('uib', chh * 0.3), fill=(255, 255, 255, int(255 * (1 - swap))), anchor='mm')
-    if swap > 0: d.text((cw / 2, chh * 0.33), e.o.get('label', 'example only' if n is None else 'views'), font=font('uib', chh * 0.3), fill=(255, 255, 255, int(255 * swap)), anchor='mm')
-    av = face_chip(c, e, chh * 0.3); g.alpha_composite(av, (int(chh * 0.14), int(chh * 0.58)))
-    d.text((chh * 0.52, chh * 0.68), e.o.get('name', 'aiwithswarag'), font=font('uib', chh * 0.09), fill=(255, 255, 255, 255), anchor='lm')
-    d.text((chh * 0.52, chh * 0.8), e.o.get('sub', 'top reel'), font=font('uim', chh * 0.075), fill=(170, 170, 176, 255), anchor='lm')
-    on = c.lt >= e.d * 0.7
-    d.rounded_rectangle([cw - chh * 0.95, chh * 0.62, cw - chh * 0.14, chh * 0.86], chh * 0.12, fill=((60, 60, 66, 255) if on else (255, 255, 255, 255)))
-    d.text((cw - chh * 0.545, chh * 0.74), 'Following' if on else 'Follow', font=font('uib', chh * 0.08), fill=((255, 255, 255, 255) if on else (16, 16, 18, 255)), anchor='mm')
-    place(c, g, W / 2, cy + (1 - ease_out((c.lt - 0.05) / 0.3)) * H * 0.1, 1, 0, al * clamp((c.lt - 0.05) / 0.12), guard=True)
-
+    """Readable real/approved portfolio cards without a forehead cutout."""
+    W=c.W
+    cards=e.cards
+    if not cards:
+        raise ValueError('profile-wall requires approved original media')
+    pw=int(W*.80)
+    cell=int(W*.30)
+    gap=int(W*.025)
+    header=int(W*.12)
+    ph=header+2*cell+3*gap
+    im=rrect(pw,ph,W*.03,(14,28,41,239))
+    d=ImageDraw.Draw(im)
+    d.text((pw*.06,header*.53),
+           str(e.o.get('title','PORTFOLIO EXAMPLES')).upper()[:27],
+           font=font('uib',W*.043),fill=(237,246,247,255),anchor='lm')
+    sx=(pw-(2*cell+gap))//2
+    for i in range(4):
+        src=cards[i%len(cards)].convert('RGB')
+        sw,sh=src.size
+        take=min(sw,sh)
+        src=src.crop(((sw-take)//2,(sh-take)//2,
+                      (sw+take)//2,(sh+take)//2))
+        tile=src.resize((cell,cell),Image.LANCZOS).convert('RGBA')
+        x=sx+(i%2)*(cell+gap)
+        y=header+gap+(i//2)*(cell+gap)
+        im.alpha_composite(tile,(x,y))
+    place_safe_panel(c,im,'above',alpha=fade(c,e)*clamp(c.lt/.18),
+                     min_scale=.35)
+    if e.o.get('count') is not None:
+        if not str(e.o.get('metric_source','')).strip():
+            raise ValueError('PROFILE_COUNT_WITHOUT_VERIFIED_SOURCE')
+        metric=str(e.o['count'])
+        metric_label=str(e.o.get('label','VERIFIED METRIC'))
+    else:
+        metric='ILLUSTRATIVE'
+        metric_label='PORTFOLIO LAYOUT'
+    bw,bh=int(W*.72),int(W*.16)
+    bar=rrect(bw,bh,W*.024,(18,34,45,235))
+    bd=ImageDraw.Draw(bar)
+    bd.text((bw*.06,bh*.38),metric,font=font('uib',W*.052),
+            fill=(247,247,245,255),anchor='lm')
+    bd.text((bw*.06,bh*.76),metric_label[:24],
+            font=font('uim',W*.029),fill=(191,214,218,255),anchor='lm')
+    place_safe_panel(c,bar,'below',
+                     alpha=fade(c,e)*clamp((c.lt-.3)/.20),min_scale=.36)
 
 @effect('tier-list', 'an executive tier list with a highlighted item')
 def fx_tier_list(c, e):
-    W, H = c.W, c.H; al = fade(c, e)
-    ttl = cached(e, 'ttl', lambda: fit_text(e.o.get('title', 'best way to edit a reel?'), W * 0.88, 'serif', int(W * 0.11), fill=YELLOW, shadow=8))
-    place(c, ttl, W / 2, max(ttl.height * 0.6, c.fy - c.fw * 1.65), 0.9 + 0.1 * ease_out(c.lt / 0.3), 0, al * clamp(c.lt / 0.15), behind=True)
-    tiers = [('S', (255, 127, 127)), ('A', (255, 191, 127)), ('B', (255, 223, 127)), ('C', (191, 255, 127)), ('D', (127, 191, 255)), ('F', (191, 127, 255))]
-    if getattr(c,'face_priority',False) and not e.o.get('all_tiers'):
-        tiers=tiers[:4]
-    cw = int(W * (0.80 if getattr(c,'face_priority',False) else 0.66))
-    rh = int(W * (0.105 if getattr(c,'face_priority',False) else 0.082))
-    pad = int(W * 0.015); chh = pad*2 + rh*len(tiers) + pad*(len(tiers)-1)
-    fill = dict(zip('BCDF', e.o.get('others', 'templates|timelines|apps|doing it by hand').split('|')))
-    def board():
-        im = rrect(cw, chh, W * 0.025, (22, 22, 26, 240)); d = ImageDraw.Draw(im)
-        for i, (lab, col) in enumerate(tiers):
-            y = pad + i * (rh + pad)
-            d.rounded_rectangle([pad, y, pad + rh, y + rh], rh * 0.14, fill=col + (255,))
-            d.text((pad + rh / 2, y + rh / 2), lab, font=font('uib', rh * 0.5), fill=(20, 20, 22, 255), anchor='mm')
-            d.rounded_rectangle([pad * 2 + rh, y, cw - pad, y + rh], rh * 0.14, fill=(40, 40, 46, 255))
-            if lab in fill:
-                f = font('uim', rh * 0.3); tw = f.getlength(fill[lab]) + rh * 0.4
-                d.rounded_rectangle([pad * 3 + rh, y + rh * 0.15, pad * 3 + rh + tw, y + rh * 0.85], rh * 0.12, fill=(78, 78, 86, 255))
-                d.text((pad * 3 + rh + rh * 0.2, y + rh / 2), fill[lab], font=f, fill=(225, 225, 230, 255), anchor='lm')
-        return shadowed(im, 18, 10, 120)
-    bd = cached(e, 'bd', board)
-    top = min(H * 0.95 - bd.height, max(c.fy + c.fw * 1.4, H * 0.45))
-    k = ease_back(c.lt / 0.35); bx, by = W / 2, top + bd.height / 2 + (1 - k) * H * 0.15
-    place(c, bd, bx, by, 1, 0, al * clamp(c.lt / 0.12), guard=True)
-    tile = cached(e, 'tile', lambda: shadowed(rrect(int(rh * 2.6), int(rh * 0.8), rh * 0.16, ORANGE + (255,)), 8, 4, 100))
-    tx = cached(e, 'tx', lambda: text_img(e.o.get('item', 'AI Strategy'), rh * 0.36, 'uib', (255, 255, 255)))
-    tl = tile.copy(); tl.alpha_composite(tx, ((tl.width - tx.width) // 2, (tl.height - tx.height) // 2 - 3))
-    sx, sy = W * 0.86, c.fy + c.fw * 0.4
-    ex = bx - bd.width / 2 + 18 + pad * 3 + rh + tile.width / 2 - 10; ey = by - bd.height / 2 + 18 + pad + rh / 2
-    q = ease_back((c.lt - 0.45) / 0.4)
-    if c.lt > 0.4: place(c, tl, sx + (ex - sx) * q, sy + (ey - sy) * q, 1.25 - 0.25 * clamp(q), 18 * (1 - clamp(q)), al, guard=True)
-
+    """Render all tiers as ONE readable panel, not a flying isolated badge."""
+    W,H=c.W,c.H
+    rows=[x.strip() for x in str(e.o.get('rows',
+       'Strategy|Execution|Delivery|Outcomes')).split('|') if x.strip()]
+    rows=rows[:6] if e.o.get('all_tiers') else rows[:4]
+    if not rows: raise ValueError('tier-list needs approved row labels')
+    labels='SABCDF'
+    accent=[(44,154,144),(69,124,165),(197,164,109),(130,147,165),
+            (182,171,151),(171,75,73)]
+    w=int(W*.80)
+    rh=int(W*.116)
+    hh=int(W*.16)
+    h=hh+rh*len(rows)+int(W*.035)
+    im=rrect(w,h,max(5,int(W*.029)),(17,31,43,240))
+    d=ImageDraw.Draw(im)
+    pad=int(W*.04)
+    title=str(e.o.get('title','EXECUTIVE PRIORITIES'))[:30].upper()
+    d.text((pad,hh*.50),title,font=font('uib',W*.049),
+           fill=(244,247,248,255),anchor='lm')
+    n=max(1,min(len(rows),int(len(rows)*clamp(c.lt/max(.3,e.d*.8)))+1))
+    for i,(label,txt) in enumerate(zip(labels,rows)):
+        top=hh+i*rh
+        if i>=n: continue
+        col=accent[i]
+        d.rounded_rectangle((pad,top+rh*.12,pad+rh*.74,top+rh*.88),
+                            rh*.14,fill=col+(255,))
+        d.text((pad+rh*.37,top+rh*.50),label,
+               font=font('uib',rh*.45),fill=(18,28,32,255),anchor='mm')
+        fs=int(W*.044)
+        avail=w-2*pad-rh*.98
+        while fs>int(W*.031) and font('uib',fs).getlength(txt)>avail:
+            fs-=1
+        if font('uib',fs).getlength(txt)>avail:
+            raise ValueError('TIER_LABEL_TOO_LONG')
+        d.text((pad+rh*.96,top+rh*.50),txt,font=font('uib',fs),
+               fill=(235,243,246,255),anchor='lm')
+    place_safe_panel(c,im,'below',alpha=fade(c,e)*clamp(c.lt/.12),
+                     min_scale=.36)
 
 @effect('broll-split', 'split screen: b-roll on top with a price-tag sticker, you on the bottom')
 def fx_broll_split(c, e):
@@ -1299,30 +1320,56 @@ def fx_broll_split(c, e):
 
 @effect('phone-fan', 'your reels fan out like a hand of phones in front of you, under a two-line headline')
 def fx_phone_fan(c, e):
-    W, H = c.W, c.H; al = fade(c, e)
-    lines = e.o.get('text', 'STRATEGY.|EXECUTION.').split('|')
-    S = cached(e, 'sz', lambda: lines_fit(lines, W * 0.84, 'uib', int(W * 0.08)))
-    y = max(H * 0.06, c.fy - c.fw * 1.3 - S * 1.3 * len(lines))
-    for j, ln in enumerate(lines):
-        kj = clamp((c.lt - 0.05 - 0.1 * j) / 0.18); last = j == len(lines) - 1
-        t = cached(e, ('t', j), lambda: text_img(ln, S, 'uib', (16, 16, 18) if last else (255, 255, 255), shadow=0 if last else 9))
-        if last: comp(c, rrect(t.width - S * 0.15, S * 1.22, S * 0.08, (255, 255, 255, 255)), W / 2 - (t.width - S * 0.15) / 2, y, al * kj, guard=True)
-        place(c, t, W / 2, y + S * 0.6, 1, 0, al * kj, guard=True); y += S * 1.3
-    pw = int(W * 0.23); ph = int(pw * 2.0)
+    """One grouped 4-phone carousel, fully within the lower safe region."""
+    W,H=c.W,c.H
+    cards=e.cards
+    if not cards:
+        raise ValueError('phone-fan needs four approved visual assets')
+    lines=[x.strip() for x in e.o.get('text','STRATEGY|EXECUTION').split('|')
+           if x.strip()][:2]
+    headline='  '.join(lines).upper()
+    font_size=lines_fit([headline],W*.83,'uib',int(W*.068))
+    hd=text_img(headline,font_size,'uib',(246,245,238),shadow=5)
+    cap=rrect(int(W*.88),int(W*.14),int(W*.024),(18,30,42,218))
+    cap.alpha_composite(hd,((cap.width-hd.width)//2,
+                             (cap.height-hd.height)//2))
+    place_safe_panel(c,cap,'above',alpha=fade(c,e)*clamp(c.lt/.10),
+                     min_scale=.55)
+    pw=max(24,int(W*.185))
+    ph=int(pw*1.80)
+    gw=int(W*.92)
+    gh=int(W*.63)
     def phone(i):
-        im = rrect(pw, ph, pw * 0.16, (14, 14, 16, 255))
-        scr = card(vary(e.cards[i % len(e.cards)], i) if e.o.get('images') is None else e.cards[i % len(e.cards)], pw - 10)
-        inner = scr.crop(((scr.width - (pw - 10)) // 2, (scr.height - (ph - 10)) // 2 - 6, (scr.width + pw - 10) // 2, (scr.height + ph - 10) // 2 - 6))
-        im.alpha_composite(inner, (5, 5))
-        ImageDraw.Draw(im).rounded_rectangle([pw * 0.36, ph * 0.025, pw * 0.64, ph * 0.045], pw * 0.03, fill=(0, 0, 0, 255))
-        return shadowed(im, 14, 8, 120)
-    ph_ = cached(e, 'ph', lambda: [phone(i) for i in range(4)])
-    cx = W / 2 * 0.5 + c.fx * 0.5; cy = max(c.fy + c.fw * 1.1 + ph / 2, H * 0.62)
-    cy = min(cy, H - ph * 0.42)
-    for i, o in enumerate((-1.5, -0.5, 0.5, 1.5)):
-        q = ease_back((c.lt - 0.2 - 0.06 * i) / 0.4)
-        place(c, ph_[i], cx + o * W * 0.19 * q, cy + o * o * W * 0.025 * q, 0.9, -o * 11 * q, al * clamp((c.lt - 0.2) / 0.1), guard=True)
-
+        outer=rrect(pw,ph,max(5,int(pw*.13)),(13,24,35,255))
+        src=cards[i%len(cards)].convert('RGB')
+        ar=(pw-8)/(ph-8)
+        sw,sh=src.size
+        if sw/sh>ar:
+            crop_w=max(1,int(sh*ar))
+            left=(sw-crop_w)//2
+            src=src.crop((left,0,left+crop_w,sh))
+        else:
+            crop_h=max(1,int(sw/ar))
+            top=(sh-crop_h)//2
+            src=src.crop((0,top,sw,top+crop_h))
+        src=src.resize((pw-8,ph-8),Image.LANCZOS).convert('RGBA')
+        outer.alpha_composite(src,(4,4))
+        return outer
+    group=Image.new('RGBA',(gw,gh),(0,0,0,0))
+    # Paint all four into one visual group. Its safe placement is tested
+    # once, avoiding the old individual-card compositor suppression.
+    positions=[(.07,.31,-11),(.28,.22,-4),(.50,.22,4),(.72,.31,11)]
+    arrival=clamp((c.lt-.15)/.4)
+    for i,(xp,yp,angle) in enumerate(positions):
+        card_im=phone(i)
+        tilted=card_im.rotate(angle*arrival,Image.BICUBIC,expand=True)
+        x=int(gw*xp+((1-arrival)*(i-1.5)*W*.12))
+        y=int(gh*yp+(1-arrival)*W*.07)
+        x=max(0,min(gw-tilted.width,x))
+        y=max(0,min(gh-tilted.height,y))
+        group.alpha_composite(tilted,(x,y))
+    place_safe_panel(c,group,'below',alpha=fade(c,e)*clamp((c.lt-.12)/.12),
+                     min_scale=.39)
 
 @effect('dot-reveal', 'your shot builds itself out of glowing dots, then snaps into the full picture')
 def fx_dot_reveal(c, e):
@@ -2075,17 +2122,14 @@ def fx_apple_toggles(c, e):
         d.ellipse([kx - kr, ky - kr + W * 0.002, kx + kr, ky + kr + W * 0.004], fill=(0, 0, 0, 40))
         d.ellipse([kx - kr, ky - kr, kx + kr, ky + kr], fill=(255, 255, 255, 255))
     q = pop(c, 0.0, 0.38); al = fade(c, e) * clamp(c.lt / 0.1)
-    if e.o.get('pos', 'above') == 'below':
-        c.graphic_region = 'below'
-        scale = 0.56 + 0.20 * q if getattr(c,'face_priority',False) else 0.6 + 0.4*q
-        cy = c.H * .84 if getattr(c,'face_priority',False) else min(c.H-ch*.75,c.fy+c.fw*2.5)
-        place(c, im, c.W/2, cy, scale, 0, al, guard=True); return
-    # Keep the ENTIRE settings unit above the eyes. Earlier behind-person
-    # masking literally erased row three, producing a half-toggled panel.
-    c.graphic_region = 'above'
-    scale = 0.65 + .20*q if getattr(c,'face_priority',False) else 0.6+.4*q
-    cy = c.H*.135 if getattr(c,'face_priority',False) else max(c.H*.08+ch/2,c.fy-c.fw*.95-ch/2)
-    place(c, im, c.W/2, cy+(1-q)*c.W*.025, scale, 0, al, guard=True)
+    region='below' if e.o.get('pos','above')=='below' else 'above'
+    if getattr(c,'face_priority',False):
+        # Strict region: a below-face variant must never silently show above.
+        place_safe_panel(c,im,region,alpha=al,min_scale=.36,
+                         max_scale=.88)
+    else:
+        cy=(c.H*.84 if region=='below' else c.H*.14)
+        place(c,im,c.W/2,cy,.68+.25*q,0,al,guard=True)
 
 
 @effect('led-sign', 'the lights drop and a glowing LED sign types itself out behind you')
