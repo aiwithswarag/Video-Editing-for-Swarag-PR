@@ -26,6 +26,7 @@ from render_effect_gallery import NAMED_VARIANTS
 from effect_motion_review import create_motion_review
 from effect_creative_review import report_for
 from effect_finish_contract import risk_for
+from effect_footprint_qc import audit_gallery
 
 
 DIAGNOSTIC_BUILD_ID="FACE-SAFE-47-CAMERA-DIAGNOSTIC-2026-11-04-R2"
@@ -246,6 +247,7 @@ def run(source,output,*,only=None):
             effect_names,_,_=read_registry()
             labels=effect_names+[name for name,_,_ in NAMED_VARIANTS]
             report["motion_review"]=create_motion_review(gallery,review,labels)
+            report["visual_footprint_review"]=audit_gallery(short,gallery,labels)
             report["review_artifact_status"]=("READY" if
                 report["motion_review"]["status"]=="MOTION_SAMPLES_AVAILABLE" else "INCOMPLETE")
         except Exception as exc:
@@ -299,6 +301,8 @@ def recover_existing(source, output):
         effect_names,_,_=read_registry()
         labels=effect_names+[label for label,_,_ in NAMED_VARIANTS]
         report["motion_review"]=create_motion_review(gallery,review,labels)
+        report["visual_footprint_review"]=audit_gallery(
+            output/"private_source_excerpt.mp4",gallery,labels)
         report["review_artifact_status"]=(
             "READY" if report["motion_review"]["status"]=="MOTION_SAMPLES_AVAILABLE"
             else "INCOMPLETE"
