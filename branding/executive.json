@@ -32,7 +32,8 @@
     "spotlight": {
       "color": "#2C9A90",
       "push": 1.03,
-      "graphic_region": "above"
+      "graphic_region": "above",
+      "dim": 0.6
     },
     "led-sign": {
       "color": "#2C9A90",
@@ -40,13 +41,14 @@
       "graphic_region": "above"
     },
     "moody": {
-      "grade": "cool"
+      "grade": "cool",
+      "vignette_strength": 0.16
     },
     "scribble": {
       "color": "#2C9A90"
     },
     "reject-stamp": {
-      "color": "#C5A46D",
+      "color": "#17283E",
       "angle": 4,
       "y": 0.78,
       "graphic_region": "below"
@@ -88,7 +90,8 @@
       "brand_cards": true,
       "labels": "AI STRATEGY|EXECUTION|GOVERNANCE|ADOPTION|MEASURABLE VALUE|DELIVERY",
       "size": 0.23,
-      "graphic_region": "above"
+      "graphic_region": "above",
+      "count": 4
     },
     "carousel-spin": {
       "brand_cards": true,
@@ -161,7 +164,8 @@
     "split-headline": {
       "height": 0.29,
       "push": 0.75,
-      "graphic_region": "above"
+      "graphic_region": "above",
+      "pill": "KEY POINT"
     },
     "pastel-word": {
       "graphic_region": "above"
@@ -184,8 +188,8 @@
       "cell": 0.017
     },
     "headline-wall": {
-      "count": 6,
-      "gap": 0.12,
+      "count": 3,
+      "gap": 0.15,
       "graphic_region": "above"
     },
     "checklist": {
@@ -214,6 +218,7 @@
     "version": "SWARAG-42-EFFECT-FINISH-2026-11-04",
     "purpose": "42 registered effects keep their signatures; executive defaults are restrained, script and verified figures override samples; all need real-camera creative review",
     "effects_with_explicit_defaults": 42,
-    "graphics_relocate_as_intact_units": true
+    "graphics_relocate_as_intact_units": true,
+    "verified_claims_required": true
   }
 }
