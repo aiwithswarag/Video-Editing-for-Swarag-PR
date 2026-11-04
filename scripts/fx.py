@@ -164,6 +164,18 @@ def safe_graphic_xy(c, x, y, w, h, preferred=None):
     if preferred in ('above', 'below'): return valid[0]
     return min(valid, key=lambda pt: abs(pt[0]-x)+abs(pt[1]-y))
 
+def editorial_headline_anchor(c, image, margin=.042):
+    """Place whole editorial words in negative space above the real head."""
+    head_top = face_protection_rect(c)[1]
+    top = c.H * margin
+    available = max(c.H * .11, head_top - top - c.H * .018)
+    scale = min(1.0, max(.54, available / max(image.height, 1)))
+    cy = max(top + image.height*scale/2,
+             min(head_top - image.height*scale/2-c.H*.018,
+                 c.H*.15))
+    return cy, scale
+
+
 def comp(c, layer, x, y, alpha=1.0, behind=False, guard=False):
     """Alpha-composite an RGBA layer with its top-left at (x, y).
     behind=True hides it wherever the person is (so it sits behind you).
@@ -377,9 +389,13 @@ def fx_backdrop_word(c, e):
     word = e.o.get('text', 'STRATEGY')
     im = cached(e, 'w', lambda: fit_text(word, c.W * 0.94, e.o.get('font', 'bold'), fill=rgb(e.o.get('color'), CREAM), shadow=10))
     k = ease_back(c.lt / 0.42)
-    y_end = c.fy - c.fw * 1.05
+    if getattr(c, 'face_priority', False):
+        y_end, scale = editorial_headline_anchor(c, im)
+    else:
+        y_end, scale = c.fy - c.fw * 1.05, 1.
     y = -im.height + (y_end + im.height) * k
-    place(c, im, c.W / 2 * 0.6 + c.fx * 0.4, y, alpha=clamp((e.d - c.lt) / 0.2), behind=True)
+    place(c, im, c.W / 2 * 0.6 + c.fx * 0.4, y, scale=scale,
+          alpha=clamp((e.d - c.lt) / 0.2), behind=True)
 
 
 _grid = {}
@@ -897,7 +913,12 @@ def fx_red_collage(c, e):
     red = rgb(e.o.get('color'), RED); al = fade(c, e)
     w = cached(e, 'w', lambda: fit_text(e.o.get('text', 'EDIT').upper(), c.W * 0.98, 'uib', 700, fill=red, glow=(red, 34)))
     s = 1.12 - 0.12 * ease_out(c.lt / 0.4)
-    place(c, w, c.W / 2, max(w.height * 0.42, c.fy - c.fw * 1.05), s, 0, clamp(c.lt / 0.12) * al, behind=True)
+    if getattr(c,'face_priority',False):
+        upper,sc = editorial_headline_anchor(c, w)
+        place(c, w, c.W / 2, upper, s*sc, 0, clamp(c.lt / 0.12) * al, behind=True)
+    else:
+        place(c, w, c.W / 2, max(w.height * 0.42, c.fy - c.fw * 1.05),
+              s, 0, clamp(c.lt / 0.12) * al, behind=True)
     lines = e.o.get('lines', 'CLEAR STRATEGY.|SMART EXECUTION.|REAL IMPACT.').split('|')
     size = cached(e, 'sz', lambda: lines_fit(lines, c.W * 0.8, 'uib', int(c.W * 0.14)))
     y = max(c.H * 0.5, c.fy + c.fw * 1.55)
@@ -959,7 +980,13 @@ def fx_pastel_word(c, e):
     c.img = c.img * (1 - k) + (you * m + bg * (1 - m)) * k
     word = cached(e, 'w', lambda: fit_text(e.o.get('text', 'INSIGHTS').upper(), W * 0.96, 'uib', 700, fill=(255, 255, 255)))
     dk = ease_out(c.lt / 0.45)
-    place(c, shadowed(word, 24, 12, 60), W / 2, max(word.height * 0.45, c.fy - c.fw * 1.2) - (1 - dk) * H * 0.06, 1, 0, al * clamp(c.lt / 0.15), behind=True)
+    if getattr(c,'face_priority',False):
+        top_y, top_scale = editorial_headline_anchor(c, word)
+    else:
+        top_y, top_scale = max(word.height * 0.45, c.fy - c.fw * 1.2), 1.0
+    place(c, shadowed(word, 24, 12, 60), W / 2,
+          top_y - (1 - dk) * H * 0.06,
+          top_scale, 0, al * clamp(c.lt / 0.15), behind=True)
     cw, chh = W * 0.86, W * 0.15; cy = H * 0.865 + (1 - ease_out((c.lt - 0.15) / 0.35)) * H * 0.2
     card_ = rrect(cw, chh, chh * 0.3, (255, 255, 255, 248)); d = ImageDraw.Draw(card_)
     av = face_chip(c, e, chh * 0.64); card_.alpha_composite(av, (int(chh * 0.18), int((chh - av.height) / 2)))
