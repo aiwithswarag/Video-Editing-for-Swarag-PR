@@ -442,24 +442,26 @@ def fx_lean_in(c, e):
 
 @effect('backdrop-word', 'a giant word drops in behind you')
 def fx_backdrop_word(c, e):
-    word = e.o.get('text', 'STRATEGY')
-    im = cached(e, 'w', lambda: fit_text(word, c.W * 0.94, e.o.get('font', 'bold'), fill=rgb(e.o.get('color'), CREAM), shadow=10))
-    k = ease_back(c.lt / 0.42)
-    if getattr(c, 'face_priority', False):
-        y_end, scale = editorial_headline_anchor(c, im)
+    word=str(e.o.get('text','STRATEGY')).upper()[:32]
+    k=ease_out(c.lt/.42)
+    al=fade(c,e)*clamp(c.lt/.12)
+    if getattr(c,'face_priority',False):
+        W=c.W
+        bw,bh=int(W*.86),int(W*.21)
+        panel=rrect(bw,bh,int(W*.022),(17,29,40,218))
+        d=ImageDraw.Draw(panel)
+        font_size=lines_fit([word],bw*.90,'didoneb',int(W*.10))
+        d.text((bw/2,bh/2),word,font=font('didoneb',font_size),
+               fill=rgb(e.o.get('color'),(207,177,124))+(255,),
+               anchor='mm')
+        place_safe_panel(c,panel,'above',alpha=al*k,min_scale=.52)
     else:
-        y_end, scale = c.fy - c.fw * 1.05, 1.
-    y = -im.height + (y_end + im.height) * k
-    place(c, im, c.W / 2 * 0.6 + c.fx * 0.4, y, scale=scale,
-          alpha=clamp((e.d - c.lt) / 0.2), behind=True)
-
-
-_grid = {}
-def grid(c):
-    if (c.W, c.H) not in _grid:
-        yy, xx = np.mgrid[0:c.H, 0:c.W].astype(np.float32); _grid[(c.W, c.H)] = (xx, yy)
-    return _grid[(c.W, c.H)]
-
+        im=cached(e,'w',lambda:fit_text(word,c.W*.94,
+             e.o.get('font','bold'),fill=rgb(e.o.get('color'),CREAM),
+             shadow=10))
+        y,scale=c.fy-c.fw*1.05,1.
+        place(c,im,c.W/2,y-(1-k)*im.height,scale=scale,
+              alpha=al,behind=True)
 
 @effect('spotlight', 'kill the lights, keep you lit')
 def fx_spotlight(c, e):
@@ -519,7 +521,10 @@ def fx_bill(c, e):
 @effect('moody', 'a moody colour grade: darker, softer, teal shadows')
 def fx_moody(c, e):
     k = ramp(c, e, 0.35, 0)
-    c.img = c.img * (1 - k) + grade(c.img, e.o.get('grade', 'moody')) * k
+    # Retain natural skin; the executive preset is a restrained grade,
+    # not a full grey/cyan replacement of the recorded camera color.
+    mix = min(.30, float(e.o.get('strength',.28))) if getattr(c,'face_priority',False) else 1.0
+    c.img = c.img*(1-k*mix)+grade(c.img,e.o.get('grade','warm'))*k*mix
     vignette(c, float(e.o.get('vignette_strength',0.4)) * k)
 
 
@@ -594,7 +599,14 @@ def fx_todo(c, e):
     left = c.fx > c.W / 2
     x = c.W * 0.05 + cw / 2 if left else c.W * 0.95 - cw / 2
     pop = ease_back(c.lt / 0.3)
-    place(c, shadowed(im, 14, 8, 90), x, max(im.height / 2 + c.H * 0.06, c.fy - c.fw * 1.4), 0.8 + 0.2 * pop, 0, clamp(c.lt / 0.12) * clamp((e.d - c.lt) / 0.2), behind=True)
+    if getattr(c,'face_priority',False):
+        place_safe_panel(c,shadowed(im,14,8,90),'above',
+                         alpha=clamp(c.lt/.12)*fade(c,e),
+                         min_scale=.46)
+    else:
+        place(c,shadowed(im,14,8,90),x,
+              max(im.height/2+c.H*.06,c.fy-c.fw*1.4),
+              .8+.2*pop,0,clamp(c.lt/.12)*fade(c,e),behind=True)
 
 
 def heart(size, color=(255, 48, 64)):
@@ -1107,45 +1119,35 @@ def fx_pastel_word(c, e):
 _gp = {}
 @effect('check-pills', 'grid-paper room, your reels pinned behind you and blue pills that get clicked')
 def fx_check_pills(c, e):
-    W, H = c.W, c.H; k = ramp(c, e, 0.15, 0); m = c.m[..., None]; al = fade(c, e)
-    if (W, H) not in _gp:
-        g = np.ones((H, W, 3), np.float32) * np.float32([0.935, 0.945, 0.96]); st = max(20, W // 20); lw = max(1, W // 700)
-        for x in range(0, W, st): g[:, x:x + lw] = np.float32([0.86, 0.875, 0.9])
-        for y in range(0, H, st): g[y:y + lw] = np.float32([0.86, 0.875, 0.9])
-        _gp[(W, H)] = g
-    c.img = c.img * (1 - k) + (c.img * m + _gp[(W, H)] * (1 - m)) * k
-    def board(i, title):
-        bw = int(W * 0.44); im = rrect(bw, int(bw * 1.12), bw * 0.07, (255, 255, 255, 255)); d = ImageDraw.Draw(im)
-        d.ellipse([bw * 0.06, bw * 0.055, bw * 0.06 + bw * 0.09, bw * 0.145], fill=(255, 160, 140, 255))
-        d.text((bw * 0.19, bw * 0.1), title, font=font('uib', bw * 0.06), fill=(20, 20, 22, 255), anchor='lm')
-        gr = thumb_grid(e.cards, 3, 3, int(bw * 0.28), int(bw * 0.025), i0=i * 3)
-        im.alpha_composite(gr, ((bw - gr.width) // 2, int(bw * 0.2))); return shadowed(im, 16, 8, 70)
-    b1 = cached(e, 'b1', lambda: board(0, e.o.get('handle', '@aiwithswarag')))
-    b2 = cached(e, 'b2', lambda: board(1, e.o.get('board', 'Illustrative concepts')))
-    by = max(H * 0.17, c.fy - c.fw * 0.9)
-    place(c, b1, W * 0.25, by, 0.6 + 0.4 * pop(c, 0.0), 8, al * clamp(c.lt / 0.1), behind=True)
-    place(c, b2, W * 0.76, by - W * 0.02, 0.6 + 0.4 * pop(c, 0.1), -8, al * clamp((c.lt - 0.1) / 0.1), behind=True)
-    names = e.o.get('text', 'Hook|Captions|Cuts|B-roll').split('|')
-    spots = [(-0.95, 2.35), (0.55, 2.0), (-0.35, 2.95), (0.95, 2.75), (0.1, 3.45), (-1.1, 3.3)]
-    ph = W * 0.078; cu = cached(e, 'cur', lambda: cursor(W * 0.055))
-    pos = []
-    for i, n in enumerate(names):
-        sx, sy = spots[i % len(spots)]
-        x = clamp(c.fx + sx * c.fw * 1.6, W * 0.16, W * 0.84); y = clamp(c.fy + sy * c.fw, H * 0.3, H * 0.9)
-        t0 = 0.22 + 0.2 * i; pos.append((x, y, t0))
-        if c.lt < t0: continue
-        clicked = c.lt >= t0 + 0.12
-        t = text_img(n, ph * 0.42, 'uib', (255, 255, 255)); pw = int(t.width + ph * (0.75 if clicked else 0.35))
-        pill = rrect(pw, ph, ph / 2, BLUE + (255,)); pill.alpha_composite(t, (int(ph * 0.18), int((ph - t.height) / 2)))
-        if clicked: tick(ImageDraw.Draw(pill), pw - ph * 0.55, ph * 0.33, ph * 0.33)
-        sq = 1 - 0.1 * math.sin(math.pi * clamp((c.lt - t0 - 0.12) / 0.2))
-        place(c, shadowed(pill, 10, 5, 90), x, y, (0.5 + 0.5 * pop(c, t0, 0.25)) * sq, 0, al, guard=True)
-    if pos and c.lt > pos[0][2] - 0.1:
-        seg = [p for p in pos if p[2] <= c.lt + 0.1]; tx, ty, t0 = seg[-1]
-        px, py = (pos[len(seg) - 2][0], pos[len(seg) - 2][1]) if len(seg) > 1 else (W * 0.9, H * 0.95)
-        q = ease_inout((c.lt - (t0 - 0.12)) / 0.2)
-        place(c, cu, px + (tx - px) * q + ph * 0.3 + cu.width / 2, py + (ty - py) * q + ph * 0.1 + cu.height / 2, 1, 0, al)
-
+    """Two clearly readable decision pills instead of fake mini reports."""
+    W=c.W
+    names=[x.strip() for x in str(e.o.get(
+        'text','DIRECTION|DELIVERY')).split('|') if x.strip()]
+    if not 1<=len(names)<=3:
+        raise ValueError('check-pills needs 1–3 approved concepts')
+    w=int(W*.80)
+    row=int(W*.135)
+    h=int(W*.105)+len(names)*row
+    lay=rrect(w,h,W*.028,(16,31,42,232))
+    d=ImageDraw.Draw(lay)
+    pad=int(W*.047)
+    d.text((pad,W*.056),'EXECUTIVE CHECKS',
+           font=font('uib',W*.043),fill=(230,242,244,255),
+           anchor='lm')
+    for i,name in enumerate(names):
+        y=int(W*.105)+(i+.5)*row
+        on=c.lt>=(.22+i*.25)
+        color=(44,154,144,255) if on else (100,121,138,255)
+        rr=max(5,int(row*.27))
+        d.ellipse((pad,y-rr,pad+2*rr,y+rr),fill=color)
+        if on:
+            tick(d,pad+rr*.55,y-rr*.15,rr*.68,
+                 w=max(2,W//100))
+        fs=lines_fit([name],w-pad*2-rr*3,'uib',int(W*.052))
+        d.text((pad+rr*2.8,y),name.upper(),
+               font=font('uib',fs),fill=(244,246,247,255),anchor='lm')
+    place_safe_panel(c,lay,'above',alpha=fade(c,e)*clamp(c.lt/.14),
+                     min_scale=.40)
 
 def red_timeline(c, e):
     W, H = c.W, c.H; k = ramp(c, e, 0.2, 0); m = c.m[..., None]; al = fade(c, e)
@@ -1184,22 +1186,26 @@ def red_timeline(c, e):
 
 @effect('headline-box', 'a punch-in with a clean two-line headline, the second line in a white box')
 def fx_headline_box(c, e):
-    face_cam(c, 1 + (float(e.o.get('zoom', 1.2)) - 1) * ease_out(c.lt / 0.22), 0.45)
-    W = c.W; al = fade(c, e); lines = e.o.get('text', 'Ideas into|measurable impact.').split('|')
-    S = cached(e, 'sz', lambda: lines_fit(lines, W * 0.84, 'uib', int(W * 0.085)))
-    y = max(c.H * 0.06, c.fy - c.fw * 1.3 - S * 1.3 * len(lines))
-    for j, ln in enumerate(lines):
-        kj = clamp((c.lt - 0.1 - 0.12 * j) / 0.18)
-        if kj <= 0: y += S * 1.3; continue
-        boxed = j == len(lines) - 1
-        t = cached(e, ('t', j), lambda: text_img(ln, S, 'uib', (16, 16, 18) if boxed else (255, 255, 255), shadow=0 if boxed else 9))
-        if boxed:
-            bx = rrect(t.width - S * 0.15, S * 1.22, S * 0.08, (255, 255, 255, 255))
-            wk = ease_out(kj); bx = bx.crop((0, 0, max(1, int(bx.width * wk)), bx.height))
-            comp(c, bx, W / 2 - (t.width - S * 0.15) / 2, y, al, guard=True)
-        place(c, t, W / 2, y + S * 0.6, 0.92 + 0.08 * ease_out(kj), 0, al * kj, guard=True)
-        y += S * 1.3
-
+    W=c.W
+    lines=[x.strip() for x in str(e.o.get(
+        'text','Strategy into|measurable impact.')).split('|') if x.strip()][:2]
+    if len(lines)!=2:
+        raise ValueError('headline-box requires two approved text lines')
+    w,h=int(W*.83),int(W*.32)
+    panel=rrect(w,h,int(W*.027),(18,32,44,224))
+    d=ImageDraw.Draw(panel)
+    pad=int(W*.042)
+    f1=lines_fit([lines[0]],w-2*pad,'uib',int(W*.072))
+    f2=lines_fit([lines[1]],w-2*pad,'uib',int(W*.070))
+    d.text((pad,h*.32),lines[0],font=font('uib',f1),
+           fill=(238,244,246,255),anchor='lm')
+    d.rounded_rectangle((pad,h*.52,w-pad,h*.91),
+                        radius=int(W*.012),fill=(245,242,233,255))
+    d.text((pad+W*.025,h*.715),lines[1],font=font('uib',f2),
+           fill=(22,33,42,255),anchor='lm')
+    place_safe_panel(c,panel,'above',
+                     alpha=fade(c,e)*clamp((c.lt-.08)/.22),
+                     min_scale=.46)
 
 @effect('profile-wall', 'your profile grid fills the wall behind you while a counter ticks up')
 def fx_profile_wall(c, e):
@@ -1424,44 +1430,33 @@ def rich(parts, size, kind, base, accent, accent_kind=None, shadow=0):
 
 @effect('headline-wall', 'a wall of your own reel headlines piles up behind your head, then your total views pop in front')
 def fx_headline_wall(c, e):
-    W, H = c.W, c.H; u = W / 1080; al = fade(c, e)
-    items = [x.split('::') for x in e.o.get('text', 'AI implementation readiness::Framework|Enterprise transformation::Strategy|'
-                                         'AI adoption: strategy to execution::Case study|Project governance: leading indicators::Framework|'
-                                         'AI ROI: measuring business outcomes::Analysis|Delivery excellence: clear ownership::Playbook|'
-                                         'Delivery management essentials::Guide').split('|')]
-    looks = [((255, 255, 255), (20, 20, 22)), ((22, 20, 24), (255, 255, 255)), ((246, 238, 226), (30, 24, 20)), ((255, 214, 10), (20, 20, 22))]
-    def hcard(i):
-        title, meta = (items[i % len(items)] + [''])[:2]; bg, fg = looks[i % len(looks)]
-        cw = int(W * 0.5); f = font('uib', cw * 0.085); words = title.split(' '); lines, cur = [], ''
-        for w_ in words:
-            tst = (cur + ' ' + w_).strip()
-            if f.getlength(tst) > cw * 0.84 and cur: lines.append(cur); cur = w_
-            else: cur = tst
-        lines.append(cur); lh = cw * 0.1
-        chh = int(cw * 0.1 + lh * len(lines) + cw * 0.16)
-        im = rrect(cw, chh, cw * 0.04, bg + (255,)); d = ImageDraw.Draw(im)
-        for j, ln in enumerate(lines): d.text((cw * 0.08, cw * 0.07 + j * lh), ln, font=f, fill=fg + (255,))
-        my = chh - cw * 0.085; s = cw * 0.04
-        d.polygon([(cw * 0.08, my - s / 2), (cw * 0.08, my + s / 2), (cw * 0.08 + s * 0.9, my)], fill=(255, 48, 64, 255))
-        d.text((cw * 0.08 + s * 1.5, my), ('@aiwithswarag  ·  ' + meta) if meta else '@aiwithswarag', font=font('uim', cw * 0.045), fill=fg + (170,), anchor='lm')
-        return shadowed(im, 14, 8, 110)
-    N = max(1,min(13,int(e.o.get('count', 13))))
-    cards = cached(e, 'cards', lambda: [hcard(i) for i in range(N)])
-    pos = cached(e, 'pos', lambda: [(random.Random(i * 7 + 1).uniform(0.2, 0.8), random.Random(i * 7 + 2).uniform(0.07, 0.42), random.Random(i * 7 + 3).uniform(-9, 9)) for i in range(N)])
-    gap = float(e.o.get('gap', 0.09))
-    for i in range(N):
-        t0 = i * gap
-        if c.lt < t0: break
-        x, y, r = pos[i]; kk = ease_back((c.lt - t0) / 0.22)
-        place(c, cards[i], x * W, y * H, 0.55 + 0.45 * kk, r, al * clamp((c.lt - t0) / 0.06), behind=True)
-    t1 = N * gap + 0.1
-    if c.lt > t1:
-        tot = e.o.get('total', 'DEMO'); lab = e.o.get('label', 'example only')
-        a = text_img(tot, 96 * u, 'anton', (255, 255, 255)); b = text_img(lab, 34 * u, 'uib', (255, 255, 255))
-        pw = int(a.width + b.width + 30 * u); ph = int(max(a.height, b.height) + 10 * u)
-        pill = rrect(pw, ph, ph * 0.28, (217, 119, 87, 245)); pill.alpha_composite(a, (int(8 * u), (ph - a.height) // 2)); pill.alpha_composite(b, (int(a.width + 8 * u), (ph - b.height) // 2))
-        place(c, shadowed(pill, 18, 8, 110), W / 2, max(c.fy + c.fw * 1.8, H * 0.6), 0.6 + 0.4 * pop(c, t1, 0.3), -3, al * clamp((c.lt - t1) / 0.08), guard=True)
-
+    """Two source-backed editorial items, not fabricated tiny publications."""
+    W=c.W
+    rows=[(x.split('::')+[''])[:2] for x in str(e.o.get(
+        'text','AI DELIVERY::ILLUSTRATIVE|GOVERNANCE::EXAMPLE')).split('|')
+        if x.strip()][:2]
+    if not rows: raise ValueError('No verified headline provided')
+    w=int(W*.84)
+    rh=int(W*.22)
+    h=int(W*.10)+len(rows)*rh
+    lay=rrect(w,h,W*.024,(21,36,49,237))
+    d=ImageDraw.Draw(lay)
+    pad=int(W*.05)
+    d.text((pad,int(W*.060)),'EDITORIAL BRIEF',
+           font=font('uib',int(W*.037)),
+           fill=(210,227,229,255),anchor='lm')
+    for j,(headline,meta) in enumerate(rows):
+        if j>0 and c.lt<(.25+j*.3): continue
+        y=int(W*.10)+j*rh
+        fsize=lines_fit([headline],w-pad*2,'uib',int(W*.062))
+        d.text((pad,y+rh*.35),headline[:62],
+               font=font('uib',fsize),fill=(243,244,241,255),
+               anchor='lm')
+        d.text((pad,y+rh*.76),meta[:30].upper(),
+               font=font('uim',int(W*.030)),
+               fill=(197,164,109,255),anchor='lm')
+    place_safe_panel(c,lay,'above',
+                     alpha=fade(c,e)*clamp(c.lt/.12),min_scale=.38)
 
 @effect('checklist', 'an executive task list builds with animated check marks')
 def fx_checklist(c, e):
