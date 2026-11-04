@@ -876,7 +876,9 @@ def glass_widgets_v1(c, e):
     a = glass(c, S, S, S * 0.2, mg + S / 2, y_top + S / 2, amt=0.14, dark=gd); d = ImageDraw.Draw(a)
     d.ellipse([S * 0.1, S * 0.115, S * 0.1 + S * 0.06, S * 0.115 + S * 0.06], fill=ORANGE + (255,))
     d.text((S * 0.2, S * 0.145), e.o.get('title', 'Swarag'), font=font('uim', S * 0.085), fill=(255, 255, 255, 235), anchor='lm')
-    d.text((S * 0.08, S * 0.2), e.o.get('text', '42'), font=font('uib', S * 0.44), fill=(255, 255, 255, 255))
+    stat=str(e.o.get('text') or 'DEMO')
+    stat_size=lines_fit([stat], S*.78,'uib', S*.33)
+    d.text((S*.08,S*.25), stat,font=font('uib',stat_size),fill=(255,255,255,255))
     for j, ln in enumerate(e.o.get('sub', 'effects|one clip').split('|')):
         d.text((S * 0.1, S * (0.7 + 0.11 * j)), ln, font=font('uim', S * 0.085), fill=(255, 255, 255, 235))
     place(c, a, mg + S / 2, y_top + S / 2, 0.6 + 0.4 * pop(c, 0.0), 0, al * clamp(c.lt / 0.1), behind=True)
@@ -1397,17 +1399,20 @@ def glass_widgets_v2(c, e):
     a = G(S, S, ax, ay); d = ImageDraw.Draw(a)
     d.ellipse([S * 0.1, S * 0.115, S * 0.16, S * 0.175], fill=ORANGE + (255,))
     d.text((S * 0.2, S * 0.145), e.o.get('title', 'Swarag'), font=font('uim', S * 0.085), fill=white + (235,), anchor='lm')
-    d.text((S * 0.08, S * 0.2), e.o.get('text', '38'), font=font('uib', S * 0.44), fill=white + (255,))
+    stat=str(e.o.get('text') or 'DEMO')
+    stat_size=lines_fit([stat], S*.80,'uib',S*.34)
+    d.text((S*.08,S*.25),stat,font=font('uib',stat_size),fill=white+(255,))
     for j, ln in enumerate(e.o.get('sub', 'effects|one clip').split('|')): d.text((S * 0.1, S * (0.7 + 0.11 * j)), ln, font=font('uim', S * 0.085), fill=white + (235,))
     show(a, ax, ay, 0)
     # 2 · render bar
     bw, bh = 400 * u, 150 * u; bx, by = W - 50 * u - bw / 2, 118 * u + bh / 2
     b = G(bw, bh, bx, by, bh * 0.28); d = ImageDraw.Draw(b); p = ease_inout(c.lt / max(0.3, e.d * 0.85))
     d.ellipse([bh * 0.17, bh * 0.2, bh * 0.28, bh * 0.31], fill=(255, 69, 58, 255))
-    d.text((bh * 0.36, bh * 0.255), 'Rendering', font=font('uim', bh * 0.19), fill=white + (240,), anchor='lm')
+    d.text((bh * 0.36, bh * 0.255), e.o.get('bar_title','Illustrative progress'), font=font('uim', bh * 0.17), fill=white + (240,), anchor='lm')
     d.rounded_rectangle([bh * 0.17, bh * 0.5, bw - bh * 0.17, bh * 0.6], bh * 0.05, fill=white + (70,))
     d.rounded_rectangle([bh * 0.17, bh * 0.5, bh * 0.17 + (bw - bh * 0.34) * max(0.04, p), bh * 0.6], bh * 0.05, fill=white + (245,))
-    d.text((bh * 0.17, bh * 0.78), f"4K render  ·  {int(p * 100)}%", font=font('uim', bh * 0.14), fill=white + (210,), anchor='lm')
+    d.text((bh*.17,bh*.78), 'DEMO WORKFLOW — NOT MEASURED',
+           font=font('uim',bh*.125),fill=white+(210,),anchor='lm')
     show(b, bx, by, 1)
     # 3 · profile
     cy3 = by + bh / 2 + 22 * u + bh / 2
@@ -1455,17 +1460,17 @@ def glass_widgets_v2(c, e):
     # 6 · calendar
     kw, kh = 330 * u, 190 * u; kx, ky = 50 * u + kw / 2, dy + ah / 2 + 26 * u + kh / 2
     ca = G(kw, kh, kx, ky, 40 * u); d = ImageDraw.Draw(ca)
-    d.text((26 * u, 36 * u), e.o.get('day', 'WED'), font=font('uib', 22 * u), fill=(255, 92, 82, 255), anchor='lm')
-    d.text((26 * u, 82 * u), e.o.get('date', '21'), font=font('uib', 56 * u), fill=white + (255,), anchor='lm')
+    d.text((26 * u, 36 * u), e.o.get('day', 'SAMPLE'), font=font('uib', 22 * u), fill=(255, 92, 82, 255), anchor='lm')
+    d.text((26 * u, 82 * u), e.o.get('date', '—'), font=font('uib', 56 * u), fill=white + (255,), anchor='lm')
     d.rounded_rectangle([22 * u, 120 * u, kw - 22 * u, 168 * u], 12 * u, fill=(255, 92, 82, 210))
-    d.text((36 * u, 144 * u), e.o.get('event', 'Review video · today'), font=font('uib', 22 * u), fill=white + (255,), anchor='lm')
+    d.text((36 * u, 144 * u), e.o.get('event', 'Illustrative example'), font=font('uib', 22 * u), fill=white + (255,), anchor='lm')
     show(ca, kx, ky, 5)
     # 7 · 4K ring
     R = 250 * u; rx, ry = W - 50 * u - R / 2, my + mh / 2 + 26 * u + R / 2
     rg = G(R, R, rx, ry, 56 * u); d = ImageDraw.Draw(rg); rp = ease_inout((c.lt - 0.4) / 1.0); rr = R * 0.34
     d.ellipse([R / 2 - rr, R / 2 - rr - 8 * u, R / 2 + rr, R / 2 + rr - 8 * u], outline=white + (60,), width=int(16 * u))
     if rp > 0: d.arc([R / 2 - rr, R / 2 - rr - 8 * u, R / 2 + rr, R / 2 + rr - 8 * u], -90, -90 + 360 * rp, fill=(52, 199, 89, 255), width=int(16 * u))
-    d.text((R / 2, R / 2 - 8 * u), 'HD', font=font('uib', 52 * u), fill=white + (255,), anchor='mm')
+    d.text((R / 2, R / 2 - 8 * u), 'DEMO', font=font('uib', 44 * u), fill=white + (255,), anchor='mm')
     d.text((R / 2, R - 26 * u), 'render', font=font('uim', 20 * u), fill=white + (210,), anchor='mm')
     show(rg, rx, ry, 6)
     # 8 · editorial label (in front)
