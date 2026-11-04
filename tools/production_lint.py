@@ -19,6 +19,19 @@ TEMPLATE_UI=frozenset({'glass-widgets','liquid-glass-graph','apple-toggles',
 ASSET_CARD_EFFECTS=frozenset({'noise','orbit','carousel-spin','check-pills',
                               'profile-wall','phone-fan','broll-split'})
 SAFE_BRAND_CARD_EFFECTS=ASSET_CARD_EFFECTS-{'broll-split'}
+# Source-specific words must be supplied at real spoken moments. A demo label
+# silently carried through the 42-effect gallery is not verified film copy.
+SPEECH_COPY_EFFECTS=frozenset({
+    'lineup','check-pills','apple-toggles','comment-box',
+    'pause-point','scribble','phone-fan','tier-list'
+})
+# Full panels must fit at 9:16 phone size before the renderer animates them.
+ROW_RULES={
+    'lineup':(4,20),'apple-toggles':(4,19),'todo':(4,27),
+    'checklist':(4,44),'the-bill':(4,24),
+    'cover-star':(3,32),'red-collage':(3,36)
+}
+
 
 def audit(plan,duration,style='premium'):
     if style not in ('premium','showcase'):
@@ -35,6 +48,45 @@ def audit(plan,duration,style='premium'):
             flag('warning','VERY_SHORT_FX',f'{label} lasts under 0.55s')
         if name in COPY_REQUIRED and not str(item.get('text','')).strip():
             flag('error','PLACEHOLDER_COPY',f'{label} requires verified, intentional text')
+        if name in SPEECH_COPY_EFFECTS:
+            key='item' if name=='tier-list' else 'text'
+            if not str(item.get(key,'')).strip():
+                flag('error','SCRIPT_COPY_REQUIRED',
+                     f'{label} must receive actual verified spoken or source-backed {key}')
+        if name in ROW_RULES:
+            key='lines' if name in ('cover-star','red-collage') else 'text'
+            if name=='checklist':
+                rows=[x.strip().split('::')[0] for x in str(item.get(key,'')).split('|') if x.strip()]
+            elif name=='cover-star' or name=='red-collage':
+                rows=[x.strip() for x in str(item.get('lines','')).split('|') if x.strip()]
+            else:
+                rows=[x.strip() for x in str(item.get(key,'')).split('|') if x.strip()]
+            limit,max_chars=ROW_RULES[name]
+            if rows and (len(rows)>limit or any(len(t)>max_chars for t in rows)):
+                flag('error','MOBILE_COPY_OVERFLOW',
+                     f'{label} needs ≤{limit} rows of ≤{max_chars} characters each for phone-sized graphics')
+        if name=='reel-frame':
+            has_metrics=any(item.get(k) is not None for k in ('likes','comments'))
+            if has_metrics and (item.get('metrics_verified') is not True
+                                or not str(item.get('metric_source','')).strip()):
+                flag('error','UNVERIFIED_SOCIAL_METRICS',
+                     f'{label} cannot publish social engagement counts without verified provenance')
+        if name in ('noise','orbit','carousel-spin','shortcut-rain','headline-wall'):
+            max_count={'noise':8,'orbit':7,'carousel-spin':8,
+                       'shortcut-rain':16,'headline-wall':8}[name]
+            if 'count' in item:
+                try: count=int(item['count'])
+                except (ValueError,TypeError): count=-1
+                if count<1 or count>max_count:
+                    flag('error','EXCESSIVE_CARD_DENSITY',
+                         f'{label} count must be 1–{max_count} in executive output')
+        if name=='carousel-spin' and 'turns' in item:
+            try: turns=float(item['turns'])
+            except (TypeError,ValueError): turns=float('inf')
+            if not math.isfinite(turns) or not 0<=turns<=1:
+                flag('error','AGGRESSIVE_CAROUSEL',
+                     f'{label} should remain below one turn for a restrained executive edit')
+
         if name in ASSET_CARD_EFFECTS:
             real_assets=bool(item.get('images'))
             brand_assets=(name in SAFE_BRAND_CARD_EFFECTS and
