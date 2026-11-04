@@ -165,15 +165,27 @@ def safe_graphic_xy(c, x, y, w, h, preferred=None):
     return min(valid, key=lambda pt: abs(pt[0]-x)+abs(pt[1]-y))
 
 def editorial_headline_anchor(c, image, margin=.042):
-    """Place whole editorial words in negative space above the real head."""
-    head_top = face_protection_rect(c)[1]
-    top = c.H * margin
-    available = max(c.H * .11, head_top - top - c.H * .018)
-    scale = min(1.0, max(.54, available / max(image.height, 1)))
-    cy = max(top + image.height*scale/2,
-             min(head_top - image.height*scale/2-c.H*.018,
-                 c.H*.15))
-    return cy, scale
+    """Place a complete editorial word only where real negative space exists.
+
+    When the upper strip is too shallow, use lower negative space. If neither
+    zone can hold legible type, omit the unsafe word rather than carve it
+    through the eyes or overlay a synthetic face-shaped black hole.
+    """
+    _, face_top, _, face_bottom = face_protection_rect(c)
+    page_top, page_bottom = c.H*margin, c.H*(1-margin)
+    air=c.H*.018
+    upper=max(0.,face_top-page_top-air)
+    lower=max(0.,page_bottom-face_bottom-air)
+    required=max(c.H*.10,image.height*.55)
+    if upper>=required:
+        scale=min(1.,upper/max(1,image.height))
+        cy=page_top+min(upper,image.height*scale)/2
+        return cy,scale
+    if lower>=required:
+        scale=min(1.,lower/max(1,image.height))
+        cy=page_bottom-image.height*scale/2
+        return cy,scale
+    return 0.,0.
 
 
 def comp(c, layer, x, y, alpha=1.0, behind=False, guard=False):
