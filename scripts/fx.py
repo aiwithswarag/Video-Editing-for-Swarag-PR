@@ -1872,16 +1872,23 @@ def fx_match_cut(c, e):
 def fx_apple_toggles(c, e):
     rows = e.o.get('text', 'CLARITY|GOVERNANCE|OUTCOMES').split('|')
     if e.o.get('pos', 'above') != 'below': face_cam(c, 1 + (float(e.o.get('zoom', 1.12)) - 1) * ease_out(c.lt / 0.5), 0.56)
-    W = c.W; cw = int(W * 0.72); rh = int(W * 0.125); ch = rh * len(rows); r = int(W * 0.055)
+    if not 1 <= len(rows) <= 4:
+        raise ValueError('apple-toggles requires 1–4 short rows')
+    W = c.W; cw = int(W * 0.78); rh = int(W * 0.145)
+    ch = rh * len(rows); r = int(W * 0.045)
     tw, th = int(W * 0.135), int(W * 0.08); tx = cw - int(W * 0.05) - tw
     def base():
         im = rrect(cw, ch, r, (255, 255, 255, 250)); d = ImageDraw.Draw(im)
-        f = font('ui', W * 0.05)
+        f = font('uim', W * 0.050)
+        allowed = tx - W * 0.075
         for i, s in enumerate(rows):
+            if f.getlength(s) > allowed:
+                raise ValueError('apple-toggles row is too long for readable phone typography')
             d.text((W * 0.05, i * rh + rh / 2), s, font=f, fill=(18, 18, 20, 255), anchor='lm')
             if i: d.line([(W * 0.05, i * rh), (cw, i * rh)], fill=(222, 222, 226, 255), width=max(2, W // 900))
-        pad = max(10, W // 60) * 2 + W // 90
-        return shadowed(im, max(10, W // 60), W // 90, 110), pad
+        blur = max(4, W // 55)
+        pad = blur * 2 + max(2, W // 120)
+        return shadowed(im, blur, max(2, W // 120), 75), pad
     sh, pad = cached(e, 'base', base)
     ts = [float(x) for x in e.o['ticks'].split('|')] if e.o.get('ticks') else [0.45 + 0.34 * i for i in range(len(rows))]
     im = sh.copy(); d = ImageDraw.Draw(im)
@@ -1896,10 +1903,16 @@ def fx_apple_toggles(c, e):
         d.ellipse([kx - kr, ky - kr, kx + kr, ky + kr], fill=(255, 255, 255, 255))
     q = pop(c, 0.0, 0.38); al = fade(c, e) * clamp(c.lt / 0.1)
     if e.o.get('pos', 'above') == 'below':
-        place(c, im, c.W / 2, min(c.H - ch * 0.75, c.fy + c.fw * 2.5), 0.6 + 0.4 * q, 0, al, guard=True); return
-    # above you, tucked behind your head: your hair overlaps only the bottom edge
-    cy = max(c.H * 0.08 + ch / 2, c.fy - c.fw * 0.95 + c.fw * float(e.o.get('overlap', 0.08)) - ch / 2)
-    place(c, im, c.W / 2, cy + (1 - q) * c.W * 0.04, 0.6 + 0.4 * q, 0, al, behind=True)
+        c.graphic_region = 'below'
+        scale = 0.56 + 0.20 * q if getattr(c,'face_priority',False) else 0.6 + 0.4*q
+        cy = c.H * .84 if getattr(c,'face_priority',False) else min(c.H-ch*.75,c.fy+c.fw*2.5)
+        place(c, im, c.W/2, cy, scale, 0, al, guard=True); return
+    # Keep the ENTIRE settings unit above the eyes. Earlier behind-person
+    # masking literally erased row three, producing a half-toggled panel.
+    c.graphic_region = 'above'
+    scale = 0.65 + .20*q if getattr(c,'face_priority',False) else 0.6+.4*q
+    cy = c.H*.135 if getattr(c,'face_priority',False) else max(c.H*.08+ch/2,c.fy-c.fw*.95-ch/2)
+    place(c, im, c.W/2, cy+(1-q)*c.W*.025, scale, 0, al, guard=True)
 
 
 @effect('led-sign', 'the lights drop and a glowing LED sign types itself out behind you')
