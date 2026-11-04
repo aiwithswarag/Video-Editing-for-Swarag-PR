@@ -47,7 +47,9 @@ if errorlevel 1 (
 )
 echo.
 echo This is your local-only editor: http://127.0.0.1:8765/
-echo Required build marker: RAG-SIX-SECTION-GUARD-2026-11-02
+echo Required build marker: 47-CAMERA-RENDER-FAIL-CLOSED-2026-11-04-R2
+echo Check the installed renderer fingerprint at http://127.0.0.1:8765/local/version
+echo All 47 short camera samples must pass before rendering a final master.
 echo Your media stays in the PRIVATE folder on this computer.
 echo Close this command window or press Ctrl+C when finished.
 start "" /min powershell -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Seconds 6; Start-Process 'http://127.0.0.1:8765/'"
