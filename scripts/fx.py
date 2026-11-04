@@ -414,7 +414,7 @@ def fx_spotlight(c, e):
     xx, yy = grid(c)
     d = ((xx - c.fx) / (c.W * 0.5)) ** 2 + ((yy - (c.fy + c.H * 0.2)) / (c.H * 0.46)) ** 2
     pool = np.clip(1 - d, 0, 1) ** 1.6
-    bright = 1 - k * (1 - (0.2 + 0.45 * pool))
+    bright = 1 - k * float(e.o.get('dim',1.0)) * (1 - (0.2 + 0.45 * pool))
     f = bright * (1 - c.m) + c.m * (1 + 0.04 * k)
     if e.o.get('text'):
         word = e.o['text']; col = rgb(e.o.get('color'), PEACH)
@@ -465,7 +465,7 @@ def fx_bill(c, e):
 def fx_moody(c, e):
     k = ramp(c, e, 0.35, 0)
     c.img = c.img * (1 - k) + grade(c.img, e.o.get('grade', 'moody')) * k
-    vignette(c, 0.4 * k)
+    vignette(c, float(e.o.get('vignette_strength',0.4)) * k)
 
 
 @effect('swipe', 'a before and after slider that sweeps across you')
@@ -981,7 +981,7 @@ def fx_split_headline(c, e):
             x += f.getlength(' ') + (S * 0.12 if core == hl else 0)
     d.rectangle([0, ch - max(5, W // 180), W, ch], fill=col + (255,))
     comp(c, lay, 0, top - ch)
-    pt = text_img(e.o.get('pill', 'in seconds ↗'), W * 0.034, 'uib', (255, 255, 255))
+    pt = text_img(e.o.get('pill', 'KEY POINT'), W * 0.050, 'uib', (255, 255, 255))
     pill = rrect(pt.width + W * 0.02, pt.height * 0.95, pt.height * 0.47, col + (255,)); pill.alpha_composite(pt, (int(W * 0.01), int(-pt.height * 0.025)))
     place(c, shadowed(pill, 10, 4, 80), W * 0.93 - pill.width / 2, top + pill.height * 0.95, 0.6 + 0.4 * pop(c, 0.62), 0, clamp((c.lt - 0.62) / 0.1) * k, guard=True)
 
@@ -1042,7 +1042,7 @@ def fx_check_pills(c, e):
         gr = thumb_grid(e.cards, 3, 3, int(bw * 0.28), int(bw * 0.025), i0=i * 3)
         im.alpha_composite(gr, ((bw - gr.width) // 2, int(bw * 0.2))); return shadowed(im, 16, 8, 70)
     b1 = cached(e, 'b1', lambda: board(0, e.o.get('handle', '@aiwithswarag')))
-    b2 = cached(e, 'b2', lambda: board(1, e.o.get('board', 'Projects  ·  42 effects')))
+    b2 = cached(e, 'b2', lambda: board(1, e.o.get('board', 'Illustrative concepts')))
     by = max(H * 0.17, c.fy - c.fw * 0.9)
     place(c, b1, W * 0.25, by, 0.6 + 0.4 * pop(c, 0.0), 8, al * clamp(c.lt / 0.1), behind=True)
     place(c, b2, W * 0.76, by - W * 0.02, 0.6 + 0.4 * pop(c, 0.1), -8, al * clamp((c.lt - 0.1) / 0.1), behind=True)
