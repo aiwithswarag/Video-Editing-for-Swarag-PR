@@ -54,6 +54,16 @@ def effect(name, desc):
 
 
 # ---------- small helpers ----------
+_grid={}
+def grid(c):
+    """Cached coordinate mesh used by the untouched cinematic effects."""
+    key=(int(c.W),int(c.H))
+    if key not in _grid:
+        yy,xx=np.mgrid[0:c.H,0:c.W].astype(np.float32)
+        _grid[key]=(xx,yy)
+    return _grid[key]
+
+
 def clamp(x, a=0.0, b=1.0): return max(a, min(b, x))
 def ease_out(x): x = clamp(x); return 1 - (1 - x) ** 3
 def ease_inout(x): x = clamp(x); return 3 * x * x - 2 * x * x * x
@@ -602,9 +612,9 @@ def fx_bill(c, e):
     if getattr(c,'face_priority',False):
         # The original print animation clipped the lower lines or moved the
         # paper through the hair when the camera framing changed.
-        place_safe_panel(c,shadowed(rec,10,5,80),'above',
+        place_safe_panel(c,rec,'above',
                          alpha=fade(c,e)*clamp(c.lt/.16),
-                         min_scale=.45)
+                         min_scale=.30)
         return
     slot_y, sw = c.H * 0.028, c.W * 0.77
     max_h = max(80, c.fy - c.fw * 1.3 - slot_y)
@@ -796,7 +806,13 @@ def fx_pause_point(c, e):
     target_x=W*float(e.o.get('target_x',.78))
     target_y=H*float(e.o.get('target_y',.16))
     if overlaps_face(c,target_x-W*.02,target_y-W*.02,W*.04,W*.04):
-        raise ValueError('PAUSE_POINT_TARGET_OVER_FACE')
+        # Put the target within actual negative space, not on the face.
+        try:
+            target_x,target_y,_=safe_panel_layout(c,W*.10,W*.10,'above',
+                                                  min_scale=.35)
+        except ValueError:
+            target_x,target_y,_=safe_panel_layout(c,W*.10,W*.10,'below',
+                                                  min_scale=.35)
     label=str(e.o.get('text','KEY DETAIL'))[:32].upper()
     panel=rrect(int(W*.76),int(W*.18),int(W*.026),
                 (18,31,42,236))
@@ -1044,7 +1060,13 @@ def fx_scribble(c, e):
         px=W*float(e.o.get('target_x',.72))
         py=H*float(e.o.get('target_y',.16))
         if overlaps_face(c,px-W*.09,py-W*.09,W*.18,W*.18):
-            raise ValueError('SCRIBBLE_MARK_OVER_FACE')
+            # Choose a face-clear target automatically; never annotate eyes.
+            try:
+                px,py,_=safe_panel_layout(c,W*.18,W*.18,'above',
+                                          min_scale=.35)
+            except ValueError:
+                px,py,_=safe_panel_layout(c,W*.18,W*.18,'below',
+                                          min_scale=.35)
         col=rgb(e.o.get('color'),(44,154,144))+(255,)
         r=max(7,int(W*.057))
         deco=Image.new('RGBA',(r*3,r*3))
@@ -2211,7 +2233,8 @@ def fx_liquid_glass_graph(c, e):
         d.text((pad,gh*.28),'ILLUSTRATIVE — NOT MEASURED',
                font=font('uim',W*.027),fill=(252,221,165,255),
                anchor='lm')
-    elif not str(e.o.get('metric_source','')).strip():
+    elif (getattr(c,'face_priority',False) and
+          not str(e.o.get('metric_source','')).strip()):
         raise ValueError('GLASS_GRAPH_REQUIRES_VERIFIED_METRIC_SOURCE')
     a,_,_=num_parts(e.o.get('from','0'))
     b,suf,dp=num_parts(e.o.get('to','0'))
