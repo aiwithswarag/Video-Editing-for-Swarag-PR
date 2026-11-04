@@ -589,6 +589,13 @@ def fx_bill(c, e):
             d.text((pad, y), ln, font=f, fill=INK + (255,))
         return im
     rec = cached(e, 'r', build)
+    if getattr(c,'face_priority',False):
+        # The original print animation clipped the lower lines or moved the
+        # paper through the hair when the camera framing changed.
+        place_safe_panel(c,shadowed(rec,10,5,80),'above',
+                         alpha=fade(c,e)*clamp(c.lt/.16),
+                         min_scale=.45)
+        return
     slot_y, sw = c.H * 0.028, c.W * 0.77
     max_h = max(80, c.fy - c.fw * 1.3 - slot_y)
     s = min(1.0, max_h / rec.height)
@@ -852,8 +859,9 @@ def fx_reel_frame(c, e):
     comments=e.o.get('comments') if verified else None
     ic = cached(e, 'ic', lambda: shadowed(reel_icons(c.W * 0.075,likes,comments), 6, 2, 120))
     comp(c, ic, x0 + iw - ic.width - c.W * 0.01, y0 + ih * 0.52, k)
-    hdl=text_img(e.o.get('text','@aiwithswarag'),
-                 c.W*.049,'uib',(255,255,255),shadow=5)
+    hdl=fit_text(e.o.get('text','@aiwithswarag'),
+                 iw*.70,'uib',int(c.W*.050),
+                 fill=(255,255,255),shadow=5)
     # One coherent, readable inset credit strip.
     hbg=rrect(int(min(iw*.83,hdl.width+c.W*.11)),
                int(hdl.height+c.W*.055),max(4,int(c.W*.013)),
@@ -1019,6 +1027,34 @@ def fx_cover_star(c, e):
 
 @effect('scribble', 'marker doodles draw themselves around you')
 def fx_scribble(c, e):
+    if getattr(c,'face_priority',False):
+        # Marker on a genuine, source-approved target instead of a halo
+        # drawn through the speaker's hair and expressions.
+        W,H=c.W,c.H
+        px=W*float(e.o.get('target_x',.72))
+        py=H*float(e.o.get('target_y',.16))
+        if overlaps_face(c,px-W*.09,py-W*.09,W*.18,W*.18):
+            raise ValueError('SCRIBBLE_MARK_OVER_FACE')
+        col=rgb(e.o.get('color'),(44,154,144))+(255,)
+        r=max(7,int(W*.057))
+        deco=Image.new('RGBA',(r*3,r*3))
+        d=ImageDraw.Draw(deco)
+        q=clamp(c.lt/.48)
+        if q>0:
+            start=-90
+            d.arc((r*.4,r*.4,r*2.6,r*2.6),start,
+                  start+int(330*q),fill=col,width=max(2,W//110))
+        place(c,deco,px,py,alpha=fade(c,e))
+        label=str(e.o.get('text','KEY DETAIL'))[:30].upper()
+        im=rrect(int(W*.70),int(W*.16),int(W*.02),(18,34,46,231))
+        d=ImageDraw.Draw(im)
+        fs=lines_fit([label],im.width*.90,'uib',int(W*.055))
+        d.text((im.width/2,im.height/2),label,
+               font=font('uib',fs),fill=(238,247,247,255),anchor='mm')
+        place_safe_panel(c,im,'above',
+                         alpha=fade(c,e)*clamp((c.lt-.25)/.18),
+                         min_scale=.45)
+        return
     col = rgb(e.o.get('color'), YELLOW) + (255,); wd = max(6, c.W // 130)
     lay = Image.new('RGBA', (c.W, c.H), (0, 0, 0, 0)); d = ImageDraw.Draw(lay)
     rx, ry = c.fw * 1.0, c.fw * 1.3
@@ -1150,6 +1186,33 @@ def glass_widgets_v1(c, e):
 
 @effect('red-collage', 'black and white you, a giant red word behind, kinetic type stacked beside you')
 def fx_red_collage(c, e):
+    if getattr(c,'face_priority',False):
+        W=c.W
+        headline=str(e.o.get('text','STRATEGY'))[:28].upper()
+        lines=[x.strip() for x in str(e.o.get(
+            'lines','CLEAR DIRECTION|SMART EXECUTION')).split('|')
+            if x.strip()][:2]
+        w=int(W*.84);h=int(W*.36)
+        card=rrect(w,h,W*.026,(25,33,39,239))
+        d=ImageDraw.Draw(card)
+        pad=int(W*.043)
+        d.text((pad,W*.049),'EDITORIAL / STRATEGY',
+               font=font('uim',W*.028),
+               fill=(208,203,190,255))
+        fs=lines_fit([headline],w-2*pad,'didoneb',int(W*.097))
+        d.text((pad,W*.133),headline,font=font('didoneb',fs),
+               fill=rgb(e.o.get('color'),(197,164,109))+(255,))
+        d.line((pad,W*.238,w-pad,W*.238),
+               fill=(197,164,109,215),width=max(2,W//110))
+        if lines:
+            second=' · '.join(lines)
+            fs=lines_fit([second],w-2*pad,'uib',int(W*.037))
+            d.text((pad,W*.285),second,font=font('uib',fs),
+                   fill=(237,239,239,255))
+        place_safe_panel(c,card,'above',
+                         alpha=fade(c,e)*clamp(c.lt/.14),
+                         min_scale=.45)
+        return
     k = ramp(c, e, 0.15, 0); m = c.m[..., None]
     bw = grade(c.img, 'bw'); out = bw * m + bw * 0.62 * (1 - m)
     c.img = c.img * (1 - k) + out * k
@@ -2455,14 +2518,17 @@ def spotlight_sparkle(c, e):
     xx, yy = grid(c)
     d = ((xx - c.fx) / (W * 0.55)) ** 2 + ((yy - (c.fy + H * 0.15)) / (H * 0.5)) ** 2
     pool = np.clip(1 - d, 0, 1) ** 1.5
-    c.img *= ((1 - k * (0.92 - 0.3 * pool)) * (1 - c.m) + c.m * (1 + 0.06 * k))[..., None]
+    strength=.40 if getattr(c,'face_priority',False) else .92
+    c.img *= ((1-k*(strength-.20*pool))*(1-c.m)+c.m*(1+.018*k))[...,None]
     ox, oy = c.fx, c.fy - c.fw * 1.1
     q = 4; sy, sx = np.mgrid[0:H // q, 0:W // q].astype(np.float32) * q
     ang = np.arctan2(sy - oy, sx - ox); rad = np.hypot(sx - ox, sy - oy)
     rays = (0.5 + 0.5 * np.cos(16 * ang + c.lt * 0.9)) ** 5 * np.exp(-rad / (H * 0.42)) + 0.9 * np.exp(-(rad / (H * 0.2)) ** 2)
     rays = cv2.resize(rays.astype(np.float32), (W, H), interpolation=cv2.INTER_LINEAR)
     halo = np.clip(cv2.GaussianBlur(c.m, (0, 0), W * 0.012) * 1.6 - c.m, 0, 1)
-    c.img += (rays * 0.32 + halo * 0.7)[..., None] * gold * k * (1 - c.m[..., None])
+    rays_int=.10 if getattr(c,'face_priority',False) else .32
+    halo_int=.16 if getattr(c,'face_priority',False) else .70
+    c.img+=(rays*rays_int+halo*halo_int)[...,None]*gold*k*(1-c.m[...,None])
     word = e.o.get('text', 'STRATEGY')
     def wimg():
         size = int(H * 0.2)
@@ -2478,7 +2544,10 @@ def spotlight_sparkle(c, e):
     place(c, im, W / 2, max(wh * 0.5 + H * 0.06, c.fy - c.fw * 1.05 - wh * 0.28), s, 0, k, behind=True)
     def spots():
         rnd = random.Random(9)
-        return [(rnd.uniform(0.04, 0.96), rnd.uniform(0.07, 0.62), rnd.uniform(0.025, 0.07), rnd.uniform(0, 6.3), rnd.uniform(5, 9), rnd.random() < 0.35) for _ in range(48)]
+        count=10 if getattr(c,'face_priority',False) else 48
+        return [(rnd.uniform(.04,.96),rnd.uniform(.05,.32),
+                 rnd.uniform(.025,.06),rnd.uniform(0,6.3),
+                 rnd.uniform(5,8),rnd.random()<.12) for _ in range(count)]
     spr = cached(e, 'star', lambda: star(W * 0.07))
     for x, y, sz, ph, sp, front in cached(e, 'sp', spots):
         a = max(0.0, math.sin(ph + c.lt * sp)) ** 2 * k
