@@ -352,15 +352,29 @@ def adaptive_panel_location(c, width, height, preferred="below", min_scale=.34):
     strict named apple-toggles-below variant. Return an explicit region
     before building glass, so the blur samples the true background.
     """
-    others=("above",) if preferred=="below" else ("below",)
-    for region in (preferred,)+others:
+    # A technically valid 0.3x card is often unreadable. Select the
+    # LARGER safe region when the preferred one would shrink the content
+    # substantially; this choice is made before frosted blur sampling.
+    # Explicit named positional variants continue using safe_panel_layout.
+    candidates=[]
+    for region in (preferred, "above" if preferred=="below" else "below"):
         try:
             cx,cy,scale=safe_panel_layout(c,width,height,region,
                                            min_scale=min_scale)
-            return region,cx,cy,scale
+            candidates.append((region,cx,cy,scale))
         except ValueError:
             continue
-    raise ValueError("NO_FACE_CLEAR_EDITORIAL_PANEL_FOR_"+preferred.upper())
+    if not candidates:
+        raise ValueError("NO_FACE_CLEAR_EDITORIAL_PANEL_FOR_"+preferred.upper())
+    chosen=candidates[0]
+    for option in candidates[1:]:
+        if option[3]>=chosen[3]+.14:
+            chosen=option
+    if getattr(c,"face_priority",False) and chosen[3]<.55:
+        raise ValueError("PANEL_UNREADABLY_SMALL_"+preferred.upper())
+    c.last_safe_panel_region=chosen[0]
+    c.last_safe_panel_scale=chosen[3]
+    return chosen
 
 
 def place_adaptive_panel(c, image, preferred="below", alpha=1.0,
@@ -710,45 +724,44 @@ def fx_moody(c, e):
 
 @effect('swipe', 'a before and after slider that sweeps across you')
 def fx_swipe(c, e):
-    """Actual same-source grade comparison without a line across the face.
+    """Source-authentic A/B grade comparison, no divider through the face."""
+    W=c.W
+    phase=ease_inout(c.lt/max(.30,e.d*.77))
+    source=c.img.copy()
+    target=grade(source,e.o.get('grade','warm'))
+    c.img=source*(1-phase)+target*phase
+    if not getattr(c,'face_priority',False):
+        return
+    # The two images depict exactly the same original camera frame before
+    # and after the requested grade; no invented business/visual result.
+    cw,ch=int(W*.84),int(W*.35)
+    deck=rrect(cw,ch,max(5,int(W*.027)),(17,32,43,246))
+    d=ImageDraw.Draw(deck)
+    tile_w=int(W*.32);tile_h=int(W*.245)
+    for index,imarray in enumerate((source,target)):
+        arr=(np.clip(imarray,0,1)*255).astype(np.uint8)
+        ih,iw=arr.shape[:2]
+        aspect=tile_w/tile_h
+        crop_w=min(iw,int(ih*aspect))
+        crop_h=min(ih,int(iw/aspect))
+        ax=(iw-crop_w)//2;ay=max(0,int(ih*.23-crop_h*.5))
+        ay=min(ay,ih-crop_h)
+        tile=Image.fromarray(arr[ay:ay+crop_h,ax:ax+crop_w]).resize(
+            (tile_w,tile_h),Image.Resampling.LANCZOS).convert('RGBA')
+        x=int(W*(.075 if index==0 else .44))
+        y=int(W*.045)
+        deck.alpha_composite(tile,(x,y))
+        label=('ORIGINAL' if index==0 else 'GRADED')
+        d.text((x+tile_w/2,W*.315),label,
+               font=font('uib',int(W*.040)),
+               fill=(244,242,236,255),anchor='mm')
+    # The divider is INSIDE the comparison only, never across eyes/mouth.
+    dx=cw*.50
+    d.line((dx,W*.065,dx,W*.264),
+           fill=(197,164,109,255),width=max(2,W//115))
+    place_adaptive_panel(c,deck,'above',
+              alpha=fade(c,e)*clamp(c.lt/.14),min_scale=.48)
 
-    This effect compares the ungraded and graded original camera shot. A
-    decorative diagonal crossing the eyes was not a safe before/after UI.
-    """
-    p = ease_inout(c.lt / max(.25, e.d*.80))
-    before = c.img.copy()
-    after = grade(before, e.o.get('grade','warm'))
-    # The image gradually reveals the actual treatment rather than drawing
-    # a sharp divider through mouth, eyes and facial expressions.
-    c.img = before * (1-p) + after * p
-    if getattr(c,'face_priority',False):
-        W = c.W
-        bw, bh = int(W*.82), int(W*.20)
-        im = rrect(bw,bh,W*.025,(24,35,43,232))
-        d = ImageDraw.Draw(im)
-        labels=(e.o.get('before_label','BEFORE GRADE'),
-                e.o.get('after_label','AFTER GRADE'))
-        f = font('uib',W*.041)
-        for i,label in enumerate(labels):
-            cx=bw*(.26 if i==0 else .75)
-            d.text((cx,bh*.33),label,font=f,
-                   fill=(225,234,239,255),anchor='mm')
-        pct=clamp(p)
-        track_y=bh*.68
-        d.rounded_rectangle((bw*.10,track_y,bw*.90,track_y+bh*.09),
-                            bh*.045,fill=(75,93,108,255))
-        d.rounded_rectangle((bw*.10,track_y,
-                             bw*(.10+.80*max(.01,pct)),track_y+bh*.09),
-                            bh*.045,fill=(44,154,144,255))
-        place_safe_panel(c,im,'above',alpha=fade(c,e)*clamp(c.lt/.10),
-                         min_scale=.60)
-    else:
-        # Preserve the distinct original catalog's diagonal wipe aesthetic.
-        xx, yy=grid(c)
-        sp=1.05-.95*ease_inout(p/.5) if p<.5 else .1+.4*ease_inout((p-.5)/.4)
-        line=sp*c.W+.22*(yy-c.H/2)
-        a=np.clip((xx-line)/3+.5,0,1)[...,None]
-        c.img=before*(1-a)+after*a
 
 @effect('todo', 'a checklist card beside your head that ticks off as you talk')
 def fx_todo(c, e):
@@ -1544,8 +1557,10 @@ def fx_profile_wall(c, e):
         x=sx+(i%2)*(cell+gap)
         y=header+gap+(i//2)*(cell+gap)
         im.alpha_composite(tile,(x,y))
-    place_safe_panel(c,im,'above',alpha=fade(c,e)*clamp(c.lt/.18),
-                     min_scale=.35)
+    # The portfolio itself is the effect. Keep its approved media grouped
+    # in the upper negative space, not a second badge across the shirt.
+    place_adaptive_panel(c,im,'above',alpha=fade(c,e)*clamp(c.lt/.18),
+                         min_scale=.55)
     if e.o.get('count') is not None:
         if not str(e.o.get('metric_source','')).strip():
             raise ValueError('PROFILE_COUNT_WITHOUT_VERIFIED_SOURCE')
@@ -1561,8 +1576,13 @@ def fx_profile_wall(c, e):
             fill=(247,247,245,255),anchor='lm')
     bd.text((bw*.06,bh*.76),metric_label[:24],
             font=font('uim',W*.029),fill=(191,214,218,255),anchor='lm')
-    place_safe_panel(c,bar,'below',
-                     alpha=fade(c,e)*clamp((c.lt-.3)/.20),min_scale=.36)
+    # Do not add a second unreadable floating badge on the chest.
+    # A verified metric remains available to the higher-level director,
+    # but must be paired with an explicit well-framed scene to be displayed.
+    if e.o.get('show_metric_badge') is True:
+        place_adaptive_panel(c,bar,'above',
+                       alpha=fade(c,e)*clamp((c.lt-.3)/.20),
+                       min_scale=.58)
 
 @effect('tier-list', 'an executive tier list with a highlighted item')
 def fx_tier_list(c,e):
