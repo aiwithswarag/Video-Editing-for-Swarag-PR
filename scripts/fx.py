@@ -1510,26 +1510,11 @@ def rag_evidence_glass_widgets(c, e):
         return font(which, max(8,pt*u))
     def position(panel,cx,top,index=0):
         y=top+panel.height/2.0 - (1-progress)*12*u
-        # Reinforce the genuine MediaPipe person mask with an independent
-        # detector-centred face ellipse. Even if the segmentation confidence
-        # falls on hair/eyes, glass alpha stays zero over the real face.
-        fw=max(float(c.fw),W*.045)
-        x0=max(0,int(c.fx-fw*1.22));x1=min(W,int(c.fx+fw*1.22)+1)
-        y0=max(0,int(c.fy-fw*1.64));y1=min(H,int(c.fy+fw*1.45)+1)
-        if x1<=x0 or y1<=y0:
-            place(c,panel,cx,y,0.965+0.035*progress,0,
-                  alpha*clamp((c.lt-index*.065)/0.18),behind=True)
-            return
-        region=c.m[y0:y1,x0:x1]
-        original_mask=region.copy()
-        yy,xx=np.ogrid[y0:y1,x0:x1]
-        ellipse=((xx-c.fx)/(fw*1.09))**2 + ((yy-c.fy)/(fw*1.42))**2
-        region[:]=np.maximum(original_mask,(ellipse<=1.0).astype(np.float32))
-        try:
-            place(c,panel,cx,y,0.965+0.035*progress,0,
-                  alpha*clamp((c.lt-index*.065)/0.18),behind=True)
-        finally:
-            region[:]=original_mask
+        # No artificial face ellipse: the actual hair/shoulder segmentation
+        # provides behind-subject depth. The old injected oval caused visible
+        # hard-edged gaps through readable glass labels.
+        place(c,panel,cx,y,0.965+0.035*progress,0,
+              alpha*clamp((c.lt-index*.065)/0.18),behind=True)
     def pane(width,height,accent):
         panel=glass(c,width,height,min(width,height)*0.105,
                     W/2,card_top+height/2,
