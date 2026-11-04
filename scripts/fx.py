@@ -716,9 +716,20 @@ def fx_todo(c, e):
     x = c.W * 0.05 + cw / 2 if left else c.W * 0.95 - cw / 2
     pop = ease_back(c.lt / 0.3)
     if getattr(c,'face_priority',False):
-        place_safe_panel(c,shadowed(im,14,8,90),'above',
+        # Prefer an upper checklist; when the upper strip is too short
+        # explicitly choose a readable lower composition. Never silently
+        # delete the entire card or punch an oval through its rows.
+        try:
+            safe_panel_layout(c, im.width, im.height,'above',
+                              min_scale=.42)
+            region='above'
+        except ValueError:
+            safe_panel_layout(c,im.width,im.height,'below',
+                              min_scale=.42)
+            region='below'
+        place_safe_panel(c,im,region,
                          alpha=clamp(c.lt/.12)*fade(c,e),
-                         min_scale=.46)
+                         min_scale=.42)
     else:
         place(c,shadowed(im,14,8,90),x,
               max(im.height/2+c.H*.06,c.fy-c.fw*1.4),
