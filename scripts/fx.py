@@ -304,7 +304,8 @@ def cached(e, key, fn):
 def fx_noise(c, e):
     cw = int(c.W * float(e.o.get('size', 0.34)))
     def setup():
-        rnd = random.Random(7); n = min(16, max(4, int(e.d / 0.22)))
+        rnd = random.Random(7)
+        n = min(16,max(2,int(e.o['count']))) if 'count' in e.o else min(16,max(4,int(e.d/0.22)))
         return [(rnd.uniform(0.14, 0.86), rnd.uniform(0.12, 0.52), rnd.uniform(-7, 7)) for _ in range(n)]
     pos = cached(e, 'pos', setup)
     cards = cached(e, 'cards', lambda: [card(im if e.o.get('brand_cards') or e.o.get('images') is not None else vary(im, i), cw) for i, im in enumerate(e.cards)])
@@ -484,7 +485,7 @@ def fx_swipe(c, e):
     d.text((r + 2, r + 2), '< >', font=font('mono', r * 0.7), fill=INK + (255,), anchor='mm')
     place(c, shadowed(h, 8, 4, 110), hx, hy)
     for lab, x in (('before', 0.14), ('after', 0.86)):
-        t = text_img(lab, c.W * 0.03, 'serif', INK); pill = rrect(t.width + 16, t.height, t.height / 2, (255, 255, 255, 225))
+        t = text_img(lab, c.W * 0.050, 'uim', INK); pill = rrect(t.width + 16, t.height, t.height / 2, (255, 255, 255, 225))
         pill.alpha_composite(t, (8, 0)); place(c, pill, c.W * x, c.H * 0.88)
 
 
@@ -934,7 +935,12 @@ def fx_red_collage(c, e):
               s, 0, clamp(c.lt / 0.12) * al, behind=True)
     lines = e.o.get('lines', 'CLEAR STRATEGY.|SMART EXECUTION.|REAL IMPACT.').split('|')
     size = cached(e, 'sz', lambda: lines_fit(lines, c.W * 0.8, 'uib', int(c.W * 0.14)))
-    y = max(c.H * 0.5, c.fy + c.fw * 1.55)
+    if getattr(c,'face_priority',False):
+        y=min(c.H*.88-len(lines)*size*1.15,
+              max(c.H*.67,c.fy+c.fw*1.55))
+        y=max(c.H*.60,y)
+    else:
+        y=max(c.H*.5,c.fy+c.fw*1.55)
     for j, ln in enumerate(lines):
         im = cached(e, ('l', j), lambda: text_img(ln, size, 'uib', red if j == 1 else (255, 255, 255), shadow=8))
         kk = clamp((c.lt - 0.18 - 0.13 * j) / 0.16)
@@ -1153,7 +1159,11 @@ def fx_tier_list(c, e):
     ttl = cached(e, 'ttl', lambda: fit_text(e.o.get('title', 'best way to edit a reel?'), W * 0.88, 'serif', int(W * 0.11), fill=YELLOW, shadow=8))
     place(c, ttl, W / 2, max(ttl.height * 0.6, c.fy - c.fw * 1.65), 0.9 + 0.1 * ease_out(c.lt / 0.3), 0, al * clamp(c.lt / 0.15), behind=True)
     tiers = [('S', (255, 127, 127)), ('A', (255, 191, 127)), ('B', (255, 223, 127)), ('C', (191, 255, 127)), ('D', (127, 191, 255)), ('F', (191, 127, 255))]
-    cw = int(W * 0.66); rh = int(W * 0.082); pad = int(W * 0.015); chh = pad * 2 + rh * 6 + pad * 5
+    if getattr(c,'face_priority',False) and not e.o.get('all_tiers'):
+        tiers=tiers[:4]
+    cw = int(W * (0.80 if getattr(c,'face_priority',False) else 0.66))
+    rh = int(W * (0.105 if getattr(c,'face_priority',False) else 0.082))
+    pad = int(W * 0.015); chh = pad*2 + rh*len(tiers) + pad*(len(tiers)-1)
     fill = dict(zip('BCDF', e.o.get('others', 'templates|timelines|apps|doing it by hand').split('|')))
     def board():
         im = rrect(cw, chh, W * 0.025, (22, 22, 26, 240)); d = ImageDraw.Draw(im)
@@ -2001,7 +2011,10 @@ def fx_led_sign(c, e):
     glow = cv2.GaussianBlur(pan, (0, 0), cell * 0.9)
     pan = np.clip(pan + glow * 1.6, 0, 1)
     ph, pw = pan.shape[:2]; x0 = int(c.W / 2 - pw / 2)
-    y0 = int(max(c.H * 0.03, c.fy - c.fw * 0.75 - ph))
+    y0 = int(max(c.H*.03, min(c.H*.11,
+              face_protection_rect(c)[1]-ph-c.H*.018))
+              if getattr(c,'face_priority',False)
+              else max(c.H*.03,c.fy-c.fw*.75-ph))
     xx, yy = grid(c)
     d = ((xx - c.fx) / (c.W * 0.6)) ** 2 + ((yy - (c.fy + c.H * 0.25)) / (c.H * 0.55)) ** 2
     bright = 1 - k * (0.84 - 0.3 * np.clip(1 - d, 0, 1))
