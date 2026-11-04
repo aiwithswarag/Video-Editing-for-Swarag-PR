@@ -244,9 +244,12 @@ def place_safe_panel(c, im, region="above", alpha=1.0, min_scale=0.42,
     if alpha <= 0: return False
     cx, cy, scale = safe_panel_layout(c, im.width, im.height, region,
                                       min_scale=min_scale,max_scale=max_scale)
-    # This complete panel never intersects the facial exclusion rectangle;
-    # therefore the normal compositor has no reason to relocate or erase it.
-    place(c, im, cx, cy, scale=scale, alpha=alpha)
+    # A proposed safe coordinate is not evidence that a pixel was drawn.
+    # The compositor may still reject it because tracking changed the face
+    # exclusion box. Count ONLY successfully composited nontransparent pixels.
+    painted = place(c, im, cx, cy, scale=scale, alpha=alpha)
+    if not painted:
+        raise ValueError("SAFE_PANEL_NOT_COMPOSITED_"+region.upper())
     c.visible_safe_panels = getattr(c, "visible_safe_panels", 0)+1
     return True
 
@@ -318,7 +321,7 @@ def comp(c, layer, x, y, alpha=1.0, behind=False, guard=False):
     guard=True only hides it where it would cover your face."""
     L = to_np(layer) if isinstance(layer, Image.Image) else layer
     h, w = L.shape[:2]; x, y = int(round(x)), int(round(y))
-    if alpha <= 0: return
+    if alpha <= 0: return False
     executive = bool(getattr(c, "face_priority", False))
     intentional_face_art = getattr(c, "current_fx", None) in _FACE_TOUCH_EFFECTS
     if executive and not behind and (guard or not intentional_face_art):
@@ -327,10 +330,10 @@ def comp(c, layer, x, y, alpha=1.0, behind=False, guard=False):
         if pos is None:
             # Do not cover the real eyes/mouth or manufacture an oval gap.
             c.layout_conflicts = getattr(c, "layout_conflicts", 0) + 1
-            return
+            return False
         x, y = [int(round(v)) for v in pos]
     x0, y0, x1, y1 = max(0, x), max(0, y), min(c.W, x + w), min(c.H, y + h)
-    if x1 <= x0 or y1 <= y0: return
+    if x1 <= x0 or y1 <= y0: return False
     L = L[y0 - y:y1 - y, x0 - x:x1 - x]
     a = L[..., 3:4] * alpha
     m = np.clip(c.m[y0:y1, x0:x1, None], 0, 1)
@@ -352,17 +355,21 @@ def comp(c, layer, x, y, alpha=1.0, behind=False, guard=False):
         fw = max(float(c.fw), float(c.W)*0.045, 1.)
         e = ((xx-c.fx)/(fw*1.07))**2 + ((yy-c.fy)/(fw*1.43))**2
         a = a * (1 - np.clip((1.25-e)/0.3,0,1)[...,None])
+    if a.size == 0 or float(a.max()) < (1.0/255):
+        return False
     dst = c.img[y0:y1, x0:x1]
     dst[:] = dst * (1 - a) + L[..., :3] * a
+    c.last_composited_bounds = (x0,y0,x1,y1)
+    return True
 
 
 def place(c, im, cx, cy, scale=1.0, rot=0.0, alpha=1.0, behind=False, guard=False):
     """Draw a PIL image centred on (cx, cy), scaled and rotated (degrees, counter-clockwise)."""
-    if scale <= 0.01 or alpha <= 0: return
+    if scale <= 0.01 or alpha <= 0: return False
     if abs(scale - 1) > 0.005:
         im = im.resize((max(1, int(im.width * scale)), max(1, int(im.height * scale))), Image.BILINEAR)
     if abs(rot) > 0.05: im = im.rotate(rot, Image.BICUBIC, expand=True)
-    comp(c, im, cx - im.width / 2, cy - im.height / 2, alpha, behind, guard)
+    return comp(c, im, cx - im.width / 2, cy - im.height / 2, alpha, behind, guard)
 
 
 def camera(c, zoom, cx, cy):
