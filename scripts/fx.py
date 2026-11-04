@@ -231,6 +231,67 @@ def place_safe_panel(c, im, region="above", alpha=1.0, min_scale=0.42,
     return True
 
 
+def executive_motion_cards(c, e, mode="noise"):
+    """Readable source-media focal card preserving each effect's motion cue.
+
+    Uses real approved media or explicitly labeled original Swarag concepts,
+    never tiny repeated selfie thumbnails. One complete unit is reserved
+    above the face, with separate animation modes for noise/orbit/carousel.
+    """
+    W=c.W
+    cards=list(getattr(e,'cards',[]) or [])
+    if not cards: raise ValueError(mode+' requires approved source cards')
+    labels=[x.strip() for x in str(e.o.get('labels','')).split('|') if x.strip()]
+    if not labels: labels=['ILLUSTRATIVE CONCEPT']*len(cards)
+    count=max(1,min(4,int(e.o.get('count',3))))
+    phase=clamp(c.lt/max(.3,e.d))
+    step=min(count-1,int(phase*count))
+    label=labels[step%len(labels)]
+    src=cards[step%len(cards)].convert('RGB')
+    w,h=int(W*.84),int(W*.29)
+    body=rrect(w,h,int(W*.025),(16,31,43,236))
+    tile_w,tile_h=int(W*.19),int(W*.22)
+    sw,sh=src.size
+    ratio=tile_w/tile_h
+    if sw/sh>ratio:
+        tw=int(sh*ratio);src=src.crop(((sw-tw)//2,0,(sw+tw)//2,sh))
+    else:
+        th=int(sw/ratio);src=src.crop((0,(sh-th)//2,sw,(sh+th)//2))
+    body.alpha_composite(src.resize((tile_w,tile_h),
+                         Image.LANCZOS).convert('RGBA'),
+                         (int(W*.034),int(W*.035)))
+    d=ImageDraw.Draw(body)
+    x=int(W*.27)
+    d.text((x,int(h*.29)),
+           ('ORBITING IDEA' if mode=='orbit' else
+            'CURRENT CARD' if mode=='carousel' else 'FOCUS CARD'),
+           font=font('uim',W*.027),fill=(184,206,211,255))
+    fs=lines_fit([label],w-x-W*.045,'uib',int(W*.057))
+    d.text((x,int(h*.60)),label.upper(),font=font('uib',fs),
+           fill=(242,245,247,255),anchor='lm')
+    d.text((x,int(h*.81)),f'{step+1:02d} / {count:02d}',
+           font=font('uim',W*.030),fill=(197,164,109,255),
+           anchor='lm')
+    # The motion identity persists in the compact preview without throwing
+    # unreadable cards across eyes or hair.
+    if mode=='orbit':
+        rad=W*.035
+        theta=phase*2*math.pi
+        ox=w*.89+rad*math.cos(theta)
+        oy=h*.50+rad*math.sin(theta)
+        rr=max(3,int(W*.012))
+        d.ellipse((ox-rr,oy-rr,ox+rr,oy+rr),fill=(44,154,144,255))
+    elif mode=='carousel':
+        bar_y=h*.91
+        d.rounded_rectangle((x,bar_y,w-W*.04,bar_y+W*.008),
+                            radius=W*.003,fill=(76,99,111,255))
+        d.rounded_rectangle((x,bar_y,x+(w-W*.04-x)*phase,bar_y+W*.008),
+                            radius=W*.003,fill=(44,154,144,255))
+    return place_safe_panel(c,body,'above',
+                            alpha=fade(c,e)*clamp((c.lt-.04)/.15),
+                            min_scale=.43)
+
+
 def comp(c, layer, x, y, alpha=1.0, behind=False, guard=False):
     """Alpha-composite an RGBA layer with its top-left at (x, y).
     behind=True hides it wherever the person is (so it sits behind you).
@@ -357,6 +418,8 @@ def cached(e, key, fn):
 # ---------- original effect library (all 42 effects) ----------
 @effect('noise', 'reels pile up behind your head, one every quarter second')
 def fx_noise(c, e):
+    if getattr(c,'face_priority',False):
+        return executive_motion_cards(c,e,'noise')
     cw = int(c.W * float(e.o.get('size', 0.34)))
     def setup():
         rnd = random.Random(7)
@@ -374,6 +437,30 @@ def fx_noise(c, e):
 
 @effect('lineup', 'numbered tiles fan out in an arc above your head')
 def fx_lineup(c, e):
+    if getattr(c,'face_priority',False):
+        W=c.W
+        names=[x.strip() for x in str(e.o.get(
+            'text','STRATEGY|EXECUTION|OUTCOMES')).split('|') if x.strip()]
+        names=names[:4]
+        if not names: raise ValueError('lineup requires approved step names')
+        w=int(W*.82)
+        rh=int(W*.115)
+        h=int(W*.055)+rh*len(names)
+        im=rrect(w,h,W*.027,(18,31,43,239))
+        d=ImageDraw.Draw(im)
+        progress=clamp(c.lt/max(.4,e.d*.7))
+        shown=max(1,min(len(names),1+int(progress*len(names))))
+        for i,name in enumerate(names[:shown]):
+            cy=int(W*.055)+(i+.50)*rh
+            d.text((W*.055,cy),f'{i+1:02d}',
+                   font=font('uib',W*.046),
+                   fill=(197,164,109,255),anchor='lm')
+            fs=lines_fit([name],w-W*.20,'uib',int(W*.049))
+            d.text((W*.19,cy),name.upper(),font=font('uib',fs),
+                   fill=(242,244,245,255),anchor='lm')
+        return place_safe_panel(c,im,'above',
+                                alpha=fade(c,e)*clamp(c.lt/.15),
+                                min_scale=.43)
     names = e.o.get('text', '|'.join(NAMES)).split('|')
     tw = int(c.W * 0.105)
     def tile(i, name):
@@ -420,6 +507,8 @@ def fx_locked_on(c, e):
 
 @effect('orbit', 'your reels circle your head: in front at the bottom, behind you at the top')
 def fx_orbit(c, e):
+    if getattr(c,'face_priority',False):
+        return executive_motion_cards(c,e,'orbit')
     K = int(e.o.get('count', 6)); cw = int(c.W * float(e.o.get('size', 0.2)))
     cards = cached(e, 'cards', lambda: [card(vary(im, i) if e.o.get('images') is None else im, cw) for i, im in enumerate(e.cards)])
     intro, out = ease_out(c.lt / 0.4), clamp((e.d - c.lt) / 0.25)
@@ -2049,6 +2138,8 @@ def fx_liquid_glass_graph(c, e):
 
 @effect('carousel-spin', 'your reels spin around you in a 3D carousel, then slow to a stop')
 def fx_carousel_spin(c, e):
+    if getattr(c,'face_priority',False):
+        return executive_motion_cards(c,e,'carousel')
     K = int(e.o.get('count', max(6, min(12, len(e.cards))))); cw = int(c.W * float(e.o.get('size', 0.3)))
     def mk():
         out = []
