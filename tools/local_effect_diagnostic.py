@@ -11,6 +11,8 @@ No external B-roll, cloud upload, invented metrics, or GitHub commit.
 from __future__ import annotations
 import argparse
 import json
+import hashlib
+import re
 import subprocess
 import sys
 import time
@@ -24,6 +26,40 @@ from render_effect_gallery import NAMED_VARIANTS
 from effect_motion_review import create_motion_review
 from effect_creative_review import report_for
 from effect_finish_contract import risk_for
+
+
+DIAGNOSTIC_BUILD_ID="FACE-SAFE-47-CAMERA-DIAGNOSTIC-2026-11-04-R2"
+
+
+def renderer_fingerprint():
+    """Hash the actual installed renderer bytes, even from Windows ZIP/Docker."""
+    try:
+        return hashlib.sha256((ROOT/"scripts"/"fx.py").read_bytes()).hexdigest()[:16]
+    except OSError:
+        return "unavailable"
+
+
+def render_error_code(log):
+    """Extract a short local-only failure reason without a private file path."""
+    log=str(log or "")
+    if not log.strip():
+        return "NO_RENDER_LOG"
+    for pattern in (
+        r"(PANEL_DOES_NOT_FIT_[A-Z]+)",
+        r"(NO_SAFE_REGION[^\n]*)",
+        r"(SAFE_PANEL_NOT_COMPOSITED_[A-Z]+)",
+        r"(NO_FACE_CLEAR_EDITORIAL_PANEL_FOR_[A-Z]+)",
+        r"(GLASS_GRAPH_REQUIRES_[A-Z_]+)",
+        r"([A-Za-z]+Error):[^\n]*",
+    ):
+        hits=re.findall(pattern,log)
+        if hits:
+            return str(hits[-1]).strip()[:100]
+    if "Motion render failed" in log:
+        return "MOTION_RENDER_FAILED"
+    if "TimeoutExpired" in log:
+        return "RENDER_TIMEOUT"
+    return "RENDER_FAILED_see_private_log"
 
 
 def probe(source):
@@ -67,13 +103,34 @@ def report_from_gallery(folder,source_duration,source_start,original_dims):
                     (by_name[key].get("media_qc") or {}).get("full_video_and_audio_decode")]
     low_change=[name for name in names if
                 (by_name.get(name,{}).get("preview_qc") or {}).get("visible_change_detected_in_sample") is False]
+    per_effect_runtime = {}
+    for label in expected:
+        entry=by_name.get(label)
+        if entry is None:
+            per_effect_runtime[label]={
+                "status":"MISSING_RESULT",
+                "preview_rendered":False,
+                "motion_decoded":False,
+                "error_code":"NO_RESULT_ENTRY"}
+            continue
+        decoded=bool((entry.get("media_qc") or {}).get("full_video_and_audio_decode"))
+        ok=bool(entry.get("ok") and decoded)
+        per_effect_runtime[label]={
+            "status":"PASS" if ok else "FAILED_OR_UNVERIFIED",
+            "preview_rendered":bool(entry.get("preview")),
+            "motion_decoded":decoded,
+            "error_code":None if ok else render_error_code(entry.get("log")),
+            "clip_duration_s":(entry.get("media_qc") or {}).get("duration_seconds")}
     per_effect_review_flags = {
         label: list((by_name.get(label, {}).get('preview_qc') or {}).get('warnings') or [])
         for label in expected
         if (by_name.get(label, {}).get('preview_qc') or {}).get('warnings')
     }
     return {
-        "schema_version":1,"purpose":"PRIVATE LOCAL DIAGNOSTIC — NOT A PUBLISHABLE EDIT",
+        "schema_version":2,
+        "diagnostic_build_id":DIAGNOSTIC_BUILD_ID,
+        "renderer_fingerprint_sha256_16":renderer_fingerprint(),
+        "purpose":"PRIVATE LOCAL DIAGNOSTIC — NOT A PUBLISHABLE EDIT",
         "presentation":"Swarag executive illustrative examples (not original effect default UI)",
         "original_effect_implementations_tested":True,
         "illustrative_fixture_content":True,
@@ -92,6 +149,7 @@ def report_from_gallery(folder,source_duration,source_start,original_dims):
                              "height":int(original_dims["height"])},
         "no_visible_change_in_one_sample_frame":low_change,
         "per_effect_review_flags":per_effect_review_flags,
+        "per_effect_runtime":per_effect_runtime,
         "human_creative_review_focus":report_for(expected),
         "effect_by_effect_finish_checklist":{name:risk_for(name) for name in expected},
         "technical_status":("ALL_42_SHORT_SAMPLE_DECODE_PASS" if
@@ -121,6 +179,10 @@ def make_review_sheet(gallery,destination):
     rows=(len(labels)+columns-1)//columns
     canvas=Image.new("RGB",(columns*cell_width,rows*cell_height),(20,32,44))
     dr=ImageDraw.Draw(canvas)
+    manifest_path=gallery/"results.json"
+    entries=(json.loads(manifest_path.read_text(encoding="utf8"))
+             if manifest_path.is_file() else [])
+    details={x.get("effect"):x for x in entries if isinstance(x,dict)}
     for i,name in enumerate(labels):
         x=(i%columns)*cell_width
         y=(i//columns)*cell_height
@@ -135,6 +197,10 @@ def make_review_sheet(gallery,destination):
                 dr.text((x+6,y+45),"FAILED TO DECODE",fill=(227,151,126))
         else:
             dr.text((x+6,y+45),"MISSING PREVIEW",fill=(227,151,126))
+            detail=details.get(name)
+            reason=(render_error_code(detail.get("log")) if detail
+                    else "NO_RESULT_ENTRY")
+            dr.text((x+6,y+65),reason[:24],fill=(227,151,126))
         dr.text((x+6,y+7),name[:27],fill=(242,239,233))
     canvas.save(destination,quality=88)
     return destination
