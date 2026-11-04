@@ -188,6 +188,49 @@ def editorial_headline_anchor(c, image, margin=.042):
     return 0.,0.
 
 
+def safe_panel_layout(c, width, height, region="above", min_scale=0.45,
+                      max_scale=1.0):
+    """Fit one complete information panel into a strict face-clear region.
+
+    Unlike safe_graphic_xy, this never swaps an explicitly requested 'below'
+    panel to the top. A non-fitting layout fails explicitly instead of
+    silently deleting a graph, checklist or phone fan from a valid MP4.
+    """
+    W, H = c.W, c.H
+    margin = max(float(W)*0.03, 4.0)
+    face_left, face_top, face_right, face_bottom = face_protection_rect(c)
+    zones = {
+        "above": (margin, min(H*0.48, face_top-margin)),
+        "below": (max(H*0.52, face_bottom+margin), H-margin),
+    }
+    if region not in zones:
+        raise ValueError("Expected strict above/below panel region")
+    top, bottom = zones[region]
+    space_h = max(0.0, bottom-top)
+    space_w = W-2*margin
+    if space_h <= 0 or space_w <= 0:
+        raise ValueError("NO_SAFE_REGION: "+region)
+    if width <= 0 or height <= 0:
+        raise ValueError("EMPTY_PANEL")
+    fit = min(float(max_scale), space_w/float(width), space_h/float(height))
+    if fit < min_scale:
+        raise ValueError("PANEL_DOES_NOT_FIT_"+region.upper())
+    return W/2.0, (top+bottom)/2.0, fit
+
+
+def place_safe_panel(c, im, region="above", alpha=1.0, min_scale=0.42,
+                     max_scale=1.0):
+    """Render a complete information unit at a guaranteed strict position."""
+    if alpha <= 0: return False
+    cx, cy, scale = safe_panel_layout(c, im.width, im.height, region,
+                                      min_scale=min_scale,max_scale=max_scale)
+    # This complete panel never intersects the facial exclusion rectangle;
+    # therefore the normal compositor has no reason to relocate or erase it.
+    place(c, im, cx, cy, scale=scale, alpha=alpha)
+    c.visible_safe_panels = getattr(c, "visible_safe_panels", 0)+1
+    return True
+
+
 def comp(c, layer, x, y, alpha=1.0, behind=False, guard=False):
     """Alpha-composite an RGBA layer with its top-left at (x, y).
     behind=True hides it wherever the person is (so it sits behind you).
