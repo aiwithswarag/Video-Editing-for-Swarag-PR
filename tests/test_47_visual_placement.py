@@ -74,7 +74,9 @@ class CriticalFrameVisibility(unittest.TestCase):
     def test_profile_wall_avoids_head_cutout(self):
         c=self.canvas('profile-wall')
         self.fx.fx_profile_wall(c,self.effect('profile-wall'))
-        self.assertGreaterEqual(c.visible_safe_panels,2)
+        # One complete portfolio unit is intentional. The old second
+        # "illustrative metric" badge was tiny and floated over the shirt.
+        self.assertEqual(c.visible_safe_panels,1)
         self.assertEqual(0,c.layout_conflicts)
 
     def test_swipe_has_no_bright_diagonal_crossing_real_face(self):
