@@ -36,6 +36,7 @@ FINISH_SPEC = {
     "cover-star": ("above", "verified masthead and cover lines", "no tiny editorial side labels near face"),
     "scribble": ("tracked", "relevant approved callout", "visible, stable strokes and legible arrow"),
     "glass-widgets": ("above", "script-specific verified widget facts", "depth, blur contrast, complete labels"),
+    "timeline": ("below", "approved edit steps and real timecode if presented", "avoid false REC or arbitrary time claims; no heavy red cast unless requested"),
     "red-collage": ("above", "verified single headline and short lines", "no lost characters in hair silhouette"),
     "split-headline": ("above", "approved words and pill", "top card stays fully readable and face remains below"),
     "pastel-word": ("above", "short actual thematic word", "word and profile bar do not interrupt expression"),
