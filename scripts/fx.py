@@ -2294,7 +2294,9 @@ def fx_liquid_glass_graph(c,e):
     """Sourced or clearly illustrative legible graph, with a distinct bento look."""
     W=c.W
     bento=e.o.get('look')=='bento'
-    w,h=int(W*.85),int(W*.38)
+    # The bento layout has a separate real section, not a note covering
+    # the plot. Reserve vertical space for the source key before the chart.
+    w,h=int(W*.85),int(W*(.51 if bento else .38))
     region,cx,cy,_=adaptive_panel_location(c,w,h,'below',min_scale=.34)
     im=glass(c,w,h,W*.030,cx,cy,amt=.09,
              tint=(16,35,43),dark=.55,blur=max(5,W//40))
@@ -2346,8 +2348,8 @@ def fx_liquid_glass_graph(c,e):
         # was placed across the first chart when both sought the top zone.
         note=str(e.o.get('bento_label',
             'ILLUSTRATIVE VIEW' if illustrative else 'SOURCE CHECK'))[:33]
-        ix,iy=int(W*.033),int(W*.245)
-        iw,ih=int(w-W*.066),int(W*.097)
+        ix,iy=int(W*.033),int(W*.167)
+        iw,ih=int(w-W*.066),int(W*.077)
         bd=ImageDraw.Draw(im)
         bd.rounded_rectangle((ix,iy,ix+iw,iy+ih),
                              radius=max(3,int(W*.014)),
