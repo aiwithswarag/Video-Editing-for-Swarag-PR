@@ -140,6 +140,9 @@ def safe_graphic_xy(c, x, y, w, h, preferred=None):
     TOGETHER; no chopped text, transparent forehead or floating UI toggle.
     """
     margin = max(c.W * 0.035, 4.0)
+    # Respect entrance/exit motion and large graphics that are already clear.
+    if not overlaps_face(c, x, y, w, h):
+        return (x, y)
     if w > c.W - margin * 2 or h > c.H - margin * 2:
         return None
     def bounded(u, a, b): return max(a, min(b, u))
